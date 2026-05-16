@@ -1,0 +1,18 @@
+# Rust
+/target/
+**/target/
+**/*.rs.bk
+*.pdb
+
+# LaTeX build artifacts (theory/papers)
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

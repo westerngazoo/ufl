@@ -1,0 +1,13 @@
+# UFL Rust workspace.
+#
+# Crates are added to `members` as their specs are accepted (spec-driven build).
+# Planned decomposition: see crates/README.md.
+[workspace]
+resolver = "2"
+members = []
+
+[workspace.package]
+edition = "2021"
+license = "MIT OR Apache-2.0"
+authors = ["Gustavo Delgadillo <westerngazoo>"]
+repository = "https://github.com/westerngazoo/ufl"
