@@ -1,36 +1,38 @@
 # Specs
 
-UFL is built **spec-driven**. Before any feature is implemented, it is described
-here as a numbered spec: what it must do, what it must *not* do, and how we know
-it is done. The spec is the contract; the implementation references it.
+A **spec** states *how* a UFL feature is built — the technical design that
+realizes one or more requirements. Requirements ([`requirements/`](../requirements/))
+are the WHAT; specs are the HOW.
+
+UFL is built spec-first: before any Rust is written, the feature is described
+here as a numbered spec — design, code outline, non-goals, acceptance mapping —
+and reviewed by the `architect` agent.
 
 ## Process
 
-1. **Draft.** A new spec is created from [`TEMPLATE.md`](TEMPLATE.md), numbered
-   with the next free 4-digit id (`NNNN-short-name.md`).
-2. **Discuss.** Gustavo and Claude refine requirements and acceptance criteria
-   until both agree the spec is unambiguous.
-3. **Accept.** The spec's status moves to `Accepted`. Only then does
-   implementation begin.
-4. **Implement.** Code is written to satisfy exactly the accepted spec. The
-   implementation cites its spec id.
-5. **Verify.** Acceptance criteria are checked. The spec status moves to
-   `Implemented`.
+1. **Draft.** Once the governing requirement is `Accepted`, create a spec from
+   [`TEMPLATE.md`](TEMPLATE.md), numbered `SPEC-NNNN`: `NNNN-short-name.md`.
+2. **Design review.** The `architect` agent reviews the design and code outline
+   against the requirement (`CLAUDE.md` §4, step 2).
+3. **Accept.** When the design is sound and unambiguous, status → `Accepted`.
+   Only then does implementation begin.
+4. **Implement.** Code satisfies exactly the accepted spec and cites its id.
+5. **Verify.** Acceptance criteria are checked; status → `Implemented`.
 
-A spec may later move to `Superseded` (replaced by a newer spec) or `Revised`
-(amended in place, with a changelog entry).
+A spec may later become `Superseded` or `Revised` (amended in place, logged).
 
 ## Status values
 
 `Draft` → `Accepted` → `Implemented` · (or `Superseded` / `Revised`)
 
-## Build order
+## Relationship to requirements
 
-There is no phased timeline. The dependency-ordered sequence of specs to build
-is in [`ROADMAP.md`](ROADMAP.md). We work through them one at a time.
+Every spec links back to the requirement(s) it realizes via its **Realizes**
+field. The build order across requirements and specs is in
+[`ROADMAP.md`](../ROADMAP.md).
 
 ## Index
 
-| Spec | Title | Status |
-|------|-------|--------|
-| _none yet_ | | |
+| Spec | Title | Realizes | Status |
+|------|-------|----------|--------|
+| _none yet_ | | | |

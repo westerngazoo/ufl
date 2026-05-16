@@ -31,22 +31,28 @@ compilation target rather than a design decision.
 | ⟦P⟧ | Predicate | Wrap an expression as a Hehner pre/post-state constraint. |
 | ⊗ | Substrate-Bind | Annotate an expression with a substrate hint. |
 
-## How we build it — spec-driven
+## How we build it — requirement- and spec-driven
 
-UFL is built **spec-first**. Every feature is described as a numbered spec in
-[`specs/`](specs/) — testable requirements, non-goals, acceptance criteria —
-*before* any Rust is written. We work through specs one at a time; each
-implementation references the spec it satisfies.
+UFL is engineered to a world-class standard. Every feature passes an eight-step
+loop: a requirement is agreed and recorded in [`requirements/`](requirements/),
+a spec realizing it is written and reviewed in [`specs/`](specs/), tests come
+first (TDD + e2e), code is described and reviewed before it is written, and
+every change lands via a reviewed GitHub PR.
 
-There is no phased timeline. The build order is the dependency-ordered spec
-sequence in [`specs/ROADMAP.md`](specs/ROADMAP.md).
+The full process — code philosophy, the SDLC, and the agent fleet (orchestrator,
+architect, qa) — is the [engineering constitution in `CLAUDE.md`](CLAUDE.md).
+There is no phased timeline; build order lives in [`ROADMAP.md`](ROADMAP.md).
 
 ## Repository layout
 
 ```
 ufl/
+├── CLAUDE.md         engineering constitution — how UFL is built
+├── ROADMAP.md        milestones + requirement backlog + status
+├── requirements/     what UFL must do (R-NNNN)
+├── specs/            how each feature is built (SPEC-NNNN)
+├── .claude/agents/   the SDLC agent fleet (orchestrator, architect, qa)
 ├── docs/             original research proposal + design notes
-├── specs/            numbered, spec-driven feature requirements
 ├── theory/           formal definitions (atoms, predicates, log-GA bridge)
 ├── crates/           Rust workspace crates (added per-spec)
 ├── gapu-connection/  GAPU architecture ↔ UFL pillar mapping
