@@ -25,12 +25,12 @@ SDLC, repo scaffold, agent fleet, engineering constitution.
 
 ### M1 — Numeric & spatial core
 
-The irreducible substrate: log-domain arithmetic and geometric algebra.
+The irreducible substrate: the EML operator and geometric algebra.
 Target crate: `ufl-core`.
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| R-0001 | Log-domain arithmetic core | ℒ ⊕ · Pillar 1 | SPEC-0001 | Backlog |
+| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | SPEC-0001 | Discussing |
 | R-0002 | Geometric algebra over G(3,0,0) | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 | Backlog |
 | R-0003 | Log–GA compatibility (no precision blowup) | bridge · Q1 | SPEC-0003 | Backlog |
 
@@ -78,5 +78,7 @@ Substrate-agnostic compilation. Target crates: `ufl-substrate`, `ufl-cli`.
 
 ## Current focus
 
-Finish M0, then begin **R-0001 (log-domain arithmetic)** — discuss the
-requirement and acceptance criteria together before any spec is written.
+**R-0001 (EML operator core)** — requirement drafted
+([`requirements/0001-eml-operator-core.md`](requirements/0001-eml-operator-core.md)),
+pending acceptance. On acceptance: write SPEC-0001. R-0002 and R-0003 will be
+reconciled against the EML primitive when their turn comes.
