@@ -78,7 +78,7 @@ Substrate-agnostic compilation. Target crates: `ufl-substrate`, `ufl-cli`.
 
 ## Current focus
 
-**R-0001 (EML operator core)** — requirement drafted
-([`requirements/0001-eml-operator-core.md`](requirements/0001-eml-operator-core.md)),
-pending acceptance. On acceptance: write SPEC-0001. R-0002 and R-0003 will be
+**R-0001 (EML operator core)** — requirement **Accepted**
+([`requirements/0001-eml-operator-core.md`](requirements/0001-eml-operator-core.md)).
+Next: write SPEC-0001 (the technical design). R-0002 and R-0003 will be
 reconciled against the EML primitive when their turn comes.

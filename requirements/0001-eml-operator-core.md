@@ -1,6 +1,6 @@
 # R-0001 — EML Operator Core
 
-- **Status:** Draft
+- **Status:** Accepted
 - **Milestone:** M1
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-05-17
@@ -115,3 +115,5 @@ subsumed by `eml`; `𝒢ₖ`, `∗`, `⟦P⟧`, and `⊗` are unchanged.
 ## Changelog
 
 - 2026-05-17 — created (Draft).
+- 2026-05-18 — accepted by the owner; status Draft → Accepted. SPEC-0001 may
+  now be written.

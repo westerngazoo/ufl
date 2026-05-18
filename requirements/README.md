@@ -33,4 +33,4 @@ the requirement(s) it satisfies. The mapping is maintained in
 
 | Req | Title | Milestone | Status |
 |-----|-------|-----------|--------|
-| [R-0001](0001-eml-operator-core.md) | EML Operator Core | M1 | Draft |
+| [R-0001](0001-eml-operator-core.md) | EML Operator Core | M1 | Accepted |
