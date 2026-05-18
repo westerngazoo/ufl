@@ -16,3 +16,8 @@
 .idea/
 .vscode/
 *.swp
+
+# Rendered HTML artifacts — source docs are Markdown.
+# docs/AllEle.html is the exception: an external paper, intentionally tracked.
+/CLAUDE.html
+/docs/ufl-first-draft.html
