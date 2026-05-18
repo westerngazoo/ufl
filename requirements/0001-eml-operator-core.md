@@ -6,7 +6,7 @@
 - **Created:** 2026-05-17
 - **Pillar / atom:** Numeric substrate — atom `eml` (supersedes proposal Pillar 1 "Logarithmic Arithmetic Core" and atoms ℒ, ⊕)
 - **Depends on:** none
-- **Realized by:** SPEC-0001 (pending)
+- **Realized by:** [SPEC-0001](../specs/0001-eml-operator-core.md)
 - **QA:** `qa` agent run scoped to R-0001
 
 ## 1. Statement
