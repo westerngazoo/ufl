@@ -9,6 +9,9 @@ neural network — is a constraint over a geometric object. UFL is a language
 expressive enough to state that constraint directly, so the substrate becomes a
 compilation target rather than a design decision.
 
+**New to UFL?** [`docs/why-ufl.md`](docs/why-ufl.md) explains what UFL is and
+why it can exist — in detail, and with a plain-language appendix for newcomers.
+
 ## The four pillars
 
 1. **Logarithmic Arithmetic Core** — all arithmetic reduces to log-domain
