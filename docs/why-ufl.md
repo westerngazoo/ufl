@@ -58,7 +58,7 @@ boundary between hardware and software is, as UFL's founding proposal puts it,
 There is a second, smaller redundancy hiding inside even a single language.
 Look at a scientific calculator: dozens of buttons — `+ − × ÷ √ xⁿ logₓ
 sin cos tan sinh …`. Each has its own rules. We *know* they are redundant —
-`sin x = cos(x − π/2)`, `√x = x^(1/2)`, `xⁿ = eⁿ ˡⁿ ˣ` — and over centuries
+`sin x = cos(x − τ/4)`, `√x = x^(1/2)`, `xⁿ = eⁿ ˡⁿ ˣ` — and over centuries
 mathematics reduced the list from "dozens" to "a handful." But it stalled
 there. Every language, every calculator, every CPU still exposes an **operator
 zoo**: a heterogeneous pile of primitives, each demanding its own
@@ -87,7 +87,7 @@ eml(x, y) = exp(x) − ln(y)
 ```
 
 together with the constant `1`, generates the **entire scientific-calculator
-repertoire**: the constants `e`, `π`, `i`; the arithmetic operations
+repertoire**: the constants `e`, `τ`, `i`; the arithmetic operations
 `+ − × ÷` and exponentiation; and every elementary transcendental and algebraic
 function. `eml` is the **continuous Sheffer stroke** — the NAND of real
 mathematics.
@@ -132,10 +132,12 @@ depths from the paper:
 
 A founded explanation states the costs.
 
-- **EML uses complex numbers internally.** Reaching `i`, `π`, and the
+- **EML uses complex numbers internally.** Reaching `i`, `τ`, and the
   trigonometric functions requires `ln` of negative values — Euler's formula
   routed through the complex logarithm. Real results, complex intermediates.
   The paper argues this is inevitable and, in practice, a minor inconvenience.
+  (UFL writes the circle constant as `τ = 2π`; the paper presents the same
+  result with `π`. See [`conventions.md`](conventions.md).)
 - **Trees grow.** Multiplication is depth 8; trigonometric functions are far
   deeper. The uniform representation trades node *variety* for node *count*.
   §5 and §6 explain why that trade is worth making.
@@ -335,7 +337,8 @@ arrangements give you a calculator, a web browser, a video game. One brick,
 endless buildings.
 
 `eml` is that brick — but for *ordinary mathematics*, the math with decimals
-and curves and `π`, not just the on/off math computers usually use. Before
+and curves and `τ` (the circle constant — you may have learned it as
+`π = τ/2`), not just the on/off math computers usually use. Before
 this discovery, math had no single brick. Now it has one.
 
 ### What is a "tree"?

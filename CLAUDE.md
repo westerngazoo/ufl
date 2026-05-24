@@ -108,6 +108,7 @@ Every requirement `R-NNNN` passes through these eight steps. None is skipped.
 | `requirements/` | what UFL must do (`R-NNNN`) |
 | `specs/` | how each feature is built (`SPEC-NNNN`) |
 | `.claude/agents/` | the agent fleet |
+| `docs/conventions.md` | notation & writing conventions (e.g. `τ` as the circle constant) |
 | `theory/` | formal definitions (atoms, predicates, log-GA bridge) |
 | `docs/ufl-first-draft.md` | the original research proposal |
 

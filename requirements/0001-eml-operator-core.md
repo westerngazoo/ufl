@@ -41,8 +41,10 @@ reduces to log-domain operations. The result in
 [`docs/AllEle.html`](../docs/AllEle.html) ("All elementary functions from a
 single operator") supersedes that intuition with a precise, stronger fact: a
 *single* binary operator, `eml(x,y) = exp(x) − ln(y)`, plus the constant `1`,
-generates the entire scientific-calculator repertoire — the constants `e`, `π`,
-`i`, all arithmetic, and every elementary transcendental and algebraic function.
+generates the entire scientific-calculator repertoire — the constants `e`, the
+circle constant `τ` (≡ `2π`; see [`docs/conventions.md`](../docs/conventions.md)),
+and `i`, all arithmetic, and every elementary transcendental and algebraic
+function.
 
 This is the continuous analogue of the NAND gate: one repeatable element from
 which everything is built. It is exactly the "single sufficient primitive"
@@ -67,7 +69,7 @@ subsumed by `eml`; `𝒢ₖ`, `∗`, `⟦P⟧`, and `⊗` are unchanged.
   producing signed zeros or infinities follows IEEE-754 semantics and never
   traps, panics, or aborts; such values propagate as ordinary results.
 - **AC4 — Branch convention.** EML's `ln` uses one documented branch cut, chosen
-  so that the derived quantities `i` and `π`, and `ln x` for real `x < 0`, carry
+  so that the derived quantities `i` and `τ`, and `ln x` for real `x < 0`, carry
   the sign of the standard principal branch.
 - **AC5 — Known identities.** Each of the following evaluates to within a
   documented tolerance of an independently computed reference value, over a
@@ -83,7 +85,7 @@ subsumed by `eml`; `𝒢ₖ`, `∗`, `⟦P⟧`, and `⊗` are unchanged.
 - The numeric substrate is complex: values are ℂ over IEEE-754 `f64`. Real
   results may require complex intermediates (AllEle §5).
 - The literal `1` is the only numeric constant terminal. All other constants
-  (`e`, `π`, `i`, …) are *derived* EML trees, never terminals.
+  (`e`, `τ`, `i`, …) are *derived* EML trees, never terminals.
 
 **Non-goals** (each a separate, later requirement)
 
@@ -115,5 +117,6 @@ subsumed by `eml`; `𝒢ₖ`, `∗`, `⟦P⟧`, and `⊗` are unchanged.
 ## Changelog
 
 - 2026-05-17 — created (Draft).
+- 2026-05-19 — `π` replaced with `τ` throughout per [`docs/conventions.md`](../docs/conventions.md) (notational; no semantic change to AC4 or scope).
 - 2026-05-18 — accepted by the owner; status Draft → Accepted. SPEC-0001 may
   now be written.
