@@ -1,6 +1,6 @@
 # SPEC-0001 — EML Operator Core
 
-- **Status:** Draft
+- **Status:** Accepted (2026-05-24, after architect review)
 - **Realizes:** R-0001
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-05-18
@@ -87,7 +87,14 @@ real axis. Principal `ln` of a point just below the cut returns `Im ≈ -τ/2`
 (not `+τ/2`), which is exactly the value the chain needs to recover the true
 principal `ln(x)`. The branch self-corrects via the floating-point
 representation of `sin(τ/2)`. Over the §6 input sample the maximum observed
-discrepancy is **≤ 1 ulp (≈ 1.11e-16)**.
+discrepancy is **≤ 1 ulp (≈ 1.11e-16)**, and the same ulp-level behaviour
+holds over a broader 2000-point random sweep of negative reals with
+`|x| ∈ [1e-6, 1e6]` (max relative error ≈ 1.74e-16).
+
+The self-correction propagates beyond the `ln` identity: a spot-check derives
+`i` as `exp(ln(-1) / 2)` and obtains `(6.12e-17, +1.000)` — the imaginary part
+is exactly `+1` and the real part is at machine epsilon, so AllEle §4's derived
+`i` and `τ` trees inherit the correct sign through the same mechanism.
 
 The resolution is *specific to* IEEE-754 floating-point arithmetic with
 `sin(τ/2) ≠ 0`. With arbitrary-precision arithmetic where `sin(τ/2)` is *exact*
@@ -218,7 +225,10 @@ Each row maps a SPEC-0001 deliverable to an R-0001 acceptance criterion; the
 - [ ] **AC2** — `eval` returns a `Value` for any closed tree, and for any
   variable-bearing tree given a complete `Env`.
 - [ ] **AC3** — trees evaluating `ln 0` / `exp(-∞)` and producing signed
-  zeros/infinities yield `inf`/`nan` `Value`s with no panic.
+  zeros/infinities yield `inf`/`nan` `Value`s with no panic. Verified directly
+  in Rust against `num-complex` (which returns `(-∞, 0)` for `ln(0+0i)` and
+  `(∞, 0)` for `exp(∞+0i)`); the Python experiment cannot exercise this
+  because `cmath.log(0)` raises.
 - [ ] **AC4** — `ln_eml` is `Complex::ln` (the standard principal branch); the
   rationale, the f64 self-correction, and its limit are documented in §2.4.
   Derived `i`, `τ`, and `ln x` for `x<0` carry the principal-branch sign via
@@ -247,9 +257,11 @@ Each row maps a SPEC-0001 deliverable to an R-0001 acceptance criterion; the
 | 2026-05-24 | **Q-AC4 resolved.** `ln_eml = Complex::ln` (principal branch), no correction term. | Verified by `experiments/q-ac4-branch.py` over `{-3, -1, -0.5, 0.5, 1, 2.5}`; max discrepancy ≈ 1.11e-16 (1 ulp). In `f64` the chain's outer `ln` consumes `exp(... ± iτ/2)` which lands ~1.22e-16 *off* the negative real axis (because `sin(τ/2) ≠ 0`), so principal `ln` returns the value the chain needs. The dependency is captured by **AC6**. |
 | 2026-05-24 | AC5 tolerance fixed at relative `1e-14` over the §6 input sample. | Two orders of magnitude generous vs the observed 1-ulp discrepancy; survives expected drift in `num-complex`'s `exp` / `ln` rounding. |
 | 2026-05-24 | New AC6 codifying the `sin(τ/2) ≠ 0` invariant as a tripwire test. | The AC4 resolution is contingent on this floating-point property; an explicit failing test is the only safe way to force Q-AC4 to be re-opened if the property ever stops holding. |
+| 2026-05-24 | SPEC-0001 promoted Draft → Accepted. | Architect-agent review (loop step 2) returned APPROVE with two minor non-blocking suggestions, both folded in: §2.4 wording broadened (broader sweep), §2.4 + experiment extended with a derived-`i` spot-check, §6 AC3 carries an explicit Rust-vs-Python divergence note. No blocking findings; SOLID / dependency-direction / single-responsibility all hold. |
 
 ## Changelog
 
 - 2026-05-18 — created (Draft).
 - 2026-05-19 — `π` replaced with `τ` in §2.4, §5, and the AC4 mapping per [`docs/conventions.md`](../docs/conventions.md) (notational; the `(-τ/2, τ/2]` interval equals the conventional principal-branch `(-π, π]`).
 - 2026-05-24 — Q-AC4 resolved (§2.4 rewritten with the resolution + f64 caveat); AC5 tolerance fixed at `1e-14`; AC6 added; §5 closed; experiment script saved as `experiments/q-ac4-branch.py`.
+- 2026-05-24 — architect-agent review applied (broader sweep wording, derived-`i` spot-check in §2.4 and the experiment, AC3 Rust/Python divergence note); **status Draft → Accepted**.

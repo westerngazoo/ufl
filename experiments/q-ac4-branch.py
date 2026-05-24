@@ -50,6 +50,7 @@ from __future__ import annotations
 
 import cmath
 import math
+import random
 from typing import Callable
 
 
@@ -79,6 +80,37 @@ def derive_ln(x: complex, ln_func: Callable[[complex], complex]) -> complex:
     return eml(one, inner2, ln_func)
 
 
+def random_negative_sweep(n: int = 2000, seed: int = 42) -> float:
+    """Confirm ulp-level behaviour beyond the §6 sample.
+
+    Sweeps `n` log-uniformly-distributed negative reals over magnitudes
+    [1e-6, 1e6] and returns the maximum relative error of the derived `ln`
+    against the true principal `ln` under principal-branch `ln_eml`.
+    """
+    rng = random.Random(seed)
+    max_rel = 0.0
+    for _ in range(n):
+        mag = 10 ** rng.uniform(-6, 6)
+        x = complex(-mag, 0.0)
+        true = cmath.log(x)
+        deriv = derive_ln(x, ln_principal)
+        denom = max(abs(true), 1.0)
+        rel = abs(deriv - true) / denom
+        if rel > max_rel:
+            max_rel = rel
+    return max_rel
+
+
+def derived_i() -> complex:
+    """AC4 spot-check: i = exp(ln(-1) / 2) under principal-branch `ln_eml`.
+
+    Confirms the self-correction propagates with the correct sign into
+    AllEle §4's derived `i` and `τ` trees, not only the `ln` identity.
+    """
+    ln_minus_one = derive_ln(complex(-1.0, 0.0), ln_principal)
+    return cmath.exp(ln_minus_one / 2)
+
+
 def _fmt(c: complex) -> str:
     return f"({c.real:+.6e}, {c.imag:+.6e})"
 
@@ -98,11 +130,26 @@ def main() -> None:
             disc = deriv - true
             print(f"{xr:>6} {_fmt(true):>32} {_fmt(deriv):>32} {_fmt(disc):>32}")
 
-    print("\n=== sin(π) in f64 — the AC6 invariant ===")
+    print("\n=== broader random sweep — 2000 negative reals, |x| ∈ [1e-6, 1e6] ===")
+    max_rel = random_negative_sweep()
+    print(f"  max relative error of derived ln vs true principal ln: {max_rel:.3e}")
+    print("  (ulp-level — confirms the §6 sample is not a lucky window)")
+
+    print("\n=== AC4 spot-check: derived i = exp(ln(-1) / 2) ===")
+    i = derived_i()
+    print(f"  derived i = {_fmt(i)}   (expect ≈ (0, +1))")
+    print("  → self-correction propagates into the derived i and τ trees, not only ln.")
+
+    print("\n=== AC3 caveat (this experiment cannot exercise) ===")
+    print("  ln(0) and exp(-inf) cases are verified in Rust against num_complex —")
+    print("  not here. Python's cmath.log(0) raises ValueError, so AC3 has to be")
+    print("  tested in the runtime that actually carries the IEEE-754 semantics.")
+
+    print("\n=== sin(τ/2) in f64 — the AC6 invariant ===")
     print(f"  math.sin(math.pi)  = {math.sin(math.pi):+.6e}")
     print(f"  math.sin(-math.pi) = {math.sin(-math.pi):+.6e}")
-    print("  Non-zero → exp(... ± iπ) lands off the negative real axis,")
-    print("  → principal `ln` of that returns Im ≈ ∓π, which is what the chain needs.")
+    print("  Non-zero → exp(... ± iτ/2) lands off the negative real axis,")
+    print("  → principal `ln` of that returns Im ≈ ∓τ/2, which is what the chain needs.")
 
 
 if __name__ == "__main__":
