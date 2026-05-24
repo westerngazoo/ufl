@@ -30,7 +30,7 @@ Target crate: `ufl-core`.
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | SPEC-0001 | Discussing |
+| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | Spec'd |
 | R-0002 | Geometric algebra over G(3,0,0) | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 | Backlog |
 | R-0003 | Log–GA compatibility (no precision blowup) | bridge · Q1 | SPEC-0003 | Backlog |
 
@@ -78,8 +78,9 @@ Substrate-agnostic compilation. Target crates: `ufl-substrate`, `ufl-cli`.
 
 ## Current focus
 
-**R-0001 (EML operator core)** — requirement Accepted; **SPEC-0001 drafted**
-([`specs/0001-eml-operator-core.md`](specs/0001-eml-operator-core.md)). Next:
-architect-agent design review, resolve the spec's open question (the `ln_eml`
-branch rule), then accept SPEC-0001 and write the R-0001 test plan. R-0002 and
-R-0003 will be reconciled against the EML primitive when their turn comes.
+**R-0001 (EML operator core)** — requirement Accepted; SPEC-0001 drafted and
+its open question Q-AC4 resolved (`ln_eml = Complex::ln`, verified by
+[`experiments/q-ac4-branch.py`](experiments/q-ac4-branch.py)). Next: architect
+design review on SPEC-0001 → flip to Accepted → write the R-0001 test plan
+(qa agent) → implement `ufl-core`. R-0002 and R-0003 will be reconciled
+against the EML primitive when their turn comes.

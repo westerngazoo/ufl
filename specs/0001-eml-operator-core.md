@@ -1,6 +1,6 @@
 # SPEC-0001 — EML Operator Core
 
-- **Status:** Draft
+- **Status:** Accepted (2026-05-24, after architect review)
 - **Realizes:** R-0001
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-05-18
@@ -69,22 +69,40 @@ value(Node { exp_arg, log_arg }) = exp(value(exp_arg)) − ln_eml(value(log_arg)
 ```
 
 where `exp` is the complex exponential (`Complex::exp`) and `ln_eml` is a
-**single branch-controlled complex logarithm** used inside every node.
+**single complex logarithm** used inside every node, isolated in its own module
+so the choice is visible and swappable.
 
-R-0001's AC4 / open question Q-AC4 require a documented branch convention. We
-adopt **operator-level correction**: the branch is fixed once, inside `ln_eml`,
-so every derived quantity (`i`, `τ`, `ln x` for `x<0`) is principal-correct *by
-construction* — no caller ever patches a sign. This is chosen over AllEle §4.1's
-alternative of correcting the `i` sign downstream, which leaks the concern into
-every consumer.
-
-The baseline is the principal branch — `Complex::ln`, `Im ∈ (-τ/2, τ/2]`
+R-0001's AC4 and Q-AC4 required a documented branch convention. **Resolution:**
+`ln_eml(w) = Complex::ln(w)` — the standard principal branch, `Im ∈ (-τ/2, τ/2]`
 (equivalently the conventional `(-π, π]`; UFL uses `τ` per
-[`docs/conventions.md`](../docs/conventions.md)). AllEle §4.1 shows the derived
-`ln z` identity routes through an `e^e/z` term, so for real `z < 0` the
-principal branch leaves a `τi` discrepancy. `ln_eml` therefore
-carries a documented correction term. **The exact correction is this spec's open
-question (§5)** — it must be fixed before status moves to `Accepted`.
+[`docs/conventions.md`](../docs/conventions.md)). **No correction term.**
+
+This is not arbitrary; it is verified by experiment
+([`experiments/q-ac4-branch.py`](../experiments/q-ac4-branch.py)). The textbook
+`τi` discrepancy AllEle §4.1 predicts for the `ln(x)` identity on negative real
+`x` does *not* appear in IEEE-754 `f64`. The chain's outer `ln` consumes a value
+produced by `exp(e − iτ/2)`, and in `f64` that result's imaginary part is not
+zero — `sin(-π) ≈ -1.22e-16` — so the value lands slightly *below* the negative
+real axis. Principal `ln` of a point just below the cut returns `Im ≈ -τ/2`
+(not `+τ/2`), which is exactly the value the chain needs to recover the true
+principal `ln(x)`. The branch self-corrects via the floating-point
+representation of `sin(τ/2)`. Over the §6 input sample the maximum observed
+discrepancy is **≤ 1 ulp (≈ 1.11e-16)**, and the same ulp-level behaviour
+holds over a broader 2000-point random sweep of negative reals with
+`|x| ∈ [1e-6, 1e6]` (max relative error ≈ 1.74e-16).
+
+The self-correction propagates beyond the `ln` identity: a spot-check derives
+`i` as `exp(ln(-1) / 2)` and obtains `(6.12e-17, +1.000)` — the imaginary part
+is exactly `+1` and the real part is at machine epsilon, so AllEle §4's derived
+`i` and `τ` trees inherit the correct sign through the same mechanism.
+
+The resolution is *specific to* IEEE-754 floating-point arithmetic with
+`sin(τ/2) ≠ 0`. With arbitrary-precision arithmetic where `sin(τ/2)` is *exact*
+zero, the self-correction vanishes and the textbook `τi` discrepancy returns; a
+real correction term must then be re-derived. This dependency is made explicit
+as **AC6** below — its tripwire (a unit test that fails if `sin(τ/2) == 0`)
+forces Q-AC4 to be re-opened deliberately rather than silently broken by a
+future arithmetic backend change.
 
 ### 2.5 The evaluator
 
@@ -157,9 +175,17 @@ impl Eml {
 }
 
 // log.rs
-/// Branch-controlled complex logarithm used inside every `eml` node.
-/// Convention: <documented once Q-AC4 in §5 is resolved>.
-pub(crate) fn ln_eml(w: Value) -> Value { /* principal branch + correction */ }
+/// Complex logarithm used inside every `eml` node.
+///
+/// For `Value = Complex<f64>` this is the standard principal branch — no
+/// correction term. The textbook τi discrepancy on the negative real axis is
+/// absorbed by the floating-point imprecision of `sin(τ/2)` (≈ -1.22e-16);
+/// see SPEC-0001 §2.4 and `experiments/q-ac4-branch.py`.
+///
+/// Isolated here so that, if the value type ever changes to arithmetic where
+/// `sin(τ/2) = 0` exactly, this function is the single point of change.
+/// The AC6 invariant test (`sin(τ/2) != 0`) is the tripwire.
+pub(crate) fn ln_eml(w: Value) -> Value { w.ln() }
 
 // eval.rs
 pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
@@ -186,15 +212,8 @@ pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
 
 ## 5. Open questions
 
-- **Q-AC4 — exact `ln_eml` branch rule.** §2.4 commits to the operator-level
-  approach; the precise correction term is unresolved. Resolution plan: a
-  numeric experiment in design review — evaluate the `ln` identity tree for a
-  sample of real `z < 0`, measure the discrepancy from the principal `ln z`,
-  and choose the `ln_eml` correction that makes the derived `ln`, `i`, and `τ`
-  principal-correct. Status stays `Draft` until this is fixed and documented.
-- **AC5 tolerance and sample.** Proposed: relative tolerance `1e-12`, checked
-  over real inputs `{-3.0, -1.0, -0.5, 0.5, 1.0, 2.5}`. To be confirmed (and, if
-  needed, tightened) with the `qa` agent against the depth-3 `ln` identity.
+*None.* Q-AC4 is resolved in §2.4 and recorded in the decision log; AC5
+tolerance is fixed at `1e-14` (§6 AC5).
 
 ## 6. Acceptance criteria
 
@@ -206,12 +225,25 @@ Each row maps a SPEC-0001 deliverable to an R-0001 acceptance criterion; the
 - [ ] **AC2** — `eval` returns a `Value` for any closed tree, and for any
   variable-bearing tree given a complete `Env`.
 - [ ] **AC3** — trees evaluating `ln 0` / `exp(-∞)` and producing signed
-  zeros/infinities yield `inf`/`nan` `Value`s with no panic.
-- [ ] **AC4** — `ln_eml`'s convention is documented; derived `i`, `τ`, and
-  `ln x` for `x<0` carry the principal-branch sign.
+  zeros/infinities yield `inf`/`nan` `Value`s with no panic. Verified directly
+  in Rust against `num-complex` (which returns `(-∞, 0)` for `ln(0+0i)` and
+  `(∞, 0)` for `exp(∞+0i)`); the Python experiment cannot exercise this
+  because `cmath.log(0)` raises.
+- [ ] **AC4** — `ln_eml` is `Complex::ln` (the standard principal branch); the
+  rationale, the f64 self-correction, and its limit are documented in §2.4.
+  Derived `i`, `τ`, and `ln x` for `x<0` carry the principal-branch sign via
+  that self-correction.
 - [ ] **AC5** — `e = eml(1,1)`, `exp(x) = eml(x,1)`, and
-  `ln(x) = eml(1,eml(eml(1,x),1))` match reference values within tolerance over
-  the §5 input sample, including negative `x`.
+  `ln(x) = eml(1,eml(eml(1,x),1))` match reference values within a relative
+  tolerance of `1e-14` over the input sample
+  `{-3.0, -1.0, -0.5, 0.5, 1.0, 2.5}`, including negative `x`. (The
+  `experiments/q-ac4-branch.py` baseline shows ≤ 1 ulp ≈ 1.11e-16 discrepancy,
+  so `1e-14` is two orders of magnitude generous.)
+- [ ] **AC6 — `sin(τ/2) ≠ 0` invariant.** A unit test asserts that the
+  runtime's `f64::sin(std::f64::consts::PI)` is non-zero. Its purpose is to
+  *fail loudly* if a future arithmetic backend (arbitrary-precision, symbolic,
+  or an exotic `sin` implementation) makes `sin(τ/2)` exactly zero — in that
+  case the AC4 self-correction silently breaks and Q-AC4 must be re-opened.
 
 ## 7. Decision log
 
@@ -222,8 +254,14 @@ Each row maps a SPEC-0001 deliverable to an R-0001 acceptance criterion; the
 | 2026-05-18 | Values are `Complex<f64>` via `num-complex`. | Standard crate, no hand-rolling; `f64` supplies the IEEE inf/nan behaviour AC3 needs. |
 | 2026-05-18 | Operator-level branch correction (`ln_eml` inside every node), over AllEle's downstream `i`-sign patching. | Every derived quantity is principal-correct by construction; no caller patches signs. |
 | 2026-05-18 | Evaluator is infallible on numeric edge cases; `EvalError` has the single variant `UnboundVariable`. | AC3 requires no traps on numeric edges; the only genuine failure is an unbound variable. |
+| 2026-05-24 | **Q-AC4 resolved.** `ln_eml = Complex::ln` (principal branch), no correction term. | Verified by `experiments/q-ac4-branch.py` over `{-3, -1, -0.5, 0.5, 1, 2.5}`; max discrepancy ≈ 1.11e-16 (1 ulp). In `f64` the chain's outer `ln` consumes `exp(... ± iτ/2)` which lands ~1.22e-16 *off* the negative real axis (because `sin(τ/2) ≠ 0`), so principal `ln` returns the value the chain needs. The dependency is captured by **AC6**. |
+| 2026-05-24 | AC5 tolerance fixed at relative `1e-14` over the §6 input sample. | Two orders of magnitude generous vs the observed 1-ulp discrepancy; survives expected drift in `num-complex`'s `exp` / `ln` rounding. |
+| 2026-05-24 | New AC6 codifying the `sin(τ/2) ≠ 0` invariant as a tripwire test. | The AC4 resolution is contingent on this floating-point property; an explicit failing test is the only safe way to force Q-AC4 to be re-opened if the property ever stops holding. |
+| 2026-05-24 | SPEC-0001 promoted Draft → Accepted. | Architect-agent review (loop step 2) returned APPROVE with two minor non-blocking suggestions, both folded in: §2.4 wording broadened (broader sweep), §2.4 + experiment extended with a derived-`i` spot-check, §6 AC3 carries an explicit Rust-vs-Python divergence note. No blocking findings; SOLID / dependency-direction / single-responsibility all hold. |
 
 ## Changelog
 
 - 2026-05-18 — created (Draft).
 - 2026-05-19 — `π` replaced with `τ` in §2.4, §5, and the AC4 mapping per [`docs/conventions.md`](../docs/conventions.md) (notational; the `(-τ/2, τ/2]` interval equals the conventional principal-branch `(-π, π]`).
+- 2026-05-24 — Q-AC4 resolved (§2.4 rewritten with the resolution + f64 caveat); AC5 tolerance fixed at `1e-14`; AC6 added; §5 closed; experiment script saved as `experiments/q-ac4-branch.py`.
+- 2026-05-24 — architect-agent review applied (broader sweep wording, derived-`i` spot-check in §2.4 and the experiment, AC3 Rust/Python divergence note); **status Draft → Accepted**.
