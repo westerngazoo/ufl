@@ -73,14 +73,16 @@ where `exp` is the complex exponential (`Complex::exp`) and `ln_eml` is a
 
 R-0001's AC4 / open question Q-AC4 require a documented branch convention. We
 adopt **operator-level correction**: the branch is fixed once, inside `ln_eml`,
-so every derived quantity (`i`, `π`, `ln x` for `x<0`) is principal-correct *by
+so every derived quantity (`i`, `τ`, `ln x` for `x<0`) is principal-correct *by
 construction* — no caller ever patches a sign. This is chosen over AllEle §4.1's
 alternative of correcting the `i` sign downstream, which leaks the concern into
 every consumer.
 
-The baseline is the principal branch (`Complex::ln`, `Im ∈ (-π, π]`). AllEle
-§4.1 shows the derived `ln z` identity routes through an `e^e/z` term, so for
-real `z < 0` the principal branch leaves a `2πi` discrepancy. `ln_eml` therefore
+The baseline is the principal branch — `Complex::ln`, `Im ∈ (-τ/2, τ/2]`
+(equivalently the conventional `(-π, π]`; UFL uses `τ` per
+[`docs/conventions.md`](../docs/conventions.md)). AllEle §4.1 shows the derived
+`ln z` identity routes through an `e^e/z` term, so for real `z < 0` the
+principal branch leaves a `τi` discrepancy. `ln_eml` therefore
 carries a documented correction term. **The exact correction is this spec's open
 question (§5)** — it must be fixed before status moves to `Accepted`.
 
@@ -188,7 +190,7 @@ pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
   approach; the precise correction term is unresolved. Resolution plan: a
   numeric experiment in design review — evaluate the `ln` identity tree for a
   sample of real `z < 0`, measure the discrepancy from the principal `ln z`,
-  and choose the `ln_eml` correction that makes the derived `ln`, `i`, and `π`
+  and choose the `ln_eml` correction that makes the derived `ln`, `i`, and `τ`
   principal-correct. Status stays `Draft` until this is fixed and documented.
 - **AC5 tolerance and sample.** Proposed: relative tolerance `1e-12`, checked
   over real inputs `{-3.0, -1.0, -0.5, 0.5, 1.0, 2.5}`. To be confirmed (and, if
@@ -205,7 +207,7 @@ Each row maps a SPEC-0001 deliverable to an R-0001 acceptance criterion; the
   variable-bearing tree given a complete `Env`.
 - [ ] **AC3** — trees evaluating `ln 0` / `exp(-∞)` and producing signed
   zeros/infinities yield `inf`/`nan` `Value`s with no panic.
-- [ ] **AC4** — `ln_eml`'s convention is documented; derived `i`, `π`, and
+- [ ] **AC4** — `ln_eml`'s convention is documented; derived `i`, `τ`, and
   `ln x` for `x<0` carry the principal-branch sign.
 - [ ] **AC5** — `e = eml(1,1)`, `exp(x) = eml(x,1)`, and
   `ln(x) = eml(1,eml(eml(1,x),1))` match reference values within tolerance over
@@ -224,3 +226,4 @@ Each row maps a SPEC-0001 deliverable to an R-0001 acceptance criterion; the
 ## Changelog
 
 - 2026-05-18 — created (Draft).
+- 2026-05-19 — `π` replaced with `τ` in §2.4, §5, and the AC4 mapping per [`docs/conventions.md`](../docs/conventions.md) (notational; the `(-τ/2, τ/2]` interval equals the conventional principal-branch `(-π, π]`).
