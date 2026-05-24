@@ -50,12 +50,19 @@ Claude must read and honour this file in every session in this repository.
 | Engineer | **Claude — main session** | Drives the loop; writes code after sign-off; opens PRs. |
 | Scrum master / PM | **orchestrator agent** | Plans, tracks state, sequences the backlog, reports status. Writes no product code. |
 | Architect | **architect agent** | Reviews every spec design and every PR for architecture quality and spec adherence. |
+| Adversarial critic | **hater agent** | Runs on every spec design (loop step 2). Models the harshest competent reviewer the work will meet — finds hidden assumptions, hand-waved claims, edge cases, footguns, scenarios where it dies in the wild. Every finding is specific, citeable, technical. |
+| Constructive critic | **nice-guy agent** | Runs on every spec design (loop step 2). Models the best mentor the work will meet — finds genuinely strong design moves, transferable patterns, surprising upsides, opportunities to amplify. Every finding is specific, citeable, technical. |
 | QA | **qa agent** (one run per requirement) | Derives tests from acceptance criteria, owns e2e tests, signs off that a requirement is met. |
 
 Note: in Claude Code a subagent cannot spawn another subagent. The
 **orchestrator** therefore produces a plan/status report; the **main session**
-executes it by invoking the architect and qa agents. The orchestrator decides
-*what is next*; the main session and Gustavo carry it out.
+executes it by invoking the architect, hater, nice-guy, and qa agents. The
+orchestrator decides *what is next*; the main session and Gustavo carry it out.
+
+The architect, hater, and nice-guy form a **three-lens review** at loop step 2:
+architect asks *is it correct?*, hater asks *how does it die in the wild?*,
+nice-guy asks *what does it unlock?* Different lenses, all three required for
+every spec design. Routine PRs use the architect alone.
 
 ## 4. The requirement loop
 
@@ -63,8 +70,13 @@ Every requirement `R-NNNN` passes through these eight steps. None is skipped.
 
 1. **Discuss** — Gustavo + Claude agree the requirement. Write
    `requirements/NNNN-*.md`. Acceptance criteria decided together.
-2. **Spec** — write `specs/NNNN-*.md` realizing the requirement. The architect
-   agent reviews the design.
+2. **Spec** — write `specs/NNNN-*.md` realizing the requirement. The
+   **three-lens review** runs: the architect agent reviews the design, the
+   hater agent stress-tests it adversarially, and the nice-guy agent
+   identifies strengths and opportunities. The spec moves `Draft → Accepted`
+   when the architect approves *and* the hater/nice-guy findings have been
+   addressed or explicitly deferred (with a decision-log entry recording
+   why).
 3. **Test plan** — the qa agent, scoped to `R-NNNN`, derives unit + e2e test
    cases from the acceptance criteria. Tests are written first and fail (red).
 4. **Code outline** — Claude describes the implementation in chat with a
