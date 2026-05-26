@@ -12,11 +12,12 @@
 
 use crate::eval::Value;
 
-// Suppressed during the TDD-red phase; `eval` calls this once R-0001 step 5
-// (implementation) lands. Remove the allow when the call site exists.
-#[allow(dead_code)]
-pub(crate) fn ln_eml(_w: Value) -> Value {
-    todo!("R-0001 implementation — see SPEC-0001 §2.4")
+/// The principal-branch complex logarithm — `Im ∈ (-τ/2, τ/2]` (equivalently
+/// the conventional `(-π, π]`). Per SPEC-0001 §2.4 (Q-AC4 resolution) no
+/// correction term is needed for `Value = Complex<f64>`: the floating-point
+/// representation of `sin(τ/2)` self-corrects the chain. AC6 is the tripwire.
+pub(crate) fn ln_eml(w: Value) -> Value {
+    w.ln()
 }
 
 #[cfg(test)]

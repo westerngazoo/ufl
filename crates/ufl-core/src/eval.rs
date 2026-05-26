@@ -50,8 +50,25 @@ pub enum EvalError {
 
 /// Evaluate an EML expression under the given environment.
 ///
-/// Recursive post-order walk per SPEC-0001 §2.5. R-0001 implementation is
-/// pending — this function panics until step 5 of the requirement loop lands.
-pub fn eval(_expr: &Eml, _env: &Env) -> Result<Value, EvalError> {
-    todo!("R-0001 implementation — see SPEC-0001 §2.5")
+/// Recursive post-order walk per SPEC-0001 §2.5:
+///
+/// - `One` → the complex value `1 + 0i`.
+/// - `Var(name)` → the binding from `env`, or `Err(UnboundVariable)`.
+/// - `Node { exp_arg, log_arg }` → `eval` both children, then return
+///   `exp(x) − ln_eml(y)`.
+///
+/// Infallible on numeric edge cases (`inf` / `nan` propagate as ordinary
+/// `Value`s); the only failure mode is an unbound variable.
+pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
+    match expr {
+        Eml::One => Ok(Value::new(1.0, 0.0)),
+        Eml::Var(name) => env
+            .get(name)
+            .ok_or_else(|| EvalError::UnboundVariable(name.clone())),
+        Eml::Node { exp_arg, log_arg } => {
+            let x = eval(exp_arg, env)?;
+            let y = eval(log_arg, env)?;
+            Ok(x.exp() - crate::log::ln_eml(y))
+        }
+    }
 }

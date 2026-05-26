@@ -257,13 +257,8 @@ fn ac4_derived_i_has_positive_imaginary_unit() {
     // result in host arithmetic, and apply `eml(.., 1)` for `exp`. The `/2`
     // is the only step not expressible as a single binary EML node at this
     // stage of UFL — flagged explicitly per the QA scoping note.
-    let mut env = Env::new();
-    env.bind("x", Value::new(-1.0, 0.0));
-    let ln_minus_one = eval(&ln_tree("x"), &env).expect("ln(-1) tree must evaluate");
-
-    let mut env2 = Env::new();
-    env2.bind("h", ln_minus_one / Value::new(2.0, 0.0));
-    let derived_i = eval_with_x(&exp_tree("h"), ln_minus_one / Value::new(2.0, 0.0));
+    let ln_minus_one = eval_with_x(&ln_tree("x"), Value::new(-1.0, 0.0));
+    let derived_i = eval_with_x(&exp_tree("x"), ln_minus_one / Value::new(2.0, 0.0));
 
     assert!(
         close(derived_i, Value::new(0.0, 1.0), 1e-14),
