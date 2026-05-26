@@ -30,7 +30,7 @@ Target crate: `ufl-core`.
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | Spec'd |
+| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | In review |
 | R-0002 | Geometric algebra over G(3,0,0) | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 | Backlog |
 | R-0003 | Log–GA compatibility (no precision blowup) | bridge · Q1 | SPEC-0003 | Backlog |
 
@@ -78,9 +78,9 @@ Substrate-agnostic compilation. Target crates: `ufl-substrate`, `ufl-cli`.
 
 ## Current focus
 
-**R-0001 (EML operator core)** — requirement Accepted; SPEC-0001 drafted and
-its open question Q-AC4 resolved (`ln_eml = Complex::ln`, verified by
-[`experiments/q-ac4-branch.py`](experiments/q-ac4-branch.py)). Next: architect
-design review on SPEC-0001 → flip to Accepted → write the R-0001 test plan
-(qa agent) → implement `ufl-core`. R-0002 and R-0003 will be reconciled
-against the EML primitive when their turn comes.
+**R-0001 (EML operator core)** — `crates/ufl-core` implementation complete and
+green: `Eml` tree + reference evaluator; 4 unit + 16 e2e tests pass; clippy and
+fmt clean. Awaiting PR review on
+[#7](https://github.com/westerngazoo/ufl/pull/7) — architect (step 6) and qa
+sign-off (step 7), then merge. R-0002 and R-0003 will be reconciled against the
+EML primitive when their turn comes.
