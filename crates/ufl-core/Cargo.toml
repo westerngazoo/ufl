@@ -1,0 +1,12 @@
+[package]
+name = "ufl-core"
+version = "0.1.0"
+description = "UFL — numeric and geometric-algebra core. Realizes R-0001 (the EML operator)."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+num-complex = "0.4"
+thiserror = "2"
