@@ -1,6 +1,6 @@
 # R-0001 — EML Operator Core
 
-- **Status:** Accepted
+- **Status:** Met (2026-05-27 — qa sign-off PASS, merged in PR #7)
 - **Milestone:** M1
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-05-17

@@ -30,8 +30,8 @@ Target crate: `ufl-core`.
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | In review |
-| R-0002 | Geometric algebra over G(3,0,0) | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 | Backlog |
+| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | Done |
+| [R-0002](requirements/0002-geometric-algebra-core.md) | Geometric algebra over G(3,0,0) | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 | Discussing |
 | R-0003 | Log–GA compatibility (no precision blowup) | bridge · Q1 | SPEC-0003 | Backlog |
 
 ### M2 — Predicative logic layer
@@ -78,9 +78,16 @@ Substrate-agnostic compilation. Target crates: `ufl-substrate`, `ufl-cli`.
 
 ## Current focus
 
-**R-0001 (EML operator core)** — `crates/ufl-core` implementation complete and
-green: `Eml` tree + reference evaluator; 4 unit + 16 e2e tests pass; clippy and
-fmt clean. Awaiting PR review on
-[#7](https://github.com/westerngazoo/ufl/pull/7) — architect (step 6) and qa
-sign-off (step 7), then merge. R-0002 and R-0003 will be reconciled against the
-EML primitive when their turn comes.
+**R-0001 (EML operator core)** — **Done.** Merged (PR #7), architect-approved,
+qa sign-off PASS, 20/20 tests green. `crates/ufl-core` ships the `Eml` tree and
+reference evaluator; the `hello_eml` example and `docs/the-shape-of-ufl.md`
+demonstrate it.
+
+**R-0002 (geometric algebra over G(3,0,0))** — **Discussing.** Requirement
+drafted ([`requirements/0002-geometric-algebra-core.md`](requirements/0002-geometric-algebra-core.md)):
+multivectors over G(3,0,0) with atoms `𝒢ₖ` and `∗`, dense 8-coefficient
+representation, complex coefficients reusing R-0001's `Value`. On acceptance it
+becomes the first spec to go through the **three-lens review** (architect +
+hater + nice-guy). R-0003 (log–GA compatibility) will be reconciled against the
+EML primitive when its turn comes — with EML as IR rather than a domain, its
+original Q1 framing is expected to partly dissolve.
