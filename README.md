@@ -11,6 +11,9 @@ compilation target rather than a design decision.
 
 **New to UFL?** [`docs/why-ufl.md`](docs/why-ufl.md) explains what UFL is and
 why it can exist — in detail, and with a plain-language appendix for newcomers.
+**Want the language tour?** [`docs/the-shape-of-ufl.md`](docs/the-shape-of-ufl.md)
+shows what's built today, what writing UFL will look like, and how the same EML
+tree compiles to each substrate (CPU, stack machine, FPGA, analog, neural).
 
 ## The four pillars
 
