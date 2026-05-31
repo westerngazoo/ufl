@@ -48,12 +48,17 @@ scalars, vectors, bivectors (oriented planes / rotors), and the pseudoscalar.
 ## 3. Acceptance criteria
 
 - **AC1 — Multivector representation.** A G(3,0,0) multivector is representable
-  as exactly **8 complex coefficients**, one per basis blade of the algebra:
-  `{1, e₁, e₂, e₃, e₁₂, e₁₃, e₂₃, e₁₂₃}`. No other component count is
-  representable.
-- **AC2 — Grade-lift `𝒢ₖ`.** For `k ∈ {0,1,2,3}`, `𝒢ₖ(s)` produces a
-  multivector whose blades of grade *k* carry the scalar `s` (in the documented
-  component order) and whose every other blade is zero. `k > 3` is rejected.
+  as exactly **8 complex coefficients**, one per basis blade of the algebra, in
+  grade-then-lexicographic order `{1, e₁, e₂, e₃, e₁₂, e₁₃, e₂₃, e₁₂₃}`. No
+  other component count is representable. Multivectors form a linear space over
+  the complex `Value`: component-wise addition and `Value`-scaling are defined
+  (needed to assemble, e.g., a rotor from a scalar part and a bivector part).
+- **AC2 — Grade-lift `𝒢ₖ`.** Grade-lift takes the *components of a single
+  grade* and places them on that grade's blades, zeroing every other blade.
+  Grades 0 and 3 take one component each (the `1` and `e₁₂₃` blades); grades 1
+  and 2 take three components each (`e₁,e₂,e₃` and `e₁₂,e₁₃,e₂₃`, in blade
+  order). Lifting a grade outside `{0,1,2,3}` is **not representable** —
+  structurally precluded, not runtime-rejected.
 - **AC3 — Geometric product axioms.** `∗` satisfies the orthonormal-basis
   axioms of G(3,0,0): `eᵢ ∗ eᵢ = 1` for each `i ∈ {1,2,3}`, and
   `eᵢ ∗ eⱼ = − eⱼ ∗ eᵢ` for `i ≠ j`. The scalar `1` blade is the product
@@ -63,10 +68,11 @@ scalars, vectors, bivectors (oriented planes / rotors), and the pseudoscalar.
   `e₁ ∗ e₁₂ = e₂` (a grade-lowering / inner result). A general product of two
   grade-1 vectors yields a grade-0 part equal to their dot product and a
   grade-2 part equal to their outer product.
-- **AC5 — Rotor sandwich preserves grade and norm.** With
-  `R = 𝒢₀(cos(τ/8)) + 𝒢₂(sin(τ/8))·e₁₂` (a τ/4 rotation in the e₁∧e₂ plane)
-  and a grade-1 vector `v`, the result `v' = R ∗ v ∗ ~R` is grade-1 (its
-  non-grade-1 blades are zero to tolerance) and `|v'| = |v|`, each to a
+- **AC5 — Rotor sandwich preserves grade and norm.** With the rotor
+  `R = 𝒢₀(cos(τ/8)) + 𝒢₂([sin(τ/8), 0, 0])` (a τ/4 rotation in the e₁∧e₂
+  plane — the bivector component on `e₁₂`) and a grade-1 vector `v`, the result
+  `v' = R ∗ v ∗ ~R` is grade-1 (its non-grade-1 blades are zero to tolerance)
+  and `|v'| = |v|` under the coefficient norm `|M| = √Σᵢ|cᵢ|²`, each to a
   relative tolerance fixed in SPEC-0002. The reverse `~R` negates the grade-2
   part of `R`.
 - **AC6 — EML-scalar composition.** A multivector whose coefficients are
@@ -97,20 +103,16 @@ scalars, vectors, bivectors (oriented planes / rotors), and the pseudoscalar.
 
 ## 5. Open questions
 
-- **Component order & sign convention.** The exact ordering of the 8 blades and
-  the orientation signs (e.g. `e₁₃` vs `e₃₁`) must be fixed in SPEC-0002 and
-  documented in [`docs/conventions.md`](../docs/conventions.md), so every later
-  layer agrees. Proposed: blades in grade-then-lexicographic order
-  `1, e₁, e₂, e₃, e₁₂, e₁₃, e₂₃, e₁₂₃`.
-- **`𝒢ₖ` for k with multiple blades.** Grade 1 has three blades (`e₁,e₂,e₃`),
-  grade 2 has three (`e₁₂,e₁₃,e₂₃`). Does `𝒢ₖ(s)` place `s` in *every* blade of
-  grade k, in the *first*, or take a component vector? SPEC-0002 must decide;
-  the AC2 phrasing ("blades of grade k carry s") currently implies all — to be
-  confirmed, as a component-wise lift may be cleaner.
-- **Norm definition under complex coefficients.** `|v|` for AC5 must be defined
-  for complex coefficients (e.g. `√⟨M ∗ ~M⟩₀` vs a Euclidean coefficient norm).
-  SPEC-0002 fixes the definition; the rotor test uses real-coefficient rotors
-  so the two agree, but the general definition must be stated.
+The three design questions raised at drafting are now resolved (see the
+decision log). What remains is a SPEC-0002 implementation detail, not a
+requirement-level unknown:
+
+- **AC5 tolerance.** The exact relative tolerance for the grade/norm
+  preservation test is fixed in SPEC-0002 with the `qa` agent, informed by the
+  rotor's tree depth and the complex `exp`/`ln` rounding inherited from R-0001.
+
+The blade-order and sign convention is to be recorded in
+[`docs/conventions.md`](../docs/conventions.md) when SPEC-0002 is accepted.
 
 ## 6. Decision log
 
@@ -119,7 +121,11 @@ scalars, vectors, bivectors (oriented planes / rotors), and the pseudoscalar.
 | 2026-05-28 | First GA is **G(3,0,0)**, dense 8-coefficient representation, complex coefficients reusing R-0001's `Value`. | 3D Euclidean is the proposal's worked example and the smallest algebra exhibiting all grades; dense + reference-first matches R-0001's stance; reusing `Value` makes "EML scalars below GA" literal. |
 | 2026-05-28 | Rotor sandwich `R ∗ v ∗ ~R` is a *derived* construction (AC5), not a new atom. | Keeps the atom set at `𝒢ₖ` + `∗` (+ reverse `~` as a structural operation); rotation is a theorem, not a primitive — consistent with the EML stance of deriving rather than baking in. |
 | 2026-05-28 | General multivector `exp` deferred; R-0002 only needs a rotor assembled from `𝒢₀`/`𝒢₂` components to rotate correctly. | Bounds scope to the two atoms; the exponential map is a substantial sub-topic better handled once its consumers (neural layer) exist. |
+| 2026-05-28 | Blade order is grade-then-lexicographic: `1, e₁, e₂, e₃, e₁₂, e₁₃, e₂₃, e₁₂₃`. Recorded in `docs/conventions.md` when SPEC-0002 is accepted. | One fixed order every later layer relies on; grade-then-lex is conventional and reads naturally. |
+| 2026-05-28 | `𝒢ₖ` is a **component-vector** lift (each grade's lift takes exactly that grade's blade-count of components), not a single-scalar broadcast. | Refines the proposal's loose "lift a scalar" wording, as EML refined Pillar 1 — a single scalar cannot specify a general grade-1 or grade-2 element. Intended SPEC-0002 encoding: one `grade_lift` atom parameterized by an enum whose variants carry fixed-size component arrays, making arity and the `k ≤ 3` bound structural (the R-0001 "type admits exactly valid inputs" discipline). |
+| 2026-05-28 | The multivector norm is the coefficient norm `|M| = √Σᵢ|cᵢ|²` over the 8 complex coefficients. | Always real and total (no complex-√ branch issue); coincides with the GA norm `√⟨M∗~M⟩₀` on the real grade-1 vectors AC5 tests, so the rotor result is unambiguous. The complex GA norm is deferred until a consumer needs it. |
 
 ## Changelog
 
 - 2026-05-28 — created (Draft).
+- 2026-05-28 — resolved the three drafting open questions (blade order, component-vector grade-lift, coefficient norm); AC1/AC2/AC5 reworded accordingly; decision log extended.
