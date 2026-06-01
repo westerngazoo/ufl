@@ -34,4 +34,4 @@ the requirement(s) it satisfies. The mapping is maintained in
 | Req | Title | Milestone | Status |
 |-----|-------|-----------|--------|
 | [R-0001](0001-eml-operator-core.md) | EML Operator Core | M1 | Met |
-| [R-0002](0002-geometric-algebra-core.md) | Geometric Algebra Core over G(3,0,0) | M1 | Draft |
+| [R-0002](0002-geometric-algebra-core.md) | Geometric Algebra Core over G(3,0,0) | M1 | Accepted |

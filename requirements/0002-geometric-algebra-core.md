@@ -1,12 +1,12 @@
 # R-0002 — Geometric Algebra Core over G(3,0,0)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-05-28 — open questions resolved together)
 - **Milestone:** M1
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-05-28
 - **Pillar / atom:** Spatial layer — atoms `𝒢ₖ` (grade-lift) and `∗` (geometric product) (proposal Pillar 2)
 - **Depends on:** R-0001 (EML operator core — provides the complex scalar `Value`)
-- **Realized by:** SPEC-0002 (pending)
+- **Realized by:** [SPEC-0002](../specs/0002-geometric-algebra-core.md)
 - **QA:** `qa` agent run scoped to R-0002
 
 ## 1. Statement
