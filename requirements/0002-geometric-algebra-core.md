@@ -68,13 +68,14 @@ scalars, vectors, bivectors (oriented planes / rotors), and the pseudoscalar.
   `e₁ ∗ e₁₂ = e₂` (a grade-lowering / inner result). A general product of two
   grade-1 vectors yields a grade-0 part equal to their dot product and a
   grade-2 part equal to their outer product.
-- **AC5 — Rotor sandwich preserves grade and norm.** With the rotor
-  `R = 𝒢₀(cos(τ/8)) + 𝒢₂([sin(τ/8), 0, 0])` (a τ/4 rotation in the e₁∧e₂
-  plane — the bivector component on `e₁₂`) and a grade-1 vector `v`, the result
-  `v' = R ∗ v ∗ ~R` is grade-1 (its non-grade-1 blades are zero to tolerance)
-  and `|v'| = |v|` under the coefficient norm `|M| = √Σᵢ|cᵢ|²`, each to a
-  relative tolerance fixed in SPEC-0002. The reverse `~R` negates the grade-2
-  part of `R`.
+- **AC5 — Rotor sandwich preserves grade and norm.** With the unit rotor
+  `R = 𝒢₀(cos(τ/8)) + 𝒢₂([−sin(τ/8), 0, 0])` (a `+τ/4` rotation in the e₁∧e₂
+  plane — the bivector component on `e₁₂`, sign per the rotor orientation in
+  [`docs/conventions.md`](../docs/conventions.md)) and a real grade-1 vector
+  `v`, the result `v' = R ∗ v ∗ ~R` is grade-1 (non-grade-1 blades zero to
+  tolerance) and `|v'| = |v|` under the coefficient norm `|M| = √Σᵢ|cᵢ|²`. The
+  rotation direction is pinned in SPEC-0002 (`e₁ → e₂`, `e₂ → −e₁`, `e₃` fixed).
+  The reverse `~R` negates the grade-2 (and grade-3) part of `R`.
 - **AC6 — EML-scalar composition.** A multivector whose coefficients are
   obtained by evaluating EML trees (R-0001) participates correctly in `𝒢ₖ` and
   `∗` — i.e. the geometric layer consumes EML `Value`s with no separate scalar
