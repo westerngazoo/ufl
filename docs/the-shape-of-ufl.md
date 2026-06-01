@@ -111,14 +111,18 @@ Today's Rust API is the *same* set of trees, written more verbosely. R-0005
 
 ```ufl
 -- promote scalars to multivectors by grade
-let v   = 𝒢₁(eml(3, 1))                            -- vector of magnitude e³
-let R   = exp(𝒢₂(eml(τ/8, 1)))                     -- rotor: τ/4 in e₁∧e₂
-let v'  = R ∗ v ∗ ~R                                -- sandwich rotation
+let v   = 𝒢₁([eml(3, 1), 0, 0])                    -- e³·e₁   (eml(3,1) = e³)
+let R   = 𝒢₀(cos(τ/8)) − 𝒢₂([sin(τ/8), 0, 0])      -- unit rotor: +τ/4 in e₁∧e₂
+let v'  = R ∗ v ∗ ~R                                -- sandwich: rotates e₁ → e₂
 ```
 
 Coefficients are `Complex<f64>` — the values EML evaluates to. The geometric
-product `∗` is table-driven over G(3,0,0)'s 8 basis blades; `~R` reverses
-grade-2 components (the Clifford reverse).
+product `∗` is table-driven over G(3,0,0)'s 8 basis blades; `~R` is the
+Clifford reverse (negates grade-2 and grade-3 components). The rotor sign and
+blade order follow [`conventions.md`](conventions.md); the `−sin` gives a `+τ/4`
+rotation sending `e₁ → e₂`. (A general bivector exponential `exp(B) → R` is a
+later requirement; here the rotor is assembled from its `cos`/`sin` parts
+directly.)
 
 ### 2.3 Predicates — programs as constraints (R-0004)
 

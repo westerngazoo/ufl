@@ -45,12 +45,31 @@ This order is recorded in [`docs/conventions.md`](../docs/conventions.md) when
 this spec is accepted, so every later layer agrees.
 
 A compact internal encoding makes the product table derivable and checkable:
-each blade is a **3-bit mask** over basis vectors `{e₁=bit0, e₂=bit1, e₃=bit2}`.
-Thus `1 = 0b000`, `e₁ = 0b001`, `e₂ = 0b010`, `e₁₂ = 0b011`, `e₃ = 0b100`,
-`e₁₃ = 0b101`, `e₂₃ = 0b110`, `e₁₂₃ = 0b111`. The mask's `popcount` is the
-grade. (Note: the *storage* order is the grade-then-lex table above; the
-bitmask is an internal device for deriving the Cayley table in §2.4, mapped to
-storage indices by a fixed permutation.)
+each blade is a **3-bit mask** over basis vectors `{e₁=bit0, e₂=bit1, e₃=bit2}`,
+and `popcount(mask)` is the grade. The storage order (the grade-then-lex table
+above) and the mask order differ, so the map is a fixed permutation, pinned as
+a **single named constant** that both the oracle and the table builder consume
+(so the §2.4.1 tripwire covers the permutation, not just the table):
+
+```rust
+/// Storage index → basis-vector mask. The one place the blade encoding lives.
+const MASK: [u8; 8] = [
+    0b000, // 0: 1
+    0b001, // 1: e₁
+    0b010, // 2: e₂
+    0b100, // 3: e₃
+    0b011, // 4: e₁₂
+    0b101, // 5: e₁₃
+    0b110, // 6: e₂₃
+    0b111, // 7: e₁₂₃
+];
+```
+
+The mask encoding is **signature-agnostic**: the result-blade rule
+`mask_i XOR mask_j` (§2.4.1) is dimension- and signature-independent. Only the
+*sign* rule specializes the `(+,+,+)` signature — this is the seam where a
+future G(p,q,r) requirement plugs in (recorded in
+[`docs/conventions.md`](../docs/conventions.md)).
 
 ### 2.2 The multivector type
 
@@ -76,9 +95,13 @@ scalar multiplication by a `Value`.
 impl Multivector {
     /// The additive identity (all coefficients zero).
     pub fn zero() -> Self;
-    /// Coefficient at a blade index `0..8`.
+    /// Coefficient at a blade index in `0..8`. Indices are program-derived
+    /// (from `MASK` / the §2.1 table), never external input; an out-of-range
+    /// index is a genuine unreachable state, so this panics with a justifying
+    /// message rather than returning `Result` (CLAUDE.md §6).
     pub fn coeff(&self, blade: usize) -> Value;
-    /// The grade-`k` part (blades of grade k kept, others zeroed).
+    /// The grade-`k` part (blades of grade `k` kept, others zeroed). `k` is in
+    /// `0..=3`; a larger grade is likewise an unreachable state (panics).
     pub fn grade(&self, k: u8) -> Self;
 }
 
@@ -145,19 +168,30 @@ and a generation test pins it**, so the table is *verified*, not hand-transcribe
 
 #### 2.4.1 Table derivation and its tripwire
 
-The sign/result of `blade_i ∗ blade_j` is computed from the 3-bit masks:
+The sign/result of `blade_i ∗ blade_j` is computed from the 3-bit masks via
+**one unambiguous algorithm**:
 
 - **Result blade** = `mask_i XOR mask_j` (shared basis vectors square to `+1`
-  and cancel; the symmetric difference survives).
-- **Sign** = `(-1)^s` where `s` is the number of adjacent transpositions needed
-  to sort the concatenated basis-vector list `[i's vectors][j's vectors]` into
-  ascending order, with each squared pair removed as it meets (all squares are
-  `+1` in signature `(+,+,+)`).
+  and cancel; the symmetric difference survives). This step is signature-
+  independent.
+- **Sign** = `(-1)^s`, computed as follows: form the concatenated basis-vector
+  list `[i's vectors ascending][j's vectors ascending]`; sort the whole list
+  into ascending order by **adjacent transpositions**, counting the total
+  number of swaps `s`; *then* delete adjacent equal indices in the sorted list
+  (each is an `eₖ² = +1`, contributing no sign). The sign is `(-1)^s`. The
+  deletion happens *after* the swap count, never during it.
+
+  This is the step that assumes the `(+,+,+)` signature: every squared pair
+  contributes `+1`. Under a `(p,q,0)` signature a deleted `eₖ² = -1` pair would
+  flip the sign, so this rule is G(3,0,0)-specific by design.
 
 SPEC-0002 ships a **generation test** that recomputes all 64 entries by this
-rule and asserts they equal the stored `CAYLEY`. The table is the fast path;
-the rule is the oracle. If the two ever disagree (a hand edit, a reorder), the
-test fails loudly — the same tripwire discipline as SPEC-0001's AC6.
+rule (consuming the same `MASK` constant) and asserts they equal the stored
+`CAYLEY`. The table is the fast path; the rule is the oracle. If the two ever
+disagree (a hand edit, a reorder, a changed `MASK`), the test fails loudly —
+the **Oracle-Tripwire pattern** (see
+[`docs/conventions.md`](../docs/conventions.md)), the same discipline as
+SPEC-0001's AC6.
 
 ### 2.5 The reverse `~`
 
@@ -187,10 +221,18 @@ impl Multivector {
 }
 ```
 
-`|cᵢ|` is the complex modulus (`Value::norm`). This is total and real for any
-multivector, and coincides with the GA norm `√⟨M ∗ ~M⟩₀` on the real grade-1
-vectors AC5 tests (proof sketch: for a real vector `v`, `v ∗ ~v = v ∗ v` is the
-scalar `Σ vᵢ²`, equal to `Σ|vᵢ|²`).
+`|cᵢ|` is the complex modulus (`Value::norm`). This is total and real for *any*
+multivector, including complex-coefficient ones — that totality is exactly why
+it is chosen over the GA norm `√⟨M ∗ ~M⟩₀`, which is complex (and branch-cut-
+prone) for general complex coefficients.
+
+The two norms **coincide only on real-coefficient vectors**. For a *real*
+grade-1 vector `v`, `v ∗ ~v = v ∗ v = Σ vᵢ²` (a real scalar) `= Σ|vᵢ|²`, so
+`norm()` equals `√⟨v ∗ ~v⟩₀`. They do *not* agree for complex coefficients:
+e.g. `v = (1+i)e₁` gives `⟨v ∗ ~v⟩₀ = 2i` (complex) while `norm() = √2`. AC5's
+test vectors and rotor are therefore constrained to **real coefficients**
+(§6 AC5), where the coefficient norm is the unambiguous physical magnitude.
+The complex GA norm is deferred until a consumer needs it (R-0002 non-goal).
 
 ### 2.7 Module layout
 
@@ -228,12 +270,22 @@ impl Multivector {
     }
 
     pub fn reverse(&self) -> Self {
-        // grades by blade index (§2.1): [0,1,1,1,2,2,2,3]
-        const GRADE: [u8; 8] = [0, 1, 1, 1, 2, 2, 2, 3];
+        // The reverse negates grades k with k(k-1)/2 odd — i.e. grades 2 and 3
+        // in G(3,0,0). Stated directly as a per-blade constant (§2.1 order) so
+        // the obvious reading is the correct reading; no arithmetic to defend.
+        const NEGATE: [bool; 8] = [
+            false, // 1     grade 0
+            false, // e₁    grade 1
+            false, // e₂    grade 1
+            false, // e₃    grade 1
+            true,  // e₁₂   grade 2
+            true,  // e₁₃   grade 2
+            true,  // e₂₃   grade 2
+            true,  // e₁₂₃  grade 3
+        ];
         let mut out = *self;
-        for (i, c) in out.coeffs.iter_mut().enumerate() {
-            let k = GRADE[i];
-            if (k * (k.wrapping_sub(1)) / 2) % 2 == 1 {
+        for (c, &neg) in out.coeffs.iter_mut().zip(NEGATE.iter()) {
+            if neg {
                 *c = -*c;
             }
         }
@@ -266,10 +318,14 @@ impl Multivector {
 impl std::ops::Mul for Multivector {
     type Output = Multivector;
     fn mul(self, rhs: Multivector) -> Multivector {
+        // Pure ∑ᵢ∑ⱼ aᵢ bⱼ · CAYLEY[i][j] — no zero-coefficient short-circuit.
+        // A `continue` on aᵢ == 0 would drop terms like 0 · ∞ = NaN, silently
+        // diverging from the stated formula and from SPEC-0001's AC3 inf/NaN
+        // propagation discipline. At reference scale the full 64-term loop is
+        // the correct, simplest behaviour.
         let mut out = Multivector::zero();
         for i in 0..8 {
             let a = self.coeffs[i];
-            if a == Value::new(0.0, 0.0) { continue; }
             for j in 0..8 {
                 let BladeProduct { sign, blade } = CAYLEY[i][j];
                 let term = a * rhs.coeffs[j];
@@ -292,10 +348,12 @@ impl std::ops::Mul for Multivector {
 
 ## 5. Open questions
 
-- **AC5 tolerance.** Proposed relative tolerance `1e-12` for the grade-zeroing
-  and norm-preservation checks, looser than SPEC-0001's `1e-14` because the
-  rotor sandwich is two geometric products deep (more rounding). To be confirmed
-  with the `qa` agent against the actual computed residual.
+- **AC5/AC6 tolerance.** Proposed relative tolerance `1e-12` for the
+  grade-zeroing, direction, and norm checks — looser than SPEC-0001's `1e-14`
+  because the rotor sandwich is two geometric products deep (more rounding).
+  To be confirmed with the `qa` agent against the actual computed residual;
+  the three-lens review measured the rotor preservation at machine zero, so
+  `1e-12` is expected to be comfortably generous.
 
 ## 6. Acceptance criteria
 
@@ -310,12 +368,24 @@ Each row maps a SPEC-0002 deliverable to an R-0002 acceptance criterion; the
   Verified by unit tests over the basis and the generation test of §2.4.1.
 - [ ] **AC4** — `e₁ ∗ e₂ = e₁₂`; `e₁ ∗ e₁₂ = e₂`; a general grade-1 × grade-1
   product splits into grade-0 (dot) and grade-2 (outer) parts.
-- [ ] **AC5** — rotor sandwich `R ∗ v ∗ ~R` with `R = 𝒢₀(cos(τ/8)) +
-  𝒢₂([sin(τ/8),0,0])` keeps `v` grade-1 and preserves `norm()` to the §5
-  tolerance; a known input rotates to the expected output (e.g. `e₁ → e₂`).
-- [ ] **AC6** — a `Multivector` whose coefficients are produced by `eval`-ing
-  EML trees (SPEC-0001) participates correctly in `lift` and `∗`. End-to-end
-  test mixing both atoms.
+- [ ] **AC5** — rotor sandwich `R ∗ v ∗ ~R` with the unit rotor
+  `R = 𝒢₀(cos(τ/8)) + 𝒢₂([−sin(τ/8), 0, 0])` (a `+τ/4` rotation in the e₁∧e₂
+  plane; the **`−sin`** sign per the rotor orientation in
+  [`docs/conventions.md`](../docs/conventions.md)). All coefficients are real.
+  The test asserts, to the §5 tolerance, **all three** of:
+  1. **Direction & plane (mandatory, not "e.g.").** `e₁ → e₂` *and* `e₂ → −e₁`
+     — two inputs pin both the rotation plane and its sign; a wrong-direction
+     or identity rotor fails at least one.
+  2. **Negative control.** `e₃ → e₃` (fixed) — distinguishes a genuine e₁₂
+     rotor from identity and from a wrong-plane rotor.
+  3. **Grade & norm.** each `v'` is grade-1 (non-grade-1 blades zero) and
+     `norm(v') = norm(v)`.
+- [ ] **AC6** — composition of the EML and GA atoms, asserted with a concrete
+  number (not a type-level "they compose"). Build `v = 𝒢₁([eval(eml(1,1)), 0,
+  0])` — `eml(1,1)` evaluates to `e ≈ 2.71828`, so `v = e·e₁`. Run it through
+  the AC5 rotor: `R ∗ v ∗ ~R` must equal `e·e₂` to the §5 tolerance. This
+  exercises the full EML-tree → `Value` → `lift` → `∗` data path with a
+  falsifiable expected value.
 - [ ] **Cayley tripwire** — the §2.4.1 generation test: the stored `CAYLEY`
   equals the rule-derived table for all 64 entries.
 
@@ -323,12 +393,14 @@ Each row maps a SPEC-0002 deliverable to an R-0002 acceptance criterion; the
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-05-28 | Multivector is a dense `[Value; 8]` struct, `Copy`, in grade-then-lex blade order. | AC1 holds structurally; 128 bytes is cheap to copy; value semantics match the algebra. |
+| 2026-05-28 | Multivector is a dense `[Value; 8]` struct, `Copy`, in grade-then-lex blade order. | AC1 holds structurally; value semantics chosen for clarity. Copy cost (128 bytes) is irrelevant at reference scale and revisited only if GA enters a hot path (a future requirement); no performance claim is made here. |
 | 2026-05-28 | `𝒢ₖ` is `Multivector::lift(GradeLift)` with an enum carrying per-grade fixed arrays. | R-0002 AC2 (component-vector lift); arity and the `k ≤ 3` bound are structural — the SPEC-0001 type-admits-exactly-valid-inputs discipline. |
-| 2026-05-28 | `∗` is a static `8×8` Cayley table, with a rule-based oracle + generation test pinning it. | At G(3,0,0) the table is 64 exact entries — small, fast, auditable. Rule-based on-the-fly multiplication is the general mechanism but over-engineered here; deriving the table by the rule and testing equality gets correctness *and* speed. |
+| 2026-05-28 | `∗` is a static `8×8` Cayley table, with a rule-based oracle + generation test pinning it (consuming a single `MASK` constant). | At G(3,0,0) the table is 64 exact entries — small, fast, auditable. Rule-based on-the-fly multiplication is the general mechanism but over-engineered here; deriving the table by the rule and testing equality gets correctness *and* speed (the Oracle-Tripwire pattern). |
 | 2026-05-28 | Reverse `~` and the coefficient norm are plain methods, not atoms. | They are structural support for AC5's rotor sandwich; UFL's atom set stays `𝒢ₖ` + `∗`. |
 | 2026-05-28 | `ga` is a submodule of `ufl-core`, beside `eml`. | R-0002 targets `ufl-core`; both atoms share `Value`; no new crate warranted yet. |
+| 2026-05-28 | Three-lens review (architect + hater + nice-guy) applied before acceptance. | Rotor sign **corrected** — the verified output of `cos(τ/8) + e₁₂ sin(τ/8)` is `e₁ → −e₂`; the spec now uses `−sin(τ/8)` so a `+τ/4` rotation sends `e₁ → e₂` per the recorded orientation convention. AC5 strengthened with `e₂ → −e₁`, an `e₃`-fixed negative control, and a mandatory direction check (was a trivially-passable "e.g."). AC6 given a concrete falsifiable value (`e·e₁ → e·e₂`). The `Mul` zero-skip removed (it broke SPEC-0001 AC3 inf/NaN propagation). Norm equivalence scoped to real coefficients. `MASK` pinned as one constant; `reverse` stated as a `NEGATE` table; blade order + rotor orientation + the Oracle-Tripwire pattern recorded in `docs/conventions.md`. |
 
 ## Changelog
 
 - 2026-05-28 — created (Draft).
+- 2026-05-28 — three-lens review applied: rotor sign corrected (`−sin`, `e₁→e₂`); AC5 strengthened (two-input direction check + `e₃` negative control); AC6 given a concrete expected value; `Mul` zero-skip removed; norm equivalence scoped to real coefficients; `MASK`/`NEGATE` constants pinned; sign-rule algorithm disambiguated; `coeff`/`grade` panic intent documented; blade order, rotor orientation, and the Oracle-Tripwire pattern recorded in `docs/conventions.md`.
