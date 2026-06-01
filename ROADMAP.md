@@ -31,7 +31,7 @@ Target crate: `ufl-core`.
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
 | [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | Done |
-| [R-0002](requirements/0002-geometric-algebra-core.md) | Geometric algebra over G(3,0,0) | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 | Discussing |
+| [R-0002](requirements/0002-geometric-algebra-core.md) | Geometric algebra over G(3,0,0) | 𝒢ₖ ∗ · Pillar 2 | [SPEC-0002](specs/0002-geometric-algebra-core.md) | Spec'd |
 | R-0003 | Log–GA compatibility (no precision blowup) | bridge · Q1 | SPEC-0003 | Backlog |
 
 ### M2 — Predicative logic layer

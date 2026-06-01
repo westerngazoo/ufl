@@ -1,6 +1,6 @@
 # SPEC-0002 — Geometric Algebra Core over G(3,0,0)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-05-28 — three-lens review passed: architect APPROVE, hater/nice-guy findings addressed)
 - **Realizes:** R-0002
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-05-28
