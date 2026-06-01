@@ -23,64 +23,74 @@ SDLC, repo scaffold, agent fleet, engineering constitution.
 | Agent fleet (orchestrator, architect, qa) | Done |
 | Reusable SDLC template extracted | In progress |
 
-### M1 — Numeric & spatial core
+> **2026-05-28 — architectural pivot.** UFL adopts a **homoiconic
+> S-expression** as its single AST (the "full LISP" direction); the per-layer
+> *typed enums* are dropped in favour of one uniform tree whose atoms are
+> *forms*. This reshapes the roadmap below: R-0003 is now the s-expression core
+> (absorbing the originally-planned surface-syntax + evaluator work), and the
+> geometric / predicate / substrate atoms are re-expressed as *forms on the
+> core*. See [R-0003](requirements/0003-sexpr-core.md) for the decision and the
+> recorded tradeoff.
 
-The irreducible substrate: the EML operator and geometric algebra.
+### M1 — Numeric core & the (paused) typed spatial layer
+
 Target crate: `ufl-core`.
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | In review |
-| R-0002 | Geometric algebra over G(3,0,0) | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 | Backlog |
-| R-0003 | Log–GA compatibility (no precision blowup) | bridge · Q1 | SPEC-0003 | Backlog |
+| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | Done |
+| R-0002 | Geometric algebra over G(3,0,0) — *typed enums* | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 | **Paused** |
 
-### M2 — Predicative logic layer
+R-0002 note: the typed-enum implementation is **paused** after the pivot, frozen
+on branch `R-0002-geometric-algebra` (tip `c92a38a`, TDD-red, recoverable). Its
+GA behaviour and qa test plan will be re-expressed as s-expression forms in M3.
 
-Programs as predicates over pre/post state. Target crate: `ufl-predicate`.
+### M2 — The s-expression core  ·  *current*
 
-| Req | Capability | Atoms / Pillar | Spec | Status |
-|-----|------------|----------------|------|--------|
-| R-0004 | Hehner predicate layer | ⟦P⟧ · Pillar 3 | SPEC-0004 | Backlog |
-
-### M3 — The UFL language
-
-Surface notation and execution. Target crates: `ufl-syntax`, `ufl-eval`.
+UFL's single homoiconic AST: the tree all atoms are *forms* within.
+Target crate: `ufl-core` (reshaped).
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| R-0005 | UFL surface syntax & AST | — | SPEC-0005 | Backlog |
-| R-0006 | Evaluator (parse → predicate-check → evaluate) | — | SPEC-0006 | Backlog |
+| [R-0003](requirements/0003-sexpr-core.md) | Homoiconic s-expression core — `Sexpr` AST + reader + evaluator (`eml` form) | the AST itself | SPEC-0003 | Discussing |
 
-### M4 — Substrate orchestration
+R-0003 supersedes R-0001's `Eml` *representation* (behaviour re-verified through
+the s-expr path) and absorbs the originally-planned surface syntax and evaluator.
 
-Substrate-agnostic compilation. Target crates: `ufl-substrate`, `ufl-cli`.
+### M3 — Forms on the core
 
-| Req | Capability | Atoms / Pillar | Spec | Status |
-|-----|------------|----------------|------|--------|
-| R-0007 | Substrate contract + CPU substrate | ⊗ · Pillar 4 | SPEC-0007 | Backlog |
+The remaining atoms, each re-expressed as an s-expression *form* rather than a
+bespoke typed AST.
 
-### M5 — Neural & GAPU
+| Req | Capability | Atoms / Pillar | Status |
+|-----|------------|----------------|--------|
+| R-0004 | Geometric forms (`𝒢ₖ`, `∗`) — re-expresses the paused R-0002 | Pillar 2 | Backlog |
+| R-0005 | Predicate form (`⟦P⟧`) | Pillar 3 | Backlog |
+| R-0006 | Substrate form + CPU substrate (`⊗`) | Pillar 4 | Backlog |
 
-| Req | Capability | Source | Spec | Status |
-|-----|------------|--------|------|--------|
-| R-0008 | Grade-filtered neural layer | proposal §4 | SPEC-0008 | Backlog |
-| R-0009 | GAPU mapping + reservoir experiment | proposal §5 | SPEC-0009 | Backlog |
+### M4 — Later
+
+| Req | Capability | Source | Status |
+|-----|------------|--------|--------|
+| R-0007 | Macros / quasiquote (exploit homoiconicity) | LISP metaprogramming | Backlog |
+| R-0008 | Grade-filtered neural layer | proposal §4 | Backlog |
+| R-0009 | GAPU mapping + reservoir experiment | proposal §5 | Backlog |
+| R-0010 | Log–GA compatibility (reconsidered — Q1 partly dissolves under EML-as-representation) | bridge · Q1 | Backlog |
 
 ## Sequencing rules
 
 - A requirement enters `Discussing` only when every requirement it depends on is
   `Done`.
-- Requirements within M1 (R-0001..R-0003) depend only on M0; R-0001 and R-0002
-  may be specced in parallel, R-0003 depends on both.
+- M3's form requirements (R-0004..R-0006) depend on the R-0003 s-expr core.
 - The proposal's §8 open research questions are tracked inside the requirement
-  that must resolve them (Q1 → R-0003, Q2 → R-0004, Q3 → R-0007).
+  that must resolve them (Q1 → R-0010, Q2 → R-0005, Q3 → R-0006).
 - This file is updated by the orchestrator whenever a requirement changes state.
+  A full re-numbering/reflow after the pivot is the orchestrator's to finalize.
 
 ## Current focus
 
-**R-0001 (EML operator core)** — `crates/ufl-core` implementation complete and
-green: `Eml` tree + reference evaluator; 4 unit + 16 e2e tests pass; clippy and
-fmt clean. Awaiting PR review on
-[#7](https://github.com/westerngazoo/ufl/pull/7) — architect (step 6) and qa
-sign-off (step 7), then merge. R-0002 and R-0003 will be reconciled against the
-EML primitive when their turn comes.
+**R-0003 (homoiconic s-expression core)** — the pivot. Requirement drafted
+([`requirements/0003-sexpr-core.md`](requirements/0003-sexpr-core.md)), pending
+owner acceptance. On acceptance it goes through the three-lens review and then
+SPEC-0003. R-0001 is **Done** (merged, qa-signed); R-0002 is **Paused** (typed
+GA, frozen on its branch) pending re-expression as s-expr forms.

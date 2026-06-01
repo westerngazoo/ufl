@@ -33,4 +33,5 @@ the requirement(s) it satisfies. The mapping is maintained in
 
 | Req | Title | Milestone | Status |
 |-----|-------|-----------|--------|
-| [R-0001](0001-eml-operator-core.md) | EML Operator Core | M1 | Accepted |
+| [R-0001](0001-eml-operator-core.md) | EML Operator Core | M1 | Met (representation superseded by R-0003) |
+| [R-0003](0003-sexpr-core.md) | Homoiconic S-Expression Core | M2 | Draft |
