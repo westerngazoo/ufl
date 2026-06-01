@@ -11,7 +11,9 @@
 
 pub mod eml;
 pub mod eval;
+pub mod ga;
 mod log;
 
 pub use eml::Eml;
 pub use eval::{eval, Env, EvalError, Value};
+pub use ga::{GradeLift, Multivector};
