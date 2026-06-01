@@ -61,3 +61,31 @@ pub(crate) mod oracle {
         unimplemented!("R-0002 implementation — Cayley oracle, see SPEC-0002 §2.4.1")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! The Cayley tripwire — the §2.4.1 generation test (Oracle-Tripwire
+    //! pattern). The stored fast-path table (`cayley`) must equal the
+    //! rule-derived oracle (`oracle::derive`) for all 64 blade pairs.
+    //!
+    //! This is **red** at TDD-red: both `cayley` and `oracle::derive` are
+    //! `unimplemented!()`, so the first call panics. It turns green only when
+    //! R-0002 step 5 lands both the table and the rule and they agree.
+
+    use super::{cayley, oracle};
+
+    // Cayley tripwire (SPEC-0002 §2.4.1) — stored table == rule-derived oracle
+    // for every (i, j) in 0..8 × 0..8. Panics now via `unimplemented!()`.
+    #[test]
+    fn cayley_tripwire_table_equals_oracle_for_all_64_entries() {
+        for i in 0..8 {
+            for j in 0..8 {
+                assert_eq!(
+                    cayley(i, j),
+                    oracle::derive(i, j),
+                    "CAYLEY[{i}][{j}] must equal the rule-derived blade product"
+                );
+            }
+        }
+    }
+}

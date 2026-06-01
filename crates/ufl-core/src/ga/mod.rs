@@ -136,3 +136,129 @@ impl std::ops::Mul<Value> for Multivector {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! Structural unit tests that belong beside the type. These exercise only
+    //! the implemented linear-space surface (`zero`/`from_coeffs`/`coeff`/
+    //! `grade`/`reverse`/`norm`/`Add`/`Sub`/`Mul<Value>`) — they do **not**
+    //! touch the geometric product `∗`, so they are green even at TDD-red.
+    //! Product-dependent behaviour (AC3–AC6, the Cayley tripwire) lives in
+    //! `tests/r_0002_acceptance.rs` and is red until R-0002 step 5.
+
+    use super::*;
+
+    fn v(re: f64) -> Value {
+        Value::new(re, 0.0)
+    }
+
+    // AC1 — a G(3,0,0) multivector is exactly 8 coefficients in §2.1 blade
+    // order; `from_coeffs` / `coeff` round-trip every index, pinning the count
+    // and the storage layout structurally.
+    #[test]
+    fn ac1_eight_coeffs_round_trip_in_blade_order() {
+        let coeffs = [
+            v(0.0),
+            v(1.0),
+            v(2.0),
+            v(3.0),
+            v(4.0),
+            v(5.0),
+            v(6.0),
+            v(7.0),
+        ];
+        let m = Multivector::from_coeffs(coeffs);
+        for (blade, &c) in coeffs.iter().enumerate() {
+            assert_eq!(m.coeff(blade), c, "coeff({blade}) must round-trip");
+        }
+    }
+
+    // AC1 — `zero()` is the additive identity: every coefficient is 0.
+    #[test]
+    fn ac1_zero_is_all_zero_coeffs() {
+        let z = Multivector::zero();
+        for blade in 0..8 {
+            assert_eq!(z.coeff(blade), v(0.0), "zero().coeff({blade}) must be 0");
+        }
+    }
+
+    // AC1 — component-wise `Add` over the linear space.
+    #[test]
+    fn ac1_add_is_componentwise() {
+        let a = Multivector::from_coeffs([v(1.0); 8]);
+        let b = Multivector::from_coeffs([v(2.0); 8]);
+        let sum = a + b;
+        for blade in 0..8 {
+            assert_eq!(sum.coeff(blade), v(3.0), "add must be component-wise");
+        }
+    }
+
+    // AC1 — component-wise `Sub` over the linear space.
+    #[test]
+    fn ac1_sub_is_componentwise() {
+        let a = Multivector::from_coeffs([v(5.0); 8]);
+        let b = Multivector::from_coeffs([v(2.0); 8]);
+        let diff = a - b;
+        for blade in 0..8 {
+            assert_eq!(diff.coeff(blade), v(3.0), "sub must be component-wise");
+        }
+    }
+
+    // AC1 — `Mul<Value>` scales every coefficient (Value-scaling of the space).
+    #[test]
+    fn ac1_value_scaling_scales_every_coeff() {
+        let a = Multivector::from_coeffs([v(2.0); 8]);
+        let scaled = a * v(3.0);
+        for blade in 0..8 {
+            assert_eq!(scaled.coeff(blade), v(6.0), "scale must hit every coeff");
+        }
+    }
+
+    // AC1 — a rotor is assembled by adding a scalar part and a bivector part,
+    // the exact linear-space move AC1 must support for AC5's rotor. This uses
+    // only `lift` + `Add`, never the product.
+    #[test]
+    fn ac1_rotor_assembles_from_scalar_and_bivector_parts() {
+        let angle = std::f64::consts::TAU / 8.0;
+        let scalar = Multivector::lift(GradeLift::Scalar(v(angle.cos())));
+        let bivector = Multivector::lift(GradeLift::Bivector([v(-angle.sin()), v(0.0), v(0.0)]));
+        let rotor = scalar + bivector;
+        assert_eq!(rotor.coeff(0), v(angle.cos()), "scalar part on blade 0");
+        assert_eq!(rotor.coeff(4), v(-angle.sin()), "−sin on the e₁₂ blade");
+        for blade in [1, 2, 3, 5, 6, 7] {
+            assert_eq!(rotor.coeff(blade), v(0.0), "blade {blade} must be zero");
+        }
+    }
+
+    // AC1 (support) — `grade(k)` projects: keep grade-k blades, zero the rest.
+    // Used by AC5's grade-1 check; verified here on a full multivector.
+    #[test]
+    fn ac1_grade_projection_keeps_only_target_grade() {
+        let full = Multivector::from_coeffs([v(1.0); 8]);
+        let g1 = full.grade(1);
+        for (blade, &grade) in GRADE.iter().enumerate() {
+            let expected = if grade == 1 { v(1.0) } else { v(0.0) };
+            assert_eq!(g1.coeff(blade), expected, "grade(1) at blade {blade}");
+        }
+    }
+
+    // AC5 (support) — the Clifford reverse negates grades 2 and 3 only; this is
+    // the `~R` used in the rotor sandwich. Verified independently of `∗`.
+    #[test]
+    fn ac5_reverse_negates_grades_two_and_three() {
+        let m = Multivector::from_coeffs([v(1.0); 8]);
+        let r = m.reverse();
+        for (blade, &grade) in GRADE.iter().enumerate() {
+            let expected = if grade >= 2 { v(-1.0) } else { v(1.0) };
+            assert_eq!(r.coeff(blade), expected, "reverse at blade {blade}");
+        }
+    }
+
+    // AC5 (support) — the coefficient norm `|M| = √Σ|cᵢ|²`. A real grade-1
+    // vector `3e₁ + 4e₂` has norm 5; verified independently of `∗`.
+    #[test]
+    fn ac5_coefficient_norm_of_real_vector() {
+        let v3e1_4e2 = Multivector::lift(GradeLift::Vector([v(3.0), v(4.0), v(0.0)]));
+        assert!((v3e1_4e2.norm() - 5.0).abs() <= 1e-12, "norm(3e₁+4e₂) == 5");
+    }
+}
