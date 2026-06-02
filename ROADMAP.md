@@ -91,10 +91,11 @@ The remaining atoms, each an s-expression *form* lowering into its typed core.
 
 ## Current focus
 
-**R-0003 (homoiconic s-expression core)** — the pivot, settled as the
-**synthesis** (s-expr front-end lowering into the typed core) after the
-three-lens review. Requirement drafted and revised
-([`requirements/0003-sexpr-core.md`](requirements/0003-sexpr-core.md)), pending
-owner acceptance. On acceptance → SPEC-0003. R-0001 is **Done** (merged,
-qa-signed — the `eml` lowering target); R-0002 is **Resumable** (its typed GA
-is the lowering target for the future geometric forms).
+**R-0003 (homoiconic s-expression core)** — implementation complete and green:
+the `ufl-syntax` crate (`Sexpr` + reader + lowering + `eval_str`) reads
+`(eml 1 1)` as text and evaluates to `e`, reusing R-0001's verified evaluator.
+66 tests pass (ufl-core 20 + ufl-syntax 46); clippy + fmt clean; the
+`hello_sexpr` example runs the docs' literal strings. Awaiting PR review —
+architect (step 6) and qa sign-off (step 7), then merge. R-0001 is **Done**;
+R-0002 is **Resumable** (its typed GA is the lowering target for the future
+geometric forms).
