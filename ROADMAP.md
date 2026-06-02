@@ -51,11 +51,11 @@ table → green on its own track.
 ### M2 — The s-expression core  ·  *current*
 
 UFL's single homoiconic surface/IR: the tree all atoms are *forms* within,
-lowering into the typed cores. Target crate: `ufl-core` / `ufl-syntax` (TBD).
+lowering into the typed cores. Target crate: `ufl-syntax` (new, → `ufl-core`).
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| [R-0003](requirements/0003-sexpr-core.md) | Homoiconic s-expression core — `Sexpr` AST + reader + lowering (`eml` form → `Eml`) | the AST itself | SPEC-0003 | Accepted |
+| [R-0003](requirements/0003-sexpr-core.md) | Homoiconic s-expression core — `Sexpr` AST + reader + lowering (`eml` form → `Eml`) | the AST itself | [SPEC-0003](specs/0003-sexpr-core.md) | Spec'd |
 
 R-0003 *builds on* R-0001 (its `Eml` is the lowering target) and absorbs the
 originally-planned surface syntax and evaluator.

@@ -1,6 +1,6 @@
 # SPEC-0003 — Homoiconic S-Expression Core
 
-- **Status:** Draft
+- **Status:** Accepted (2026-05-28 — three-lens review applied, architect APPROVE, hater/nice-guy findings addressed)
 - **Realizes:** R-0003
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-05-28
