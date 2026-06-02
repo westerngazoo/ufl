@@ -35,4 +35,5 @@ field. The build order across requirements and specs is in
 
 | Spec | Title | Realizes | Status |
 |------|-------|----------|--------|
-| [SPEC-0001](0001-eml-operator-core.md) | EML Operator Core | R-0001 | Accepted |
+| [SPEC-0001](0001-eml-operator-core.md) | EML Operator Core | R-0001 | Implemented |
+| [SPEC-0003](0003-sexpr-core.md) | Homoiconic S-Expression Core | R-0003 | Draft |
