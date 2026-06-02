@@ -1,24 +1,24 @@
 # R-0003 — Homoiconic S-Expression Core
 
 - **Status:** Draft
-- **Milestone:** M1
+- **Milestone:** M2
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-05-28
-- **Pillar / atom:** UFL's single abstract syntax — the homoiconic AST that all
-  atoms (`eml`, and later `𝒢ₖ`, `∗`, `⟦P⟧`, `⊗`) are *forms* within
-- **Depends on:** R-0001 (behavioral parity target — the `eml` semantics)
-- **Supersedes (representation only):** the `Eml` enum of SPEC-0001; the typed
-  `Multivector`/`GradeLift` ASTs of R-0002 (paused). The *behavioral*
-  requirements of R-0001 survive and are re-verified here.
+- **Pillar / atom:** UFL's single surface syntax & IR — the homoiconic tree that
+  all atoms (`eml`, and later `𝒢ₖ`, `∗`, `⟦P⟧`, `⊗`) are *forms* within
+- **Depends on:** R-0001 (the `Eml` typed core that the `eml` form lowers into)
+- **Builds on (does not supersede):** R-0001's `Eml` enum and evaluator are
+  **kept** as the lowering target. R-0002's typed `Multivector` will be the
+  lowering target for the geometric forms (later requirement).
 - **Realized by:** SPEC-0003 (pending)
 - **QA:** `qa` agent run scoped to R-0003
 
 ## 1. Statement
 
-UFL's single abstract syntax is a **homoiconic S-expression**. Every UFL program
-*and* every UFL datum is an S-expression — **code is data**. There is one tree
-type; the atoms (`eml` now; `𝒢ₖ`, `∗`, `⟦P⟧`, `⊗` later) are **forms** — symbols
-in operator position — not bespoke Rust types.
+UFL gains a **homoiconic S-expression** as its single surface syntax and
+intermediate representation. Every UFL program *and* every UFL datum is an
+S-expression — **code is data** — and the atoms (`eml` now; `𝒢ₖ`, `∗`, `⟦P⟧`,
+`⊗` later) are **forms**: symbols in operator position.
 
 ```
 ;; UFL, as s-expressions
@@ -27,14 +27,24 @@ in operator position — not bespoke Rust types.
 (eml 1 (eml (eml 1 x) 1))          ; ln(x)
 ```
 
-This replaces the per-layer *typed* ASTs — the `Eml` enum (R-0001) and the
-`Multivector`/`GradeLift` enums (R-0002) — with one uniform tree. Evaluation
-produces a **dynamically-typed runtime value**.
+Crucially, the S-expression is a **front-end that lowers into the typed core**.
+The pipeline is:
 
-R-0003 delivers the core: the `Sexpr` type, a **reader** (text → `Sexpr`), the
-dynamic runtime value, and an **evaluator** for the `eml` form — re-deriving
-R-0001's numeric behaviour through the s-expression path. Geometric, predicate,
-and substrate forms are later requirements.
+```
+text ──reader──▶ Sexpr ──lower──▶ Eml ──eval──▶ Value
+```
+
+The reader is uniform; a **lowering pass** translates a well-formed `eml` form
+into R-0001's `Eml` enum; R-0001's verified evaluator computes the result. The
+homoiconic, code-as-data, tree-rewritable surface is delivered in full — *and*
+the typed core's compile-time structural guarantees (R-0001 AC1) and its
+delicate, verified numerics (the `sin(τ/2)` self-correction) are **reused, not
+re-implemented**.
+
+R-0003 delivers the core for the `eml` form: the `Sexpr` type, a **reader**
+(text → `Sexpr`), and a **lowering pass** (`Sexpr → Eml`) feeding R-0001's
+evaluator. Geometric, predicate, and substrate forms are later requirements;
+each lowers into its own typed core (e.g. GA forms → R-0002's `Multivector`).
 
 ## 2. Rationale
 
@@ -42,96 +52,132 @@ UFL's thesis is *everything is a uniform tree of one operator* — `eml` all the
 way down, the continuous analogue of NAND. **Homoiconicity lifts that thesis to
 the meta level**: the language itself is a uniform tree, and code is
 indistinguishable from data. The grammar `S → 1 | var | eml(S, S)` already *is*
-an S-expression grammar; making the AST an S-expression is the honest
-realization of what UFL has been all along.
+an S-expression grammar — indeed full binary trees of one operator are
+*isomorphic* to S-expressions of one head symbol (a clean formal fact worth a
+`theory/` note). UFL is not bolting on homoiconicity; it is recognizing the
+structure was a special case of a uniform tree all along. **UFL is the
+continuous LISP.**
 
 It also serves the part of UFL that most needs it. The substrate orchestrator
 (atom `⊗`) compiles and rewrites an expression to a target substrate — CPU,
-FPGA, analog. That is **tree rewriting**, exactly what a homoiconic S-expression
-makes natural. `docs/the-shape-of-ufl.md` already frames "EML trees are the
-universal *how*" that the orchestrator transforms; a uniform S-expression IR is
-that "universal how" made concrete. One AST, one reader, one evaluator dispatch
-— adding an atom becomes adding a *form*, never a new type plus a new dispatch
-path.
+FPGA, analog. That is **tree rewriting**, which a homoiconic S-expression makes
+native: the orchestrator becomes one `Sexpr → Sexpr` rewriter rather than a
+separate compiler per typed layer. One AST, one reader, one dispatch — adding
+an atom becomes adding a *form*.
+
+**Why a lowering front-end, not a dynamic replacement (the three-lens review).**
+The first draft of R-0003 went "full LISP" — dropping the typed enums for a
+dynamically-typed runtime value. The three-lens review (architect, hater,
+nice-guy) converged: the homoiconic *direction* is right and thesis-aligned,
+but every benefit it unlocks is a property of the **S-expression AST**, not of
+dropping the types. Going dynamic would forfeit the compile-time structural
+guarantees that caught the SPEC-0002 rotor-sign bug *at design time*, push a
+whole class of arity/type/grade errors to runtime (dangerous on FPGA/analog
+substrates with no `Result`), conflict with `CLAUDE.md` §2/§6, and risk the
+1-ulp `sin(τ/2)` self-correction during re-implementation — all for a
+uniformity the lowering approach delivers for free. UFL therefore adopts the
+**synthesis**: homoiconic S-expression surface/IR lowering into the typed core.
 
 ## 3. Acceptance criteria
 
-- **AC1 — Homoiconic representation.** There is exactly one syntax tree type,
-  `Sexpr`: an *atom* (a number or a symbol) or a *list* of `Sexpr`. A UFL
-  program is an `Sexpr` and is itself ordinary data — constructible,
-  traversable, and comparable. Code and data share one representation.
+- **AC1 — Homoiconic representation.** There is one syntax tree type, `Sexpr`:
+  an *atom* (a number or a symbol) or a *list* of `Sexpr`. A UFL program is an
+  `Sexpr` and is itself ordinary data — constructible, traversable, and
+  comparable. Code and data share one representation.
 - **AC2 — Reader.** Text S-expressions parse to `Sexpr`: `(eml 1 1)`,
   `(eml x 1)`, arbitrary nesting, insignificant whitespace, and line comments.
   Malformed input (unbalanced parentheses, empty application, stray tokens)
-  yields a **typed parse error** — never a panic.
-- **AC3 — `eml` form evaluation.** `(eml a b)` evaluates to
-  `exp(eval a) − ln(eval b)` over the dynamic runtime value. The literal `1` is
-  a number; a symbol in argument position resolves from an environment; an
-  unbound symbol yields a **typed evaluation error**.
-- **AC4 — Behavioural parity with R-0001.** Through the S-expression path, the
-  identities hold within R-0001's tolerance, over inputs including negative
-  real `x`:
+  yields a **parse error reported via a typed `ReadError` enum** — never a
+  panic.
+- **AC3 — Lowering the `eml` form.** A well-formed `eml` form lowers to R-0001's
+  `Eml`: `1` → `Eml::One`, a symbol → `Eml::Var`, `(eml a b)` →
+  `Eml::node(lower a, lower b)`. Lowering **validates structure at lowering
+  time** — an unknown head symbol, an `eml` with other than two arguments, or a
+  non-form list yields a **lowering error reported via a typed `LowerError`
+  enum**. This check runs *before* evaluation (and, later, before substrate
+  compilation), so structural validity of a known form is recovered by the
+  type system at the lowering boundary, not deferred to runtime on a substrate
+  that cannot report it.
+- **AC4 — Behavioural parity with R-0001, through the typed core.** Lowering
+  feeds R-0001's *existing, verified* evaluator — the numerics are reused, not
+  re-implemented. Through the `text → Sexpr → Eml → eval` path the identities
+  hold within R-0001's tolerance, over inputs including negative real `x`:
   - `(eml 1 1) = e`
   - `(eml x 1) = exp(x)`
   - `(eml 1 (eml (eml 1 x) 1)) = ln(x)`
 
-  The R-0001 / Q-AC4 branch convention carries over: derived `i`, `τ`, and
-  `ln x` for `x < 0` are principal-correct.
-- **AC5 — Extended reals.** `ln 0`, `exp(−∞)`, and signed-zero/infinity cases
-  follow IEEE-754 and propagate as ordinary values — no trap, panic, or abort
-  (R-0001 AC3, carried over).
-- **AC6 — Dynamic value and error model.** Evaluation yields a runtime value;
-  every misuse is a **typed error, never a panic** — an unbound symbol, a head
-  symbol that names no known form, or a form applied with the wrong argument
-  count. (Because the typed enums are dropped, these checks are *runtime*, not
-  compile-time — the explicitly accepted tradeoff of §6.)
+  The R-0001 / Q-AC4 branch convention and its `sin(τ/2)` tripwire carry over
+  unchanged (they live in the reused `Eml` evaluator).
+- **AC5 — Extended reals.** Inherited from R-0001 via the reused evaluator:
+  `ln 0`, `exp(−∞)`, and signed-zero/infinity cases follow IEEE-754 and
+  propagate as ordinary values — no trap, panic, or abort.
+- **AC6 — Error model: typed, layered, no panics.** Every failure surfaces as a
+  typed error enum, never a panic, at the earliest layer that can detect it:
+  `ReadError` (lexical/syntactic), `LowerError` (unknown form, wrong arity,
+  non-form) at the lowering boundary, and R-0001's `EvalError::UnboundVariable`
+  at evaluation. Errors that the *typed core* makes structurally impossible
+  (an `eml` node with the wrong child count) remain impossible once lowered —
+  the dynamic frontier is only the genuinely dynamic part (raw text, unbound
+  symbols, unknown heads).
 
 ## 4. Constraints & non-goals
 
 **Constraints**
 
-- One `Sexpr` AST; no per-layer typed syntax trees.
-- The runtime value is dynamically typed (extensible to multivectors and beyond
-  in later requirements); R-0003 needs only the numeric (complex) case.
+- One `Sexpr` AST as the surface/IR; the typed cores (`Eml` now, `Multivector`
+  later) are **retained** as lowering targets.
+- R-0003's only runtime value is R-0001's `Value` (`Complex<f64>`), produced by
+  the reused evaluator. A heterogeneous runtime value (multivectors, booleans)
+  arrives with the forms that need it, in later requirements.
 - `eml` semantics, the complex substrate, and the branch convention are
-  inherited from R-0001 unchanged — only the *representation* changes.
+  R-0001's, unchanged.
 
 **Non-goals** (separate, later requirements)
 
-- Geometric, predicate, and substrate **forms** (`𝒢ₖ`, `∗`, `⟦P⟧`, `⊗`).
-- **Macros / quasiquote / reader macros** — homoiconicity is established; the
-  metaprogramming layer that exploits it is later.
-- **R-0002's typed multivector implementation** — paused; GA will be
-  re-expressed as S-expression forms in a later requirement.
-- Optimization, substrate compilation, `let`/binding surface sugar.
+- Geometric, predicate, and substrate **forms** (`𝒢ₖ`, `∗`, `⟦P⟧`, `⊗`) and
+  their lowering into their typed cores.
+- **Macros / quasiquote / reader macros** — homoiconicity is established here;
+  the metaprogramming layer that exploits it (and the orchestrator-as-rewriter)
+  is later.
+- Optimization / substrate compilation; an `Sexpr` pretty-printer is a small
+  follow-on, not required here (though see §5).
 
 ## 5. Open questions
 
 - **Numeric literals in the reader.** R-0001's *semantics* admit only `1` as a
-  primitive constant (everything else is a derived `eml` tree). Does the
-  *reader's tokenizer* nonetheless accept arbitrary numeric literals (`3`,
-  `-1`, `2.5`) for test ergonomics and practicality, with the "only `1` is
-  primitive" claim remaining a statement about the *language*, not the lexer?
-  SPEC-0003 decides.
-- **Runtime value shape.** A `Value` enum with a `Num(Complex<f64>)` variant
-  now, designed to grow (multivectors, booleans) — versus keeping R-0003
-  strictly complex. SPEC-0003 decides, mindful of later GA/predicate forms.
-- **Crate placement.** Since R-0003 supersedes R-0001's representation, does it
-  reshape `ufl-core` in place (replacing `eml.rs`/`eval.rs`) or land a new
-  `ufl-sexpr` crate that `ufl-core` builds on? SPEC-0003 decides; the architect
-  reviews the boundary.
-- **`Eml` enum disposition.** Is the R-0001 `Eml` enum deleted outright, or kept
-  transitionally behind the s-expr core during migration? SPEC-0003 decides.
+  primitive constant. Does the *reader's tokenizer* nonetheless accept arbitrary
+  numeric literals (`3`, `-1`, `2.5`) for test ergonomics, with "only `1` is
+  primitive" remaining a statement about the language, not the lexer? SPEC-0003
+  decides.
+- **Crate placement.** Does the `Sexpr` + reader + lowering pass live in
+  `ufl-core` beside `eml`, or in a new `ufl-syntax` crate that depends on
+  `ufl-core`? The architect reviews the boundary; the front-end naturally
+  depends on the core (inward), favouring a separate crate, but a submodule is
+  acceptable for one form.
+- **Dispatch seam.** Should the lowering dispatch (head symbol → form lowerer)
+  be a *form table* rather than a hardcoded `match`, so the later
+  orchestrator/macro layer can register rewrites against the same table? A
+  design seam for SPEC-0003 to get right while cheap (nice-guy opportunity).
+- **Runtime `Value` model.** When heterogeneous results arrive (GA forms), a
+  uniform runtime `Value` (union of result types) is wanted — orthogonal to the
+  typed IR. Isolate it in one module with an invariant tripwire when it lands
+  (the SPEC-0001 `ln_eml` pattern). Out of scope for R-0003 (complex-only) but
+  flagged so SPEC-0003 does not foreclose it.
 
 ## 6. Decision log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-05-28 | UFL adopts a **homoiconic S-expression** as its single AST (the "full LISP" direction); all atoms become forms within it. | Homoiconicity is the meta-level form of UFL's "everything is a uniform tree of one operator" thesis; the orchestrator's substrate-rewriting job is tree rewriting, which S-expressions make natural; one AST / reader / evaluator maximizes composability. Owner decision. |
-| 2026-05-28 | **Drop the typed enums** (`Eml`, `Multivector`, `GradeLift`) in favour of one `Sexpr` AST + one dynamically-typed runtime value. **Accepted tradeoff, recorded:** this forfeits the compile-time structural guarantees that the typed enums gave — the `Eml` enum made an ill-formed grammar unrepresentable, and the three-lens review used `Multivector`/`GradeLift` precision to catch real bugs. In exchange UFL gains homoiconic uniformity and first-class tree rewriting. Errors that were compile-time (e.g. applying `eml` to a non-number) become **runtime** typed errors (AC6). | Owner chose the "full LISP, drop typed enums" option over the "s-expr IR + typed core" synthesis. Per CLAUDE.md §1 the choice is discussed and recorded here; the engineer flagged the loss of structural safety as the cost being paid. |
-| 2026-05-28 | R-0003 **supersedes the representation** of SPEC-0001 (the `Eml` enum), but **not** R-0001's behavioural requirement. `eml = exp(x) − ln(y)`, the `e`/`exp`/`ln` identities, the complex substrate, and the Q-AC4 branch convention all carry over and are re-verified through the S-expression evaluator (AC4/AC5). | The pivot is representational, not semantic — the EML atom and its behaviour are unchanged; only the AST that holds them changes. R-0001's tests largely carry over, re-expressed against the s-expr API. |
-| 2026-05-28 | **R-0002 (typed geometric algebra) is paused**, frozen on branch `R-0002-geometric-algebra` (tip `c92a38a`, TDD-red), recoverable. Its GA behaviour will be re-expressed as S-expression forms in a later requirement. | The pivot drops the typed approach R-0002 was built on; finishing it as typed enums would be throwaway work. Freezing (not deleting) preserves the design and the qa test plan for reuse. |
+| 2026-05-28 | UFL adopts a **homoiconic S-expression** as its single surface syntax and IR; all atoms become forms. | Homoiconicity is the meta-level form of UFL's "everything is a uniform tree of one operator" thesis (full binary trees of one operator ≅ S-expressions); the orchestrator's substrate-rewriting job is tree rewriting, which S-expressions make native; one AST / reader / dispatch maximizes composability. Owner decision; all three review lenses endorsed the direction. |
+| 2026-05-28 | **Synthesis, not full-dynamic:** the S-expression is a front-end that **lowers into the typed core** (`Eml` now, `Multivector` later); the typed enums are **kept**, not dropped. Supersedes the earlier (same-day) draft decision to drop the typed enums. | The three-lens review converged (architect REQUEST CHANGES → synthesis; hater NEEDS WORK; nice-guy's pros all hold under the synthesis): every LISP benefit is a property of the S-expr AST, not of dynamic typing. Lowering keeps R-0001 AC1's structural guarantees, the design-time bug-catching the rotor-sign fix relied on, `CLAUDE.md` §2/§6 compliance, and the 1-ulp `sin(τ/2)` self-correction (reused, not re-implemented) — at no cost to homoiconicity, tree-rewriting, or macros. Owner accepted the synthesis. |
+| 2026-05-28 | R-0001's `Eml` enum and evaluator are **retained as the lowering target**; R-0003 *builds on* R-0001 rather than superseding it. Resolves the earlier draft's open "Eml disposition" question to "kept." | The typed core is the lowering target and the cross-check oracle for AC4 parity; deleting it would discard merged, qa-signed work and the verified numerics. |
+| 2026-05-28 | **R-0002 (typed geometric algebra) is un-paused** — its `Multivector`/`GradeLift` become the lowering target for the future geometric forms, so the work is reused, not throwaway. | Under the synthesis the typed GA core is needed, not discarded; R-0002 can resume (finish the Cayley table → green) on its own track, and a later requirement adds the s-expr GA forms that lower into it. |
 
 ## Changelog
 
-- 2026-05-28 — created (Draft).
+- 2026-05-28 — created (Draft, "full LISP / drop typed enums").
+- 2026-05-28 — revised to the **synthesis** after the three-lens review:
+  homoiconic S-expression front-end lowering into the retained typed core. AC3
+  reframed as a lowering pass with lowering-time validation; AC4 parity now
+  reuses R-0001's evaluator; AC6 reframed as a layered typed-error model; R-0002
+  un-paused as the GA lowering target; decision log records the review outcome.
