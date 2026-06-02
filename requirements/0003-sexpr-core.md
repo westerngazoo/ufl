@@ -1,6 +1,6 @@
 # R-0003 — Homoiconic S-Expression Core
 
-- **Status:** Draft
+- **Status:** Accepted (2026-05-28 — synthesis, endorsed by the three-lens review)
 - **Milestone:** M2
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-05-28

@@ -55,7 +55,7 @@ lowering into the typed cores. Target crate: `ufl-core` / `ufl-syntax` (TBD).
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| [R-0003](requirements/0003-sexpr-core.md) | Homoiconic s-expression core — `Sexpr` AST + reader + lowering (`eml` form → `Eml`) | the AST itself | SPEC-0003 | Discussing |
+| [R-0003](requirements/0003-sexpr-core.md) | Homoiconic s-expression core — `Sexpr` AST + reader + lowering (`eml` form → `Eml`) | the AST itself | SPEC-0003 | Accepted |
 
 R-0003 *builds on* R-0001 (its `Eml` is the lowering target) and absorbs the
 originally-planned surface syntax and evaluator.
