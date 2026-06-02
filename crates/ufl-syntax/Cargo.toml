@@ -1,0 +1,12 @@
+[package]
+name = "ufl-syntax"
+version = "0.1.0"
+description = "UFL — homoiconic S-expression surface and IR. Reads text into an Sexpr and lowers it into the ufl-core typed Eml. Realizes R-0003."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+ufl-core = { path = "../ufl-core" }
+thiserror = "2"

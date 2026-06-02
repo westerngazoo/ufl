@@ -280,6 +280,11 @@ fn lower_form(items: &[Sexpr]) -> Result<Eml, LowerError> {
 - **Macros / quasiquote / a form-table registry** — deferred until form count
   warrants it.
 - **`read_all` / a REPL / file loading** — trivial follow-ons, not in scope.
+- **A general cons primitive** (`car`/`cdr`/`cons`, dotted/improper pairs) —
+  deferred to the metaprogramming layer. Lists here are `Vec`-backed
+  (ergonomic; no `nil`/improper-list edge cases), and the lowered `Eml::Node`
+  already provides core-level *binary* pairing, so R-0003 needs no separate
+  cons. See the decision log.
 - Optimization; a heterogeneous runtime `Value` (complex-only here).
 
 ## 5. Open questions
@@ -332,6 +337,7 @@ agent's tests verify them.
 | 2026-05-28 | Lowering reuses `ufl_core::eval` verbatim; SPEC-0003 adds no numerics. | AC4 parity is through the *verified* core, so the branch convention and the 1-ulp `sin(τ/2)` self-correction are inherited, not re-implemented (the hater's migration risk, designed out). |
 | 2026-05-28 | Dispatch is a `match` on the head symbol; the form-table registry is deferred. | One form needs no registry (no premature abstraction, CLAUDE.md §2); the seam is documented for when forms multiply. |
 | 2026-05-28 | Ship a round-trippable `Display` and a `hello_sexpr` example now. | `Display` gives AC1 its round-trip oracle and structural rewrite-diffing; `hello_sexpr` runs the docs' literal strings, demonstrating AC1+AC4 and making the docs' notation runnable (the four-way string identity). |
+| 2026-05-28 | Lists are `Vec`-backed; **no general cons-cell primitive** in R-0003. | `Vec` gives O(1) access, clean slice-pattern lowering, and no `nil`/improper-pair edge cases; the lowered `Eml::Node` already provides core-level binary pairing (`eml` *is* a cons). A general `cons`/`car`/`cdr` becomes valuable only at the metaprogramming layer (manipulating code as data) — there is a clean symmetry there (cons : structure :: `eml` : number :: NAND : Boolean) worth building when macros arrive, evaluated on its merits then. (Owner raised this; recorded for the macro requirement.) |
 
 ## Changelog
 
