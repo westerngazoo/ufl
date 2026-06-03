@@ -21,9 +21,12 @@ post-state) pair satisfies a predicate.
 This first slice is a **checker, not a solver**: evaluating a predicate against
 a *concrete* pre/post pair is decidable; *finding* a satisfying post-state (the
 substrate orchestrator's job) is undecidable in general and is a later
-requirement. It is the first piece of UFL's **control-universality** layer —
-see [`theory/universal-computability.md`](../theory/universal-computability.md),
-Route B.
+requirement. It delivers the **boolean and comparison substrate** that the
+control constructions — branching `(b ∧ S) ∨ (¬b ∧ T)`, sequencing, recursion —
+are *expressed in* (see
+[`theory/universal-computability.md`](../theory/universal-computability.md),
+Route B §6); those constructions themselves are deferred. It is the first
+executable artifact on the control-layer frontier, not a crossing of it.
 
 New forms (all s-expressions, composing with the existing `eml` form):
 
