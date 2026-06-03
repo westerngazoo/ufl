@@ -10,108 +10,164 @@
 ## 1. Motivation
 
 SPEC-0004 realizes [R-0004](../requirements/0004-predicate-layer.md): UFL's
-predicate atom `⟦P⟧` as a **checker**. It adds booleans, the comparison `(= a b)`,
-the connectives `(and …)` / `(or …)` / `(not …)`, and the predicate wrapper
-`(pred E)`, plus a `check` that evaluates a predicate over a pre/post state to
-`true` or `false`. It is the first piece of UFL's control layer
-([`theory/universal-computability.md`](../theory/universal-computability.md),
-Route B).
+predicate atom `⟦P⟧` as a **checker**. It adds the **boolean and comparison
+substrate** — booleans, `(= a b)`, `(and …)` / `(or …)` / `(not …)`, and the
+predicate wrapper `(pred E)` — plus a `check` that evaluates a predicate over a
+pre/post state to `true` or `false`.
+
+This is **not** yet control universality. Following the honest ledger in
+[`theory/universal-computability.md`](../theory/universal-computability.md) §6,
+the control *constructions* — branching `(b ∧ S) ∨ (¬b ∧ T)`, sequencing,
+recursion — are deferred. SPEC-0004 delivers the boolean substrate those
+constructions are *expressed in*, and the `=` bridge from `eml`-valued
+conditions to booleans. It is the first executable artifact on the
+control-layer frontier; it does not cross it.
 
 ## 2. Design
 
 ### 2.1 The value model — two typed evaluators, no god-enum
 
-The crux. UFL keeps **two typed evaluation modes**, bridged by `=`, rather than a
+UFL keeps **two typed evaluation modes**, bridged by `=`, rather than a
 heterogeneous `Num | Bool` runtime value:
 
 - **Numeric:** an `Sexpr` that denotes a number is lowered (`ufl_syntax::lower`)
   to `Eml` and evaluated by the **reused** `ufl_core::eval` → `Value`
   (`Complex<f64>`). *No numerics are added here* — the branch convention and the
-  `sin(τ/2)` self-correction are inherited.
-- **Boolean:** a new `eval_pred : &Sexpr × &Env → Result<bool, PredError>`
-  evaluates an `Sexpr` that denotes a *predicate* (a boolean expression) → Rust
-  `bool`.
+  `sin(τ/2)` self-correction are inherited transitively.
+- **Boolean:** `eval_pred : &Sexpr × &Env → Result<bool, PredError>` evaluates an
+  `Sexpr` that denotes a predicate → Rust `bool`.
 
-`=` is the bridge: it evaluates its two operands *numerically* and returns a
-`bool`. Booleans are therefore never values in the numeric substrate; they are
-the result type of `eval_pred`. This honours the synthesis (stay typed; no god
-enum; reuse the verified core) and keeps R-0004 from touching `ufl-core`'s
-`Value`.
+`=` bridges: it evaluates its operands *numerically* and returns a `bool`.
+Booleans are the result type of `eval_pred`, never a numeric value. This honours
+the synthesis (stay typed; reuse the verified core; never touch `ufl-core`'s
+`Value`).
 
-### 2.2 Crate
+### 2.2 The single classifier
 
-A new crate **`ufl-predicate`** depends on `ufl-syntax` (for `Sexpr`, `lower`,
-`LowerError`) and `ufl-core` (for `eval`, `Env`, `Value`, `EvalError`).
-Dependencies point inward: `ufl-predicate → ufl-syntax → ufl-core`. Predicate
-logic is a bounded responsibility distinct from syntax.
+Both evaluators agree on what an `Sexpr` *is* through **one** function — there is
+no second, drifting classification. This is the load-bearing guard for AC1.
 
+```rust
+enum Mode { Numeric, Boolean }
+
+/// Which evaluation mode an Sexpr denotes, by its outermost shape.
+fn classify(s: &Sexpr) -> Mode {
+    match s {
+        Sexpr::Sym(t) if t == "true" || t == "false" => Mode::Boolean,
+        Sexpr::Sym(_) | Sexpr::Num(_) => Mode::Numeric,      // a variable, or a number
+        Sexpr::List(items) => match items.split_first() {
+            Some((Sexpr::Sym(h), _)) if is_pred_head(h) => Mode::Boolean,
+            _ => Mode::Numeric,                              // (eml …) or a non-form list
+        },
+    }
+}
+
+fn is_pred_head(h: &str) -> bool {
+    matches!(h, "and" | "or" | "not" | "=" | "pred")
+}
 ```
-crates/ufl-predicate/
-├── Cargo.toml          # → ufl-syntax, ufl-core
-└── src/
-    ├── lib.rs          # #![forbid(unsafe_code)]; re-exports; check / check_str
-    └── eval_pred.rs    # eval_pred, PredError, the form dispatch
-└── examples/
-    └── hello_pred.rs   # ⟦ x' = (eml x 1) ⟧ checked true/false
-```
+
+- `eval_pred(s)` requires `classify(s) == Boolean`; a `Numeric` shape in boolean
+  position is `PredError::ExpectedBool`.
+- `eval_num(s)` (the `=`-operand path) requires `classify(s) == Numeric`; a
+  `Boolean` shape in numeric position is `PredError::ExpectedNumber` — caught
+  *before* `lower`, so `(= true 1)` is a clean type error, **not** a downstream
+  `UnboundVariable("true")`.
+
+**The `true`/`false` rule, stated once.** `true` and `false` are boolean
+literals **at the predicate/numeric boundary** — i.e. wherever `classify` is
+consulted (a direct operand of `=`/`and`/`or`/`not`/`pred`, or a checked
+predicate). They are *not* reserved globally: inside a numeric subtree, e.g.
+`(eml true 1)`, the symbol `true` is an ordinary variable (numeric context), and
+`(= (eml true 1) 1)` yields `PredError::Eval(UnboundVariable("true"))` unless
+`true` is bound. Global reservation is deferred (it would couple `ufl-syntax` to
+boolean concerns); the boundary rule suffices for the checker and is tested.
 
 ### 2.3 The predicate forms
 
-Evaluated by `eval_pred` (boolean position):
-
 | form | meaning | evaluation |
 |------|---------|------------|
-| `true` / `false` (symbols) | boolean literals | → `true` / `false` |
-| `(= a b)` | exact equality | eval `a`, `b` *numerically*; `true` iff `a == b` |
-| `(and p …)` | conjunction | each `pᵢ` boolean; `true` iff all `true` (short-circuit) |
-| `(or p …)` | disjunction | each `pᵢ` boolean; `true` iff any `true` (short-circuit) |
-| `(not p)` | negation | `p` boolean; logical not |
-| `(pred E)` | the `⟦P⟧` atom — mark `E` as a predicate | transparent for the checker: evaluates `E` |
+| `true` / `false` | boolean literals | → `true` / `false` |
+| `(= a b)` | exact equality | `classify`-check both `Numeric`; eval each numerically; `true` iff `a == b` |
+| `(and p …)` | conjunction | each `pᵢ` boolean; **lazy** short-circuit; `(and)` = `true` |
+| `(or p …)` | disjunction | each `pᵢ` boolean; **lazy** short-circuit; `(or)` = `false` |
+| `(not p)` | negation | `p` boolean; logical not; arity 1 |
+| `(pred E)` | the `⟦P⟧` atom | arity 1; transparent at check time — evaluates `E` |
 
-Anything else in boolean position — a number, a bare non-`true`/`false` symbol,
-or a *numeric* form like `(eml …)` — is a `PredError::ExpectedBool`. Symmetrically
-`=`'s operands must be numeric; a boolean form (`true`, `(and …)`) as an operand
-of `=` is `PredError::ExpectedNumber`.
+**Empty-connective identities are normative:** `(and)` = `true`, `(or)` = `false`
+(the empty conjunction/disjunction). **Short-circuit is lazy and intentionally
+suppresses errors in unreached operands:** `(and false X)` = `false` even if `X`
+would error; `(or true X)` = `true` even if `X` would error. (Standard
+boolean-short-circuit semantics; verdict may depend on operand order when an
+unreached operand contains an error — this is by design, and tested.) AC6's
+"earliest layer" governs *where a produced error surfaces*, not that unreached
+operands must be evaluated.
 
-### 2.4 Exact equality
+### 2.4 Exact equality and its contract
 
-`(= a b)` is **exact**, no tolerance (R-0004 AC2). It is realized as IEEE value
-equality on `Complex<f64>` (`a == b`, i.e. component `PartialEq`): so `+0.0`
-equals `−0.0`, and `NaN ≠ NaN` — the standard "equal as numbers" semantics, the
-least surprising reading of `=`. (Literal bit-equality — `to_bits` — was
-considered; it would make `NaN == NaN` and `+0 ≠ −0`, both wrong for a numeric
-`=`. The R-0004 "exact, no tolerance" decision is honoured; the IEEE reading is
-the natural realization.) When both sides are computed the same way (the checker
-use case), they are bit-identical and equal under either reading; the difference
-only appears at `±0`/`NaN`, where IEEE is correct.
+`(= a b)` is **exact**, no tolerance (R-0004 AC2), realized as IEEE value
+equality on `Complex<f64>` (`a == b`, component `PartialEq`): `+0.0 == −0.0`,
+`NaN ≠ NaN` — the standard "equal as numbers" reading. (Literal bit-equality was
+rejected: it would give `NaN == NaN` and `+0 ≠ −0`, both wrong for `=`.)
 
-### 2.5 Pre/post-state as an env convention
+Three consequences are **documented contracts**, not surprises (each tested):
+
+1. **`=` operands must be numerically lowerable.** Per R-0001, only `1` is a
+   numeric *literal*; `(= 2 2)` does **not** lower (`2` → `LowerError::Unsupported‐
+   Literal`). `=` operands are therefore `1`, a variable, or an `eml` form.
+   (AC5's `(= x' (eml x 1))` respects this.)
+2. **`=` is non-reflexive on `NaN`.** If an operand evaluates to `NaN` (reachable
+   only via R-0001's extended-reals edges, e.g. `ln 0 = −∞` paths), `(= a a)` is
+   `false`. So a predicate over a `NaN`-valued state is unsatisfiable by `=` —
+   IEEE-correct, and a tested contract.
+3. **`=` compares the full complex value (re *and* im).** A *clean real*
+   post-state will not equal an `eml` result that carries a `sin(τ/2)`
+   self-correction imaginary residue (~1e-16 i) — e.g. results through the
+   `ln`-of-negatives path. (`(eml x 1) = exp(x)` is clean real, so AC5 is safe;
+   the residue bites only self-correction comparisons.) The remedy —
+   tolerance / real-projection equality — is deferred (R-0004 §4 non-goal); the
+   exact contract is honoured and its limit is documented.
+
+### 2.5 Pre/post-state, the priming convention, and its boundary
 
 A predicate mentions pre-state variables (`x`) and post-state variables (`x'`,
-primed — the reader already admits `'` in symbols). **Checking does not change
-the numeric evaluator:** `x` and `x'` are just two symbols. The checker binds
-both into a single `Env` — `x` from the pre-state, `x'` from the post-state — so
-the reused `ufl_core::eval` resolves them with no modification.
+primed — the reader admits `'` in symbols, so `x'` reads as one `Sym` with no
+change to `ufl-core`). Checking binds both into one `Env` — `x` from the
+pre-state, `x'` from the post-state — so the reused evaluator resolves them
+unmodified.
+
+**The priming convention is made injective.** Post vars are bound under
+`name'`. To keep this unambiguous, **`check` rejects any pre/post binding name
+that contains `'`** (it is reserved for the priming suffix) with a typed error.
+So a pre-var cannot be named `x'`, and post-`x` (→ key `x'`) cannot collide with
+a user pre-var. The *predicate text* still uses `x'` freely to reference
+post-state; only the binding *names* passed to `check` are constrained.
 
 ```rust
-/// Check a predicate against a pre-state and a post-state.
-/// Binds pre vars under their name, post vars under `name'`.
+/// Low-level: evaluate a predicate under an already-built env.
+pub fn eval_pred(predicate: &Sexpr, env: &Env) -> Result<bool, PredError>;
+
+/// Check a predicate against a pre-state and a post-state. Binds pre vars by
+/// name and post vars under `name'`; rejects names containing `'`.
 pub fn check(
     predicate: &Sexpr,
     pre: &[(&str, Value)],
     post: &[(&str, Value)],
-) -> Result<bool, PredError>;
+) -> Result<bool, CheckError>;
 
-/// Convenience: read + check from text, given an already-built Env.
-pub fn check_str(src: &str, env: &Env) -> Result<bool, CheckError>;
+/// Read + check from text, with the same pre/post priming as `check`.
+pub fn check_str(
+    src: &str,
+    pre: &[(&str, Value)],
+    post: &[(&str, Value)],
+) -> Result<bool, CheckError>;
 ```
 
-`check` builds the combined `Env` (post vars get a `'` suffix) and calls
-`eval_pred`. `check_str` reads text first (so it composes `ReadError`).
+`check` and `check_str` share one state-binding convention (pre/post slices,
+auto-primed). `eval_pred` is the low-level door for callers who build the `Env`
+themselves.
 
 ### 2.6 The error model
-
-`PredError` is typed; it composes the numeric-layer errors `=` can hit:
 
 ```rust
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
@@ -123,20 +179,22 @@ pub enum PredError {
     #[error("`{form}` expects {expected} arguments, got {got}")]
     Arity { form: String, expected: usize, got: usize },
     #[error(transparent)]
-    Lower(#[from] LowerError),   // a numeric operand of `=` failed to lower
+    Lower(#[from] LowerError),   // a numeric `=` operand failed to lower
     #[error(transparent)]
     Eval(#[from] EvalError),     // a numeric operand had an unbound variable
 }
 
 #[derive(Debug, Clone, PartialEq, thiserror::Error)]
 pub enum CheckError {
+    #[error("reserved variable name `{0}`: state-variable names may not contain '\\''")]
+    ReservedName(String),
     #[error(transparent)] Read(#[from] ReadError),
     #[error(transparent)] Pred(#[from] PredError),
 }
 ```
 
-No panics. Every misuse — wrong kind in a position, bad arity, unbound state
-variable — is a typed variant, surfaced at the earliest layer (R-0004 AC6).
+No panics; every misuse is a typed variant surfaced at the earliest layer that
+can detect it (R-0004 AC6).
 
 ## 3. Code outline
 
@@ -147,7 +205,7 @@ pub fn eval_pred(s: &Sexpr, env: &Env) -> Result<bool, PredError> {
         Sexpr::Sym(t) if t == "true"  => Ok(true),
         Sexpr::Sym(t) if t == "false" => Ok(false),
         Sexpr::List(items) => eval_form(items, env),
-        other => Err(PredError::ExpectedBool { found: describe(other) }),
+        _ => Err(PredError::ExpectedBool { found: describe(s) }),
     }
 }
 
@@ -156,64 +214,67 @@ fn eval_form(items: &[Sexpr], env: &Env) -> Result<bool, PredError> {
         return Err(PredError::ExpectedBool { found: "non-form list".into() });
     };
     match head.as_str() {
-        "pred" => match args { [e] => eval_pred(e, env), _ => arity("pred", 1, args) },
-        "not"  => match args { [p] => Ok(!eval_pred(p, env)?), _ => arity("not", 1, args) },
-        "="    => match args {
-            [a, b] => Ok(eval_num(a, env)? == eval_num(b, env)?),
-            _ => arity("=", 2, args),
-        },
+        "pred" => one_arg("pred", args).and_then(|e| eval_pred(e, env)),
+        "not"  => one_arg("not", args).and_then(|p| Ok(!eval_pred(p, env)?)),
+        "="    => {
+            let [a, b] = two_args("=", args)?;
+            Ok(eval_num(a, env)? == eval_num(b, env)?)
+        }
         "and"  => { for p in args { if !eval_pred(p, env)? { return Ok(false); } } Ok(true) }
         "or"   => { for p in args { if  eval_pred(p, env)? { return Ok(true);  } } Ok(false) }
-        _ => Err(PredError::ExpectedBool { found: format!("form `{head}`") }),
+        // is_pred_head agrees with this match; any other head is non-boolean.
+        other  => Err(PredError::ExpectedBool { found: format!("form `{other}`") }),
     }
 }
 
-/// Evaluate a *numeric* operand: it must not be a boolean form.
+/// Evaluate a numeric operand. A boolean-shaped operand is a type error,
+/// caught before `lower` so the diagnostic is `ExpectedNumber`, not a
+/// downstream unbound-variable error.
 fn eval_num(s: &Sexpr, env: &Env) -> Result<Value, PredError> {
-    if is_boolean_form(s) {
+    if matches!(classify(s), Mode::Boolean) {
         return Err(PredError::ExpectedNumber { found: describe(s) });
     }
-    let eml = ufl_syntax::lower(s)?;          // LowerError → PredError::Lower
-    Ok(ufl_core::eval(&eml, env)?)            // EvalError  → PredError::Eval
+    let eml = ufl_syntax::lower(s)?;   // LowerError → PredError::Lower
+    Ok(ufl_core::eval(&eml, env)?)     // EvalError  → PredError::Eval
 }
 ```
 
-(`and`/`or` empty-arg cases — `(and)` = `true`, `(or)` = `false` — are the
-standard identities; confirmed in tests.)
+Helpers `describe(&Sexpr) -> String`, `one_arg`/`two_args` (arity → `Arity`), and
+`classify`/`is_pred_head` (§2.2) are implementation-local and defined in the PR.
 
 ## 4. Non-goals
 
 - Sequencing (`;`), parallel (`∃`), recursion/fixpoints, the orchestrator.
-- Approximate/tolerance equality; ordering (`<`, `≤`); quantifiers.
+- Approximate / tolerance / real-projection equality (the §2.4-(3) remedy).
+- Ordering (`<`, `≤`); quantifiers.
 - A heterogeneous runtime `Value` enum (explicitly avoided — §2.1).
-- Booleans as first-class numeric operands (they are a separate mode).
+- Globally reserving `true`/`false` (only the boundary rule, §2.2).
 
 ## 5. Open questions
 
-- **`(pred E)` transparency.** For the checker, `(pred E)` evaluates as `E`.
-  Confirm that giving the atom a no-op-at-eval identity now (it gains meaning
-  with sequencing later) is the right minimal move, vs omitting `pred` until it
-  does something. Lean: keep it — it is the named atom R-0004 introduces.
-- **`describe`/`found` strings.** The error payloads are human strings; confirm
-  that is acceptable for `PredError` (vs a structured kind enum). Lean: strings
-  are fine for a diagnostic; the *variant* carries the type information.
+*None blocking.* The classifier (§2.2), the equality contracts (§2.4), the
+priming boundary (§2.5), and the short-circuit semantics (§2.3) are fixed. The
+`(pred E)` transparency is now a decision (§7), not an open question.
 
 ## 6. Acceptance criteria
 
-- [ ] **AC1** — `eval_pred` yields `bool`; `true`/`false` evaluate; a number or a
-  numeric form in boolean position is `PredError::ExpectedBool`; a boolean form
-  as a `=` operand is `PredError::ExpectedNumber` — no coercion, no panic.
-- [ ] **AC2** — `(= a b)` evaluates operands numerically (via the reused
-  evaluator) and returns exact IEEE equality of the two `Value`s.
-- [ ] **AC3** — `(and …)`, `(or …)`, `(not p)` give the standard truth tables,
-  short-circuit, with `(and)`=`true` / `(or)`=`false`; wrong arity for `not` is
-  `PredError::Arity`.
-- [ ] **AC4** — `check(pred, pre, post)` binds pre vars by name and post vars
-  primed, then evaluates; an unbound state variable surfaces as
-  `PredError::Eval(UnboundVariable)`.
-- [ ] **AC5** — `⟦ x' = (eml x 1) ⟧` (`(pred (= x' (eml x 1)))`) checks `true`
-  when `post[x] = e^{pre[x]}` and `false` for a deliberately wrong post-state,
-  over several `x`.
+- [ ] **AC1** — `eval_pred` yields `bool`. `true`/`false` evaluate. A numeric
+  shape in boolean position → `ExpectedBool`; a boolean shape as a `=` operand →
+  `ExpectedNumber` (tested for `(= true 1)`, `(= (and true) 1)`, `(not (eml 1 1))`,
+  `(and (eml 1 1) true)`) — caught at the boundary, never a downstream
+  unbound-variable error, never a panic.
+- [ ] **AC2** — `(= a b)` returns exact IEEE equality of the two numerically-
+  evaluated `Value`s. Contracts tested: `(= 2 2)` → `Lower(UnsupportedLiteral)`;
+  a `NaN`-valued `(= a a)` → `false` (non-reflexive); a clean-real vs residue
+  pair → `false`.
+- [ ] **AC3** — `(and …)`/`(or …)`/`(not p)` truth tables; `(and)` = `true`,
+  `(or)` = `false`; `(not)` / `(not a b)` → `Arity`; lazy short-circuit
+  suppresses an unreached erroring operand (`(and false <unbound>)` → `false`).
+- [ ] **AC4** — `check(pred, pre, post)` binds pre by name, post primed; an
+  unbound state variable → `Pred(Eval(UnboundVariable))`; a binding name
+  containing `'` → `CheckError::ReservedName`.
+- [ ] **AC5** — `⟦ x' = (eml x 1) ⟧` checks `true` when `post[x] = e^{pre[x]}`
+  and `false` for a deliberately wrong post-state, over several real `x`.
 - [ ] **AC6** — every failure is a typed `PredError` / `CheckError` variant,
   never a panic, at the earliest detecting layer.
 
@@ -221,12 +282,22 @@ standard identities; confirmed in tests.)
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-06-02 | **Two typed evaluators, no god-enum.** Numeric → `Complex` via the reused `ufl_core::eval`; boolean → Rust `bool` via new `eval_pred`; `=` bridges. | The synthesis answer: stay typed, reuse the verified core, never pollute `Value`. Booleans are the result of predicate evaluation, not a numeric value kind. |
-| 2026-06-02 | New crate `ufl-predicate` (→ `ufl-syntax`, `ufl-core`). | Predicate logic is a bounded responsibility; deps point inward. |
-| 2026-06-02 | Pre/post-state is an **env convention** — post vars bound under `name'`; the numeric evaluator is unchanged. | Minimal: `x` and `x'` are just symbols; no change to `ufl-core`. |
-| 2026-06-02 | Exact `=` realized as IEEE `Complex` equality (`==`), not literal bit-equality. | `=` means equal-as-numbers; IEEE gives the standard `NaN ≠ NaN`, `±0` equal. Honours R-0004 "exact, no tolerance"; bit-equality's `NaN == NaN` / `+0 ≠ −0` are wrong for `=`. |
-| 2026-06-02 | `(pred E)` is transparent at check time (evaluates `E`). | It is the named `⟦P⟧` atom R-0004 introduces; it gains operational meaning with sequencing later, and marking predicates as first-class now costs nothing. |
+| 2026-06-02 | **Two typed evaluators, no god-enum.** Numeric → `Complex` via reused `ufl_core::eval`; boolean → `bool` via `eval_pred`; `=` bridges. | The synthesis answer; reuse the verified core, never pollute `Value`. |
+| 2026-06-02 | New crate `ufl-predicate` (→ `ufl-syntax`, `ufl-core`). | Bounded responsibility; deps inward. |
+| 2026-06-02 | **One `classify(&Sexpr) → Mode`** consulted by both `eval_pred` and `eval_num`; `true`/`false` are boolean at the boundary, variables inside numeric subtrees. | Collapses the boolean/numeric type guard into a single auditable function (no drift); fixes the `(= true 1)` → `UnboundVariable` leak the three-lens review found. |
+| 2026-06-02 | Exact `=` is IEEE `Complex` `==`; non-reflexive on `NaN`; compares re+im. Three contracts documented + tested (§2.4). | `=` means equal-as-numbers; the NaN/residue limits are IEEE-correct and narrow (AC5's `exp` path is clean); tolerance equality is the deferred remedy. |
+| 2026-06-02 | Lazy short-circuit `and`/`or` **intentionally suppress errors in unreached operands**; `(and)`=`true`, `(or)`=`false`. | Standard boolean semantics; AC6 governs where produced errors surface, not evaluation of unreached operands. |
+| 2026-06-02 | `check` **rejects pre/post binding names containing `'`** (`CheckError::ReservedName`); `check`/`check_str` share the pre/post priming; `eval_pred` is the raw-env door. | Makes the priming injective (no `x'`-collision); one ergonomic convention across the text and tree entry points. |
+| 2026-06-02 | `(pred E)` kept, transparent at check time. | It is the named `⟦P⟧` atom and the **marked boundary** a future solver pattern-matches to find proof obligations; present-now/meaningful-later costs nothing and avoids a syntax break. |
 
 ## Changelog
 
 - 2026-06-02 — created (Draft).
+- 2026-06-02 — three-lens review applied (architect REQUEST CHANGES, hater
+  NEEDS WORK, nice-guy STRONG WORK): defined the single `classify` (fixing the
+  `true`/`false` type-confusion + undefined `is_boolean_form`); documented the
+  three exact-`=` contracts (operand-lowerability, NaN non-reflexivity, complex
+  residue); made the priming injective (`'` reserved, `ReservedName`); unified
+  `check`/`check_str`; pinned short-circuit + empty-connective semantics;
+  promoted `(pred E)` to a decision; reworded §1 to "boolean substrate", not
+  "control layer" (matching the honest ledger). Open questions closed.
