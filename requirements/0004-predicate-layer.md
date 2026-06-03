@@ -1,6 +1,6 @@
 # R-0004 — Predicate Layer (`⟦P⟧`) — the Checker
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-02 — by owner delegation; scope + equality decided)
 - **Milestone:** M3
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-06-02
