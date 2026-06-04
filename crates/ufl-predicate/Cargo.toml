@@ -1,0 +1,13 @@
+[package]
+name = "ufl-predicate"
+version = "0.1.0"
+description = "UFL — the predicate layer (atom ⟦P⟧). A checker: does a concrete pre/post state satisfy a predicate? Realizes R-0004."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+ufl-core = { path = "../ufl-core" }
+ufl-syntax = { path = "../ufl-syntax" }
+thiserror = "2"
