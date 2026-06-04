@@ -84,6 +84,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufl-predicate"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+ "ufl-core",
+ "ufl-syntax",
+]
+
+[[package]]
 name = "ufl-syntax"
 version = "0.1.0"
 dependencies = [
