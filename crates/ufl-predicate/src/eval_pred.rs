@@ -60,13 +60,70 @@ fn describe(s: &Sexpr) -> String {
 }
 
 /// Evaluate a predicate `Sexpr` to a boolean under `env` (SPEC-0004 §3).
-pub fn eval_pred(_s: &Sexpr, _env: &Env) -> Result<bool, PredError> {
-    unimplemented!("R-0004 implementation — eval_pred, see SPEC-0004 §3")
+pub fn eval_pred(s: &Sexpr, env: &Env) -> Result<bool, PredError> {
+    match s {
+        Sexpr::Sym(t) if t == "true" => Ok(true),
+        Sexpr::Sym(t) if t == "false" => Ok(false),
+        Sexpr::List(items) => eval_form(items, env),
+        _ => Err(PredError::ExpectedBool { found: describe(s) }),
+    }
+}
+
+/// Dispatch a list form in boolean position on its head symbol. This `match` is
+/// the documented seam where the deferred control forms (`;`, choice, fixpoint)
+/// plug in — one arm at a time (SPEC-0004 §2.3).
+fn eval_form(items: &[Sexpr], env: &Env) -> Result<bool, PredError> {
+    let Some((Sexpr::Sym(head), args)) = items.split_first() else {
+        return Err(PredError::ExpectedBool {
+            found: "non-form list".to_string(),
+        });
+    };
+    match head.as_str() {
+        "pred" => match args {
+            [e] => eval_pred(e, env),
+            _ => Err(arity("pred", 1, args.len())),
+        },
+        "not" => match args {
+            [p] => Ok(!eval_pred(p, env)?),
+            _ => Err(arity("not", 1, args.len())),
+        },
+        "=" => match args {
+            [a, b] => Ok(eval_num(a, env)? == eval_num(b, env)?),
+            _ => Err(arity("=", 2, args.len())),
+        },
+        // Lazy short-circuit: an unreached operand's error is not surfaced.
+        "and" => {
+            for p in args {
+                if !eval_pred(p, env)? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        "or" => {
+            for p in args {
+                if eval_pred(p, env)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        other => Err(PredError::ExpectedBool {
+            found: format!("form `{other}`"),
+        }),
+    }
+}
+
+fn arity(form: &str, expected: usize, got: usize) -> PredError {
+    PredError::Arity {
+        form: form.to_string(),
+        expected,
+        got,
+    }
 }
 
 /// Evaluate a numeric operand of `=`. Boolean-shaped operands are a type error
-/// caught before `lower` (SPEC-0004 §2.2). Used by the `=` form.
-#[allow(dead_code)]
+/// caught before `lower` (SPEC-0004 §2.2).
 fn eval_num(s: &Sexpr, env: &Env) -> Result<Value, PredError> {
     if matches!(classify(s), Mode::Boolean) {
         return Err(PredError::ExpectedNumber { found: describe(s) });
