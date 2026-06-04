@@ -68,7 +68,7 @@ The remaining atoms, each an s-expression *form* lowering into its typed core.
 
 | Req | Capability | Atoms / Pillar | Status |
 |-----|------------|----------------|--------|
-| [R-0004](requirements/0004-predicate-layer.md) | **Predicate form (`⟦P⟧`) — the checker** (boolean substrate for control) | Pillar 3 | In review ([SPEC-0004](specs/0004-predicate-layer.md); `ufl-predicate` green, 34 tests) |
+| [R-0004](requirements/0004-predicate-layer.md) | **Predicate form (`⟦P⟧`) — the checker** (boolean substrate for control) | Pillar 3 | **Done** (merged, PR #14; `ufl-predicate`, 34 tests) |
 | R-0005 | Geometric forms (`𝒢ₖ`, `∗`) — lower into R-0002's garust multivector | Pillar 2 | Backlog (after R-0002 GA core) |
 | R-0006 | Substrate form + CPU substrate (`⊗`) | Pillar 4 | Backlog |
 
@@ -98,15 +98,21 @@ forms need the garust multivector.
 
 ## Current focus
 
-**R-0004 (predicate form `⟦P⟧`)** — the next build, in the **main session**.
-This is where control universality (the "all computable" discharge — see
-[`theory/universal-computability.md`](theory/universal-computability.md)) begins:
-predicates over pre/post state, as s-expression forms lowering over the
-EML-valued core. Discussion/scoping next, then the eight-step loop.
+**Next requirement — to be chosen.** With R-0001 (EML core), R-0003 (s-expr
+surface), and R-0004 (predicate checker) all merged, the open candidates are:
 
-**In parallel (separate GA agent flow):** R-0002 — the garust-based GA core
-([`requirements/0002-geometric-algebra-core.md`](requirements/0002-geometric-algebra-core.md)),
+- **Branching `(if b S T)`** — the next control rung, built from R-0004's
+  `and`/`or`/`not` substrate (`(b ∧ S) ∨ (¬b ∧ T)`). Advances control
+  universality.
+- **GA s-expr forms (R-0005)** — `𝒢ₖ`/`∗` as forms lowering into the garust
+  multivector — once the **GA agent flow** lands the R-0002 garust core.
+- **The literal eml-NAND tree** — materialise §3 of
+  [`theory/universal-computability.md`](theory/universal-computability.md) as a
+  pure-eml experiment through `ufl-core`.
+
+**In parallel (separate GA agent flow):** R-0002 — the garust-based GA core,
 contingent on the garust `Scalar` split for `Complex<f64>`.
 
-**Done:** R-0001 (EML core) and R-0003 (s-expr core) — `(eml 1 1)` evaluates
-from text, reusing the verified evaluator.
+**Done:** R-0001 (EML core), R-0003 (s-expr core), R-0004 (predicate checker).
+`(eml 1 1)` evaluates and `⟦ x' = (eml x 1) ⟧` checks — both from text, reusing
+the verified evaluator. 100 tests green across three crates.
