@@ -69,8 +69,9 @@ The remaining atoms, each an s-expression *form* lowering into its typed core.
 | Req | Capability | Atoms / Pillar | Status |
 |-----|------------|----------------|--------|
 | [R-0004](requirements/0004-predicate-layer.md) | **Predicate form (`⟦P⟧`) — the checker** (boolean substrate for control) | Pillar 3 | **Done** (merged, PR #14; `ufl-predicate`, 34 tests) |
-| R-0005 | Geometric forms (`𝒢ₖ`, `∗`) — lower into R-0002's garust multivector | Pillar 2 | Backlog (after R-0002 GA core) |
-| R-0006 | Substrate form + CPU substrate (`⊗`) | Pillar 4 | Backlog |
+| [R-0005](requirements/0005-value-conditional.md) | **Value conditional (`if b a c`)** — the bool→value bridge | control | Discussing (main session) |
+| R-0006 | Geometric forms (`𝒢ₖ`, `∗`) — lower into R-0002's garust multivector | Pillar 2 | Backlog (after R-0002 GA core) |
+| R-0007 | Substrate form + CPU substrate (`⊗`) | Pillar 4 | Backlog |
 
 Predicate (R-0004) is built next by the **main session**; geometric forms
 (R-0005) wait on the R-0002 GA core (built by the GA flow). The two are
