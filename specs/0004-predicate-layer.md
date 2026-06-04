@@ -1,6 +1,6 @@
 # SPEC-0004 — Predicate Layer (`⟦P⟧`) — the Checker
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-02 — three-lens applied; owner accepted, exact equality confirmed)
 - **Realizes:** R-0004
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-02
