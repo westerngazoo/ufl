@@ -36,4 +36,4 @@ the requirement(s) it satisfies. The mapping is maintained in
 | [R-0001](0001-eml-operator-core.md) | EML Operator Core | M1 | Met (the typed core R-0003 lowers into) |
 | [R-0002](0002-geometric-algebra-core.md) | Geometric Algebra Core over G(3,0,0) — *via garust* | M1 | Accepted (built by the GA agent flow) |
 | [R-0003](0003-sexpr-core.md) | Homoiconic S-Expression Core | M2 | Met (merged, PR #11) |
-| [R-0004](0004-predicate-layer.md) | Predicate Layer (`⟦P⟧`) — the Checker | M3 | Draft |
+| [R-0004](0004-predicate-layer.md) | Predicate Layer (`⟦P⟧`) — the Checker | M3 | Met (merged, PR #14) |
