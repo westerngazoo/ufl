@@ -68,7 +68,7 @@ The remaining atoms, each an s-expression *form* lowering into its typed core.
 
 | Req | Capability | Atoms / Pillar | Status |
 |-----|------------|----------------|--------|
-| R-0004 | **Predicate form (`⟦P⟧`)** — control universality (the "all computable" discharge) | Pillar 3 | Discussing (main session) |
+| [R-0004](requirements/0004-predicate-layer.md) | **Predicate form (`⟦P⟧`) — the checker** (boolean substrate for control) | Pillar 3 | In review ([SPEC-0004](specs/0004-predicate-layer.md); `ufl-predicate` green, 34 tests) |
 | R-0005 | Geometric forms (`𝒢ₖ`, `∗`) — lower into R-0002's garust multivector | Pillar 2 | Backlog (after R-0002 GA core) |
 | R-0006 | Substrate form + CPU substrate (`⊗`) | Pillar 4 | Backlog |
 
