@@ -1,6 +1,6 @@
 # R-0006 — Exact Integer-Tensor Core (the discovery substrate)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-04 — owner accepted; Strassen + naive fixtures verified to reconstruct `T_2` with error 0)
 - **Milestone:** M5 — Discovery
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-06-04
