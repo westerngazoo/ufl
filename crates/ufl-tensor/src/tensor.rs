@@ -33,20 +33,41 @@ impl Tensor {
 
     /// Add `v` at `(p, q, r)`. Internal — callers loop `0..dim`, so the index
     /// is in range by construction.
-    // Wired up by `target`/`reconstruct` in R-0006 step 5; unused during TDD-red.
-    #[allow(dead_code)]
     pub(crate) fn add_at(&mut self, p: usize, q: usize, r: usize, v: i64) {
         self.data[(p * self.dim + q) * self.dim + r] += v;
     }
 }
 
-/// The matmul target tensor `T_n` (SPEC-0006 §2.1).
-pub fn target(_n: usize) -> Tensor {
-    unimplemented!("R-0006 implementation — target, see SPEC-0006 §2.1/§3")
+/// The matmul target tensor `T_n` (SPEC-0006 §2.1): `T_n[i·n+j, j·n+k, i·n+k] =
+/// 1` for all `i,j,k ∈ 0..n`, else 0. The map is injective, so every entry is
+/// 0 or 1.
+pub fn target(n: usize) -> Tensor {
+    let d = n * n;
+    let mut t = Tensor::zeros(d);
+    for i in 0..n {
+        for j in 0..n {
+            for k in 0..n {
+                t.add_at(i * n + j, j * n + k, i * n + k, 1);
+            }
+        }
+    }
+    t
 }
 
 /// `Σ (a − b)²` over all entries; `None` if the dims differ (total, no panic);
 /// `Some(0)` iff equal. Exact within the §2.5 i64 envelope.
-pub fn error(_a: &Tensor, _b: &Tensor) -> Option<i64> {
-    unimplemented!("R-0006 implementation — error, see SPEC-0006 §3")
+pub fn error(a: &Tensor, b: &Tensor) -> Option<i64> {
+    if a.dim != b.dim {
+        return None;
+    }
+    Some(
+        a.data
+            .iter()
+            .zip(&b.data)
+            .map(|(x, y)| {
+                let diff = x - y;
+                diff * diff
+            })
+            .sum(),
+    )
 }

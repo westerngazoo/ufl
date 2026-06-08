@@ -71,17 +71,12 @@ impl Triple {
         false
     }
 
-    // The u/v/w accessors are consumed by `reconstruct` in R-0006 step 5;
-    // unused during TDD-red.
-    #[allow(dead_code)]
     pub(crate) fn u(&self) -> &[i8] {
         &self.u
     }
-    #[allow(dead_code)]
     pub(crate) fn v(&self) -> &[i8] {
         &self.v
     }
-    #[allow(dead_code)]
     pub(crate) fn w(&self) -> &[i8] {
         &self.w
     }
