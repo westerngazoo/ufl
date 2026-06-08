@@ -1,0 +1,11 @@
+[package]
+name = "ufl-tensor"
+version = "0.1.0"
+description = "UFL — exact integer-tensor core for matmul-decomposition discovery. T_n, schemes, exact reconstruction. Realizes R-0006."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+thiserror = "2"

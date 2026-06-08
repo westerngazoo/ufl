@@ -37,3 +37,5 @@ the requirement(s) it satisfies. The mapping is maintained in
 | [R-0002](0002-geometric-algebra-core.md) | Geometric Algebra Core over G(3,0,0) — *via garust* | M1 | Accepted (built by the GA agent flow) |
 | [R-0003](0003-sexpr-core.md) | Homoiconic S-Expression Core | M2 | Met (merged, PR #11) |
 | [R-0004](0004-predicate-layer.md) | Predicate Layer (`⟦P⟧`) — the Checker | M3 | Met (merged, PR #14) |
+| R-0005 | Value Conditional (`if`) | M3 | **Shelved** (language-build thread paused for the discovery pivot; on branch `R-0005-value-conditional`) |
+| [R-0006](0006-integer-tensor-core.md) | Exact Integer-Tensor Core (`ufl-tensor`) | M5 — Discovery | Draft |

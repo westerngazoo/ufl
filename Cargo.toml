@@ -4,7 +4,7 @@
 # Planned decomposition: see crates/README.md.
 [workspace]
 resolver = "2"
-members = ["crates/ufl-core", "crates/ufl-syntax", "crates/ufl-predicate"]
+members = ["crates/ufl-core", "crates/ufl-syntax", "crates/ufl-predicate", "crates/ufl-tensor"]
 
 [workspace.package]
 edition = "2021"

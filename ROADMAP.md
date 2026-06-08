@@ -77,14 +77,34 @@ Predicate (R-0004) is built next by the **main session**; geometric forms
 independent — predicates need booleans + the s-expr core (done); geometric
 forms need the garust multivector.
 
-### M4 — Later
+### M5 — Discovery (matmul decomposition)  ·  *current headline*
+
+> **2026-06-04 — pivot.** After the [`ufl-discovery` PRD](https://docs.google.com/document/d/170cdfV8ZvglRa_9jz7Gr8MBV1WFyxNfxXFZ6G2Dxabo)
+> review ([`ufl-discovery/FINDINGS.md`](ufl-discovery/FINDINGS.md)), the new
+> headline is an **AlphaTensor-style discovery engine** — rediscover Strassen's
+> 7-multiplication 2×2 scheme by search + exact verification, then generalize
+> across sizes. Pursued **Path B**: extend the substrate so the verifier *is*
+> the Hehner predicate discharge of `P_n,R` (not a parallel check). The
+> language-build thread (value conditional, GA forms, substrate orchestrator)
+> is **paused** for this.
+
+| Req | Capability | Status |
+|-----|------------|--------|
+| [R-0006](requirements/0006-integer-tensor-core.md) | **Exact integer-tensor core** (`ufl-tensor`) — `T_n`, scheme genotype, exact reconstruction + error. PRD Phase 0. | In review (`ufl-tensor` green, 33 tests; **Strassen gate passes**) |
+| R-0007 | **Tensor-equality predicate** — extend `ufl-predicate` so `P_n,R` (Σ u⊗v⊗w == T_n) is expressible & dischargeable. Closes FINDINGS C1. | Backlog (needs R-0006) |
+| R-0008 | **Discovery engine** (`ufl-discovery`) — GA search; verifier = the predicate discharge. PRD Phases 1–3. | Backlog (needs R-0007) |
+
+### M4 / language-build — *paused for the discovery pivot*
+
+Resumable when the discovery thread reaches a milestone. The value conditional
+exploration is shelved on branch `R-0005-value-conditional` (recoverable).
 
 | Req | Capability | Source | Status |
 |-----|------------|--------|--------|
-| R-0007 | Macros / quasiquote (exploit homoiconicity) | LISP metaprogramming | Backlog |
-| R-0008 | Grade-filtered neural layer | proposal §4 | Backlog |
-| R-0009 | GAPU mapping + reservoir experiment | proposal §5 | Backlog |
-| R-0010 | Log–GA compatibility (reconsidered — Q1 partly dissolves under EML-as-representation) | bridge · Q1 | Backlog |
+| R-0005 | Value conditional (`if b a c`) | control | Shelved (branch) |
+| (lang) | GA s-expr forms (`𝒢ₖ`, `∗`) — lower into R-0002's garust multivector | Pillar 2 | Paused (after GA core) |
+| (lang) | Substrate form + CPU substrate (`⊗`) | Pillar 4 | Paused |
+| (lang) | Macros / quasiquote; grade-filtered neural layer; GAPU mapping; Log–GA compat | proposal §4/§5, Q1 | Paused |
 
 ## Sequencing rules
 
@@ -98,21 +118,24 @@ forms need the garust multivector.
 
 ## Current focus
 
-**Next requirement — to be chosen.** With R-0001 (EML core), R-0003 (s-expr
-surface), and R-0004 (predicate checker) all merged, the open candidates are:
+**M5 Discovery — Path B.** The headline is the matmul-decomposition discovery
+engine (rediscover Strassen, then generalize), built so the verifier is the
+Hehner discharge of `P_n,R`. The Path-B chain, foundational-first:
 
-- **Branching `(if b S T)`** — the next control rung, built from R-0004's
-  `and`/`or`/`not` substrate (`(b ∧ S) ∨ (¬b ∧ T)`). Advances control
-  universality.
-- **GA s-expr forms (R-0005)** — `𝒢ₖ`/`∗` as forms lowering into the garust
-  multivector — once the **GA agent flow** lands the R-0002 garust core.
-- **The literal eml-NAND tree** — materialise §3 of
-  [`theory/universal-computability.md`](theory/universal-computability.md) as a
-  pure-eml experiment through `ufl-core`.
+1. **R-0006 — exact integer-tensor core** (`ufl-tensor`): `T_n`, the scheme
+   genotype, exact reconstruction + error, and the **Strassen Phase-0 gate**.
+   Pure integer; no EML/Complex (FINDINGS C3). *Requirement drafted; pending
+   acceptance.*
+2. **R-0007 — tensor-equality predicate**: bridge the core into `ufl-predicate`
+   so `P_n,R` is dischargeable (closes FINDINGS C1).
+3. **R-0008 — discovery engine** (`ufl-discovery`): GA search, verifier = the
+   predicate discharge.
 
-**In parallel (separate GA agent flow):** R-0002 — the garust-based GA core,
-contingent on the garust `Scalar` split for `Complex<f64>`.
+**Paused:** the language-build thread (R-0005 value conditional shelved on its
+branch; GA forms / substrate / macros / neural / GAPU) — resumable later.
 
-**Done:** R-0001 (EML core), R-0003 (s-expr core), R-0004 (predicate checker).
-`(eml 1 1)` evaluates and `⟦ x' = (eml x 1) ⟧` checks — both from text, reusing
-the verified evaluator. 100 tests green across three crates.
+**In parallel (separate GA agent flow):** R-0002 — the garust-based GA core.
+
+**Done:** R-0001 (EML core), R-0003 (s-expr core), R-0004 (predicate checker) —
+100 tests green across three crates. `ufl-discovery/FINDINGS.md` records the PRD
+review that set this direction.
