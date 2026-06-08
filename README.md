@@ -14,6 +14,10 @@ why it can exist — in detail, and with a plain-language appendix for newcomers
 **Want the language tour?** [`docs/the-shape-of-ufl.md`](docs/the-shape-of-ufl.md)
 shows what's built today, what writing UFL will look like, and how the same EML
 tree compiles to each substrate (CPU, stack machine, FPGA, analog, neural).
+**Want to *run* it?** Open [`docs/playground.html`](docs/playground.html) in a
+browser — an interactive architecture diagram plus a live playground (a faithful
+JS port of the evaluator, predicate checker, and tensor verifier): evaluate
+`(eml 1 1)`, check `⟦x' = (eml x 1)⟧`, and verify the Strassen scheme.
 
 ## The four pillars
 
