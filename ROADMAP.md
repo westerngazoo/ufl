@@ -90,8 +90,8 @@ forms need the garust multivector.
 
 | Req | Capability | Status |
 |-----|------------|--------|
-| [R-0006](requirements/0006-integer-tensor-core.md) | **Exact integer-tensor core** (`ufl-tensor`) — `T_n`, scheme genotype, exact reconstruction + error. PRD Phase 0. | In review (`ufl-tensor` green, 33 tests; **Strassen gate passes**) |
-| R-0007 | **Tensor-equality predicate** — extend `ufl-predicate` so `P_n,R` (Σ u⊗v⊗w == T_n) is expressible & dischargeable. Closes FINDINGS C1. | Backlog (needs R-0006) |
+| [R-0006](requirements/0006-integer-tensor-core.md) | **Exact integer-tensor core** (`ufl-tensor`) — `T_n`, scheme genotype, exact reconstruction + error. PRD Phase 0. | **Done** (merged, PR #16; 33 tests, Strassen gate passes) |
+| [R-0007](requirements/0007-tensor-predicate.md) | **Tensor-equality predicate** — `P_n,R` (Σ u⊗v⊗w == T_n ∧ rank == R) dischargeable as a Hehner predicate. Closes FINDINGS C1. | Discussing |
 | R-0008 | **Discovery engine** (`ufl-discovery`) — GA search; verifier = the predicate discharge. PRD Phases 1–3. | Backlog (needs R-0007) |
 
 ### M4 / language-build — *paused for the discovery pivot*
