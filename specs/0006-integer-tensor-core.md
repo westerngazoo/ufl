@@ -1,6 +1,6 @@
 # SPEC-0006 — Exact Integer-Tensor Core (`ufl-tensor`)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-04 — three-lens applied; owner accepted)
 - **Realizes:** R-0006
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-04

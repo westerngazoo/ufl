@@ -40,7 +40,7 @@ field. The build order across requirements and specs is in
 
 | [SPEC-0004](0004-predicate-layer.md) | Predicate Layer (`⟦P⟧`) — the Checker | R-0004 | Implemented (merged) |
 
-| [SPEC-0006](0006-integer-tensor-core.md) | Exact Integer-Tensor Core (`ufl-tensor`) | R-0006 | Draft |
+| [SPEC-0006](0006-integer-tensor-core.md) | Exact Integer-Tensor Core (`ufl-tensor`) | R-0006 | Accepted |
 
 SPEC-0002 (G(3,0,0) GA core, garust-based) is written by the separate GA agent
 flow against [R-0002](../requirements/0002-geometric-algebra-core.md).
