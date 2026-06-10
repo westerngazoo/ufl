@@ -1,6 +1,6 @@
 # R-0007 — Tensor-Equality Predicate (the Hehner-discharge bridge)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-08 — by owner delegation; **Option A** chosen, to be pressure-tested by the three-lens)
 - **Milestone:** M5 — Discovery
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-06-04
