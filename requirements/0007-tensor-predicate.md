@@ -51,7 +51,9 @@ This is a genuine design decision for the owner; SPEC-0007 commits to one.
 Introduce in `ufl-predicate` a small abstraction: *a predicate is a decidable
 property of a candidate state*, with a `discharge(candidate) -> bool`. R-0004's
 scalar predicate (an `Sexpr` over a pre/post state) is one instance; the tensor
-predicate `TensorEq { n, rank }` over a `Scheme` candidate is another. The
+predicate `RankDecomposition { n, rank }` (named `TensorEq` at drafting; renamed
+per the three-lens review — see the decision log) over a `Scheme` candidate is
+another. The
 discovery engine discharges the tensor predicate directly (a typed Rust call,
 fast enough for a search loop checking millions of candidates).
 
