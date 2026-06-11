@@ -91,6 +91,13 @@ directly in `verify.rs` with a TODO"; "is a dedicated integer reconstruction
 path cleaner?"). This review confirms: **yes, take the direct integer path; the
 predicate bridge is a future aspiration, not available now.**
 
+> **2026-06-08 — C1 status update.** R-0007 / SPEC-0007 (in flight) closes
+> C1's **discharge-unification half**: `P_n,R` becomes a first-class predicate
+> (`RankDecomposition`) discharged through `ufl-predicate`'s `Predicate`
+> contract — the same trait R-0004's scalar Hehner check routes through. The
+> **expression half** (writing tensor predicates as s-expressions, Option B)
+> remains open by design.
+
 ---
 
 ## §7 open questions — answered

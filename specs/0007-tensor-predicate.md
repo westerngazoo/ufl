@@ -44,8 +44,9 @@ pub trait Predicate {
     type Candidate;
     type Error: std::error::Error;
     /// Decide whether `candidate` satisfies this predicate. Total within the
-    /// domain's stated envelope: a malformed candidate is a typed `Error`,
-    /// never a panic.
+    /// domain's stated envelope: a malformed candidate *or an undischargeable
+    /// predicate* (e.g. a non-boolean `Sexpr`, an unbound variable) is a typed
+    /// `Error`, never a panic.
     fn discharge(&self, candidate: &Self::Candidate) -> Result<bool, Self::Error>;
 }
 ```
@@ -104,6 +105,12 @@ constructor, so the trait path and `check` are the same path), and **no wrapper
 struct with hedged fields** (the `Sexpr` is the predicate — no clone, no
 adapter). `eval_pred` remains the documented low-level raw-`Env` door it already
 is under SPEC-0004.
+
+**Implementation constraint (AC2's "unchanged" made literal):** `State::new`
+**delegates to the existing `combined_env` verbatim** (becoming its only
+caller) rather than absorbing it — the five existing unit tests that target
+`combined_env` directly then remain untouched, and "all R-0004 tests pass
+unchanged" holds at the test-file level, not just behaviourally.
 
 ### 2.3 The tensor instance (in `crates/ufl-discovery`)
 
@@ -169,6 +176,10 @@ A trait-only `ufl-predicate-core` crate was considered and rejected as the
 actual premature abstraction (a crate for six lines, with no consumer that must
 avoid `ufl-syntax`).
 
+The same PR **updates `crates/README.md`** — its decomposition table still
+carries pre-pivot spec numbers and lacks `ufl-tensor` and `ufl-discovery`
+(review finding; the table is `CLAUDE.md` §6's crate-boundary reference).
+
 ### 2.5 Test fixtures
 
 The Strassen 7-triple keystone lives as a private fn in `ufl-tensor`'s
@@ -199,7 +210,12 @@ fn discharge_all<P: Predicate>(p: &P, candidates: &[P::Candidate])
 
 - The GA search / engine (R-0008) — `crates/ufl-discovery` gains only the
   predicate here. (R-0008's design review may reshape the crate's internals;
-  recorded as an assumption, not a commitment.)
+  recorded as an assumption, not a commitment.) **Breadcrumb for R-0008:**
+  `RankDecomposition` already holds the cached target, so the GA's *graded*
+  fitness is the same computation one method short — a `residual(&self, scheme)
+  -> Result<i64, SchemeError>` beside `discharge` would make the fitness
+  function and the verifier provably the same computation. Deliberately not
+  added here.
 - Tensor values/forms in the s-expr language (Option B) — the *expression* half
   of C1, deferred.
 - The orchestrator; buffer-reuse optimization of `discharge` (a measured R-0008
@@ -253,16 +269,30 @@ fixed.
 | 2026-06-08 | `RankDecomposition::new` **caches `T_n`**; discharge reconstructs unconditionally, dim-checks, then conjoins rank. Renamed from `TensorEq` (the rank bound is the discovery prize; the old name named one conjunct). | Fixes the review's blocking finding (short-circuit made the error contract flip on the rank field, violating AC5) and the measured per-call `target(n)` rebuild (2 allocations → 1). |
 | 2026-06-08 | Crate at `crates/ufl-discovery`; root `ufl-discovery/` stays the research-doc home. Strassen fixture duplicated in tests (cited), shared-fixture machinery deferred. | Placement was unstated (maintainer trap); fixture duplication ≠ code duplication. |
 | 2026-06-08 | C1 claim scoped honestly: this closes the **discharge-unification half**; the expression half (Option B tensor s-exprs) remains open by design. | The hater's overstatement finding; FINDINGS.md annotated to match. |
+| 2026-06-08 | Architect + nice-guy passes applied: R-0007 reconciled (rename, AC precision, AC6 restatement, decision-log rows); `State::new` delegates to `combined_env` verbatim; trait doc widened to undischargeable predicates; `crates/README.md` update folded into the PR; the R-0008 `residual()` breadcrumb recorded; a crate-level doctest (an `n = 1` discharge end-to-end) is part of the implementation per CLAUDE.md §6. | Architect REQUEST CHANGES was reconciliation-only (design verified sound against the real APIs, including error precedence of the routed path); nice-guy STRONG WORK with two thin spots (FINDINGS annotation, AC2 cheap path), both closed. |
+
+## 8. Companion edits (this branch)
+
+- `requirements/0007-tensor-predicate.md` — reconciled (the architect's gating
+  finding).
+- `ufl-discovery/FINDINGS.md` — C1 annotated with the half-closure.
+- `crates/README.md` — decomposition table brought to post-pivot reality.
+- `docs/conventions.md` — engineering-patterns register added (nice-guy
+  opportunity): Invariant Tripwire, Guard Inside the Candidate, Structural
+  Frugality over Wall-Clock, Fixture Duplication with an Un-deferral Trigger.
 
 ## Changelog
 
 - 2026-06-08 — created (Draft).
-- 2026-06-08 — three-lens review applied (architect REQUEST CHANGES → all
-  amendments in; hater NEEDS WORK, executed the draft body and proved the AC5
-  short-circuit violation + measured the per-call target rebuild → both designed
-  out): trait made load-bearing (routed `check`, generic test consumer, `Error`
-  bound, `?Sized` dropped, orchestrator-seam claim softened); scalar instance
-  re-shaped to `impl Predicate for Sexpr` over a guarded `State`;
-  `TensorEq` → `RankDecomposition` with cached target and order-fixed discharge;
-  AC3/AC4/AC5 made partition-precise; AC6 restated structurally (no wall
-  clock); crate path + fixture provenance pinned; C1 claim halved honestly.
+- 2026-06-08 — hater review applied (NEEDS WORK; executed the draft body and
+  proved the AC5 short-circuit violation + measured the per-call target rebuild
+  → both designed out): trait made load-bearing (routed `check`, generic test
+  consumer, `Error` bound, `?Sized` dropped, orchestrator-seam claim softened);
+  scalar instance re-shaped to `impl Predicate for Sexpr` over a guarded
+  `State`; `TensorEq` → `RankDecomposition` with cached target and order-fixed
+  discharge; AC3/AC4/AC5 made partition-precise; AC6 restated structurally (no
+  wall clock); crate path + fixture provenance pinned; C1 claim halved honestly.
+- 2026-06-08 — architect (REQUEST CHANGES, reconciliation-only; design verified
+  sound) + nice-guy (STRONG WORK) applied: R-0007 amended to match; §2.2
+  delegate constraint; §2.1 doc widen; §2.4 crates-README fold-in; §4 R-0008
+  breadcrumb; FINDINGS/conventions companion edits (§8).

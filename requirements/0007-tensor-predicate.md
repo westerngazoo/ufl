@@ -90,19 +90,24 @@ tensor predicate by hand.
 - **AC2 — Scalar predicate is an instance.** R-0004's scalar/Hehner check is
   expressible as (or adapted to) the abstraction without changing its behaviour
   — the existing R-0004 tests still pass.
-- **AC3 — The tensor predicate.** `TensorEq { n, rank }` discharges to `true` on
-  a scheme iff `reconstruct(scheme) == T_n` and `rank(scheme) == R` — i.e. it is
-  exactly `is_valid` (R-0006), now framed as a predicate.
-- **AC4 — Strassen through the predicate.** Discharging the tensor predicate
-  `TensorEq { n: 2, rank: 7 }` on the Strassen scheme returns `true`; on a
-  broken scheme, `false`. The keystone, now via the predicate layer.
+- **AC3 — The tensor predicate.** `RankDecomposition { n, rank }` discharges to
+  `true` on a scheme iff `reconstruct(scheme) == T_n` and `rank(scheme) == R` —
+  i.e. exactly `is_valid` (R-0006) **on dim-consistent schemes**, now framed as
+  a predicate. (Dim-mismatched schemes are AC5's domain: there `discharge` is
+  `Err` where `is_valid` collapses to `false`.)
+- **AC4 — Strassen through the predicate.** Discharging
+  `RankDecomposition { n: 2, rank: 7 }` on the Strassen scheme returns `true`;
+  on a **broken** scheme — *well-formed dim, wrong reconstruction* — `false`.
+  The keystone, now via the predicate layer. (AC4 and AC5 partition the inputs.)
 - **AC5 — Honest discharge, not a wrapper that hides errors.** A dim/`n`
-  mismatch surfaces as a typed error (reusing R-0006's `DimMismatch`), never a
-  panic or a silent `false`.
-- **AC6 — The discovery engine can discharge it.** The abstraction is callable
-  in a tight loop (no per-call allocation surprises that would make a
-  million-candidate search impractical) — demonstrated by a benchmark-style test
-  discharging the predicate over many candidates.
+  mismatch surfaces as a typed error (reusing R-0006's `DimMismatch`)
+  **regardless of the rank field**, never a panic or a silent `false`.
+- **AC6 — The discovery engine can discharge it.** Frugality is **structural,
+  not wall-clock**: the target tensor is computed once per predicate instance
+  (not per discharge), and `discharge` allocates at most the one reconstruction
+  buffer — verified by construction plus a generic batch test discharging the
+  predicate over many candidates. No timing assertion (a wall-clock bound is
+  flaky and cannot reliably fail under the regression it guards).
 
 ## 5. Open questions
 
@@ -122,7 +127,15 @@ tensor predicate by hand.
 |------|----------|-----------|
 | 2026-06-04 | R-0007 makes `P_n,R` a **Hehner predicate discharge**, closing FINDINGS C1 — the step that earns the "rides UFL's verifier" thesis. | R-0006 decides `P_n,R` but as a bespoke `ufl-tensor` function; R-0007 unifies it with UFL's predicate concept. |
 | 2026-06-04 | Realization fork (§3) surfaced; **Option A (domain-general discharge abstraction) recommended** over Option B (tensor s-expr forms). | The GA engine checks millions of candidates → the discharge must be a typed call, not s-expr evaluation; two real instances justify the abstraction; Option B's heterogeneous-value expansion is deferred. Owner to confirm. |
+| 2026-06-08 | **Option A accepted** (owner delegation); requirement `Draft → Accepted`. | Recorded here per the loop; the three-lens review was tasked with pressure-testing the trait. |
+| 2026-06-08 | **Three-lens ruling: the trait is kept and made load-bearing.** `check`/`check_str` route through the trait's `discharge` (so R-0004's production path and tests exercise it) and a generic test consumer exercises `P: Predicate`. Thinning was rejected: it would reduce R-0007 to a rename of `is_valid`. | Architect: CLAUDE.md §2 guards against *wrong* structure, not against naming the founding concept with two real instances. Hater: a trait nobody calls is a fig leaf — routing the production path is what makes the unification real. |
+| 2026-06-08 | `TensorEq` renamed **`RankDecomposition`**; AC3/AC4 made partition-precise; AC6 restated as structural frugality (no wall clock). | The old name named one conjunct — and the omitted conjunct (rank) is exactly the field the review's blocking short-circuit bug flipped on. AC wording reconciled so qa derives tests from the requirement mechanically (architect's gating finding). |
 
 ## Changelog
 
 - 2026-06-04 — created (Draft).
+- 2026-06-08 — accepted (Option A, owner delegation). Three-lens reconciliation:
+  `TensorEq` → `RankDecomposition` in AC3/AC4; AC3 scoped to dim-consistent
+  schemes (AC5 owns the error domain); AC5 strengthened ("regardless of the
+  rank field"); AC6 restated structurally without wall-clock; decision log
+  extended with the trait-kept ruling.

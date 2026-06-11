@@ -32,3 +32,49 @@ still the only callers costs nothing and is consistent with UFL's stance of
 building from a clean base.
 
 **Decided:** 2026-05-19.
+
+## Engineering patterns
+
+Named, reusable disciplines that recur across specs. Cite them by name instead
+of rediscovering them.
+
+### Invariant Tripwire
+
+When a design's correctness is contingent on a property outside its own control
+(a floating-point fact, a runtime behaviour), ship a unit test that asserts the
+property directly, so a future change that breaks the assumption **fails
+loudly** and re-opens the design question deliberately rather than silently.
+Instances: SPEC-0001 AC6 (`sin(τ/2) ≠ 0` underpins the branch self-correction).
+
+**Decided:** 2026-06-08 (practiced since 2026-05-24).
+
+### Guard Inside the Candidate (invariant by construction)
+
+When a value must satisfy an invariant to be used safely, put the guard in the
+type's **only constructor** rather than at each use site — the invalid value
+becomes unconstructible, and every code path is the guarded path. Instances:
+`ufl-tensor`'s `Triple::new`/`Scheme::push` (length consistency — the `d`/`n`
+desync is impossible), SPEC-0007's `State` (the priming/ReservedName rules live
+in `State::new`, so the trait path cannot bypass them).
+
+**Decided:** 2026-06-08.
+
+### Structural Frugality over Wall-Clock
+
+Performance acceptance criteria assert the **mechanism** (a cached field, a
+bounded allocation count) — never a timing bound. A wall-clock test is flaky on
+shared CI and cannot reliably fail under the regression it guards. Complement
+of the Invariant Tripwire: assert the symptom when the mechanism is outside
+your control; assert the mechanism when it is yours. Instance: SPEC-0007 AC6.
+
+**Decided:** 2026-06-08.
+
+### Fixture Duplication with an Un-deferral Trigger
+
+Test fixtures (e.g. the Strassen 7-triple keystone) may be duplicated across
+crates with a comment citing the source of truth — fixture duplication is not
+code duplication. Shared-fixture machinery is deferred **until a third consumer
+exists**; the deferral ships with its own un-deferral trigger, which is what
+makes it a rule rather than a shrug. Instance: SPEC-0007 §2.5.
+
+**Decided:** 2026-06-08.
