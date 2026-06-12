@@ -39,4 +39,5 @@ the requirement(s) it satisfies. The mapping is maintained in
 | [R-0004](0004-predicate-layer.md) | Predicate Layer (`⟦P⟧`) — the Checker | M3 | Met (merged, PR #14) |
 | R-0005 | Value Conditional (`if`) | M3 | **Shelved** (language-build thread paused for the discovery pivot; on branch `R-0005-value-conditional`) |
 | [R-0006](0006-integer-tensor-core.md) | Exact Integer-Tensor Core (`ufl-tensor`) | M5 — Discovery | Met (merged, PR #16) |
-| [R-0007](0007-tensor-predicate.md) | Tensor-equality predicate (the Hehner-discharge bridge) | M5 — Discovery | Accepted (implementation in review) |
+| [R-0007](0007-tensor-predicate.md) | Tensor-equality predicate (the Hehner-discharge bridge) | M5 — Discovery | Met (merged, PR #18) |
+| [R-0008](0008-discovery-engine.md) | Discovery engine — GA search for matmul decompositions | M5 — Discovery | Draft |

@@ -91,8 +91,8 @@ forms need the garust multivector.
 | Req | Capability | Status |
 |-----|------------|--------|
 | [R-0006](requirements/0006-integer-tensor-core.md) | **Exact integer-tensor core** (`ufl-tensor`) — `T_n`, scheme genotype, exact reconstruction + error. PRD Phase 0. | **Done** (merged, PR #16; 33 tests, Strassen gate passes) |
-| [R-0007](requirements/0007-tensor-predicate.md) | **Tensor-equality predicate** — `P_n,R` dischargeable as a Hehner predicate (`RankDecomposition` via the load-bearing `Predicate` trait). Closes FINDINGS C1's discharge half. | In review (`ufl-discovery` green, 19 tests + doctest; Strassen discharged through the trait) |
-| R-0008 | **Discovery engine** (`ufl-discovery`) — GA search; verifier = the predicate discharge. PRD Phases 1–3. | Backlog (needs R-0007) |
+| [R-0007](requirements/0007-tensor-predicate.md) | **Tensor-equality predicate** — `P_n,R` dischargeable as a Hehner predicate (`RankDecomposition` via the load-bearing `Predicate` trait). Closes FINDINGS C1's discharge half. | **Done** (merged, PR #18; Strassen discharged through the trait) |
+| [R-0008](requirements/0008-discovery-engine.md) | **Discovery engine** (`ufl-discovery`) — GA search whose accept step is the R-0007 discharge. PRD Phases 0–1 (rediscover Strassen). | Discussing |
 
 ### M4 / language-build — *paused for the discovery pivot*
 
@@ -118,18 +118,13 @@ exploration is shelved on branch `R-0005-value-conditional` (recoverable).
 
 ## Current focus
 
-**M5 Discovery — Path B.** The headline is the matmul-decomposition discovery
-engine (rediscover Strassen, then generalize), built so the verifier is the
-Hehner discharge of `P_n,R`. The Path-B chain, foundational-first:
-
-1. **R-0006 — exact integer-tensor core** (`ufl-tensor`): `T_n`, the scheme
-   genotype, exact reconstruction + error, and the **Strassen Phase-0 gate**.
-   Pure integer; no EML/Complex (FINDINGS C3). *Requirement drafted; pending
-   acceptance.*
-2. **R-0007 — tensor-equality predicate**: bridge the core into `ufl-predicate`
-   so `P_n,R` is dischargeable (closes FINDINGS C1).
-3. **R-0008 — discovery engine** (`ufl-discovery`): GA search, verifier = the
-   predicate discharge.
+**R-0008 — the discovery engine.** Steps 1–2 of Path B are **Done**: R-0006
+(the exact integer verifier, Strassen gate) and R-0007 (the verifier *is* the
+Hehner discharge — `P_{2,7}(strassen) → Ok(true)` through the same `Predicate`
+trait the scalar checker routes through). What remains is the prize: the GA
+search (PRD Phases 0–1) that finds an exact rank-7 scheme **without being given
+Strassen**, accepting candidates via the R-0007 discharge and emitting a
+re-verifiable certificate. *Requirement drafted; pending acceptance.*
 
 **Paused:** the language-build thread (R-0005 value conditional shelved on its
 branch; GA forms / substrate / macros / neural / GAPU) — resumable later.
