@@ -1,14 +1,31 @@
 //! The tensor instance of the `Predicate` trait (SPEC-0007 §2.3).
 
 use ufl_predicate::Predicate;
-use ufl_tensor::{target, Scheme, SchemeError, Tensor};
+use ufl_tensor::{error, reconstruct, target, Scheme, SchemeError, Tensor};
 
 /// `P_{n,R}`: a scheme satisfies it iff it is a valid **rank-R decomposition**
 /// of the matmul tensor `T_n` — `reconstruct(scheme) == T_n` AND
 /// `rank(scheme) == R`. (Named for both conjuncts: the rank bound is the
 /// discovery prize.)
-// Fields are consumed by `discharge` in R-0007 step 5; unread during TDD-red.
-#[allow(dead_code)]
+///
+/// Relation to `ufl_tensor::is_valid` (SPEC-0007 §2.3): on dim-consistent
+/// schemes, `discharge == Ok(is_valid(scheme, n, rank))`; on dim-mismatched
+/// schemes `discharge` is `Err(DimMismatch)` where `is_valid` collapses to
+/// `false`.
+///
+/// ```
+/// use ufl_discovery::RankDecomposition;
+/// use ufl_predicate::Predicate;
+/// use ufl_tensor::{Scheme, Triple};
+///
+/// // n = 1: 1×1 matmul is one multiplication — the trivial exact scheme.
+/// let mut scheme = Scheme::new();
+/// scheme
+///     .push(Triple::new(vec![1], vec![1], vec![1]).unwrap())
+///     .unwrap();
+/// let p = RankDecomposition::new(1, 1);
+/// assert_eq!(p.discharge(&scheme), Ok(true));
+/// ```
 pub struct RankDecomposition {
     n: usize,
     rank: usize,
@@ -33,8 +50,18 @@ impl Predicate for RankDecomposition {
 
     /// Reconstruct unconditionally, dim-check against the cached target, then
     /// conjoin the rank bound. A dim/`n` mismatch is **always**
-    /// `Err(DimMismatch)` — independent of the rank field (SPEC-0007 §2.3).
-    fn discharge(&self, _scheme: &Scheme) -> Result<bool, SchemeError> {
-        unimplemented!("R-0007 implementation — discharge, see SPEC-0007 §2.3")
+    /// `Err(DimMismatch)` — independent of the rank field (SPEC-0007 §2.3; the
+    /// review's blocking finding was a short-circuit that flipped the error
+    /// contract on the rank conjunct).
+    fn discharge(&self, scheme: &Scheme) -> Result<bool, SchemeError> {
+        let recon = reconstruct(scheme);
+        match error(&recon, &self.target) {
+            None => Err(SchemeError::DimMismatch {
+                n: self.n,
+                expected: self.target.dim(),
+                got: recon.dim(),
+            }),
+            Some(e) => Ok(e == 0 && scheme.rank() == self.rank),
+        }
     }
 }
