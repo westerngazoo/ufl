@@ -1,0 +1,12 @@
+[package]
+name = "ufl-discovery"
+version = "0.1.0"
+description = "UFL — discovery bridge: the matmul-decomposition predicate P_{n,R} as a Hehner discharge (SPEC-0007), home of the future GA engine (R-0008)."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+ufl-predicate = { path = "../ufl-predicate" }
+ufl-tensor = { path = "../ufl-tensor" }

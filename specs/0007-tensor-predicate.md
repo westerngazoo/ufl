@@ -1,6 +1,6 @@
 # SPEC-0007 — Tensor-Equality Predicate (the Hehner-discharge bridge)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-08 — three-lens complete: hater NEEDS WORK → fixed; architect REQUEST CHANGES → reconciled → confirmation APPROVE; nice-guy STRONG WORK; owner accepted)
 - **Realizes:** R-0007 (Option A — the typed discharge abstraction)
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-08

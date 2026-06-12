@@ -84,6 +84,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufl-discovery"
+version = "0.1.0"
+dependencies = [
+ "ufl-predicate",
+ "ufl-tensor",
+]
+
+[[package]]
 name = "ufl-predicate"
 version = "0.1.0"
 dependencies = [
