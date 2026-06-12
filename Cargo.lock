@@ -87,7 +87,9 @@ dependencies = [
 name = "ufl-discovery"
 version = "0.1.0"
 dependencies = [
+ "ufl-core",
  "ufl-predicate",
+ "ufl-syntax",
  "ufl-tensor",
 ]
 

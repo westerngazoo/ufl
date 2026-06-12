@@ -10,3 +10,10 @@ repository.workspace = true
 [dependencies]
 ufl-predicate = { path = "../ufl-predicate" }
 ufl-tensor = { path = "../ufl-tensor" }
+
+# Test-only: the R-0007 acceptance suite exercises the scalar instance too
+# (AC1/AC2 — `read` from ufl-syntax, `Value`/`eval` from ufl-core). Both are
+# already transitive via ufl-predicate; the production graph is unchanged.
+[dev-dependencies]
+ufl-core = { path = "../ufl-core" }
+ufl-syntax = { path = "../ufl-syntax" }
