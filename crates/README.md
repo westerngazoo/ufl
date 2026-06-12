@@ -3,16 +3,27 @@
 UFL Rust workspace crates. Each crate is created only when its governing spec
 is accepted — nothing here is pre-scaffolded.
 
-## Planned decomposition
+## Current decomposition
 
-| Crate | Responsibility | Atoms / Pillar | Spec |
-|-------|----------------|----------------|------|
-| `ufl-core` | Log-domain arithmetic + GA multivectors | ℒ ⊕ 𝒢ₖ ∗ — Pillars 1–2 | 0002, 0003, 0004 |
-| `ufl-predicate` | Hehner pre/post-state predicates | ⟦P⟧ — Pillar 3 | 0005 |
-| `ufl-syntax` | Lexer, parser, AST for UFL surface notation | — | 0006 |
-| `ufl-eval` | parse → predicate-check → evaluate | — | 0007 |
-| `ufl-substrate` | Substrate contract trait, cost model, CPU substrate | ⊗ — Pillar 4 | 0008 |
-| `ufl-cli` | Entry-point binary | — | TBD |
+| Crate | Responsibility | Atoms / Pillar | Spec | Status |
+|-------|----------------|----------------|------|--------|
+| `ufl-core` | The EML numeric core: `Eml` tree + reference evaluator over `Complex<f64>` | `eml` · `1` | SPEC-0001 | shipped |
+| `ufl-syntax` | Homoiconic s-expression surface: `Sexpr`, reader, lowering into `Eml` | the AST itself | SPEC-0003 | shipped |
+| `ufl-predicate` | Hehner predicate checker over pre/post state; the `Predicate` discharge trait | `⟦P⟧` — Pillar 3 | SPEC-0004, SPEC-0007 | shipped / in flight |
+| `ufl-tensor` | Exact integer-tensor core for matmul decomposition (`T_n`, schemes, reconstruction) — pure leaf | discovery substrate | SPEC-0006 | shipped |
+| `ufl-discovery` | Discovery bridge + engine: the `RankDecomposition` predicate (SPEC-0007), then the GA search (R-0008) | discovery | SPEC-0007 | in flight |
+
+Note: the root-level `ufl-discovery/` directory is the discovery thread's
+*research-artifact* home (FINDINGS.md, writeups); the crate lives at
+`crates/ufl-discovery`. Deliberately distinct homes.
+
+## Planned (paused language-build thread)
+
+| Crate | Responsibility | Atoms / Pillar |
+|-------|----------------|----------------|
+| GA core | Geometric algebra over G(3,0,0) via garust (`Complex<f64>` coefficients) — built by the separate GA agent flow (R-0002) | `𝒢ₖ` `∗` — Pillar 2 |
+| `ufl-substrate` | Substrate contract trait, cost model, CPU substrate | `⊗` — Pillar 4 |
+| `ufl-cli` | Entry-point binary | — |
 
 When a crate is added, register it in the workspace `members` list in the
-top-level `Cargo.toml`.
+top-level `Cargo.toml` and update this table in the same PR.

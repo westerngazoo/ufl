@@ -13,8 +13,10 @@
 #![forbid(unsafe_code)]
 
 mod eval_pred;
+mod predicate;
 
 pub use eval_pred::{eval_pred, PredError};
+pub use predicate::{Predicate, State};
 
 use ufl_core::{Env, Value};
 use ufl_syntax::{read, ReadError, Sexpr};
@@ -50,24 +52,28 @@ fn combined_env(pre: &[(&str, Value)], post: &[(&str, Value)]) -> Result<Env, Ch
 }
 
 /// Check a predicate `Sexpr` against a pre-state and a post-state.
+///
+/// Routes through the [`Predicate`] trait (SPEC-0007 §2.2): the s-expression
+/// *is* the predicate, discharged against the guarded [`State`]. Behaviour is
+/// identical to the pre-trait path (`State::new` delegates to `combined_env`).
 pub fn check(
     predicate: &Sexpr,
     pre: &[(&str, Value)],
     post: &[(&str, Value)],
 ) -> Result<bool, CheckError> {
-    let env = combined_env(pre, post)?;
-    Ok(eval_pred(predicate, &env)?)
+    predicate.discharge(&State::new(pre, post)?)
 }
 
 /// Read a predicate from text, then check it against a pre/post state.
+///
+/// Error precedence is unchanged: `Read` first, then `ReservedName`, then
+/// `Pred` (the receiver `read(src)?` evaluates before the `State` argument).
 pub fn check_str(
     src: &str,
     pre: &[(&str, Value)],
     post: &[(&str, Value)],
 ) -> Result<bool, CheckError> {
-    let predicate = read(src)?;
-    let env = combined_env(pre, post)?;
-    Ok(eval_pred(&predicate, &env)?)
+    read(src)?.discharge(&State::new(pre, post)?)
 }
 
 #[cfg(test)]
