@@ -1,6 +1,6 @@
 # SPEC-0008 — Discovery Engine (loop validation + blind-proposer falsification)
 
-- **Status:** Draft (revised after the empirical de-risk + first three-lens)
+- **Status:** Draft — **three-lens passed** (hater SHIP IT, architect APPROVE, nice-guy STRONG WORK; ready for Draft → Accepted, owner's call)
 - **Realizes:** R-0008
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-12
@@ -252,8 +252,10 @@ tangible).
   recorded rank-7 trajectory must satisfy, for every seed: an *initial strict
   decrease* (final-generation best residual `<` seed-population best) **and**
   termination `> 0`** — the descend-then-stall signature measured in §4b. A
-  no-op or mis-seeded engine (no decrease) fails AC4. Strassen's scheme appears
-  **only in tests**, never in the engine path.
+  no-op or mis-seeded engine (no decrease) fails AC4. *(The guard is asserted on
+  the **rank-7** trajectory specifically — rank-8 is the sanity run and may or
+  may not solve.)* Strassen's scheme appears **only in tests**, never in the
+  engine path.
 - [ ] **AC5 — Certificates.** Every `Found.scheme` re-discharges `Ok(true)`
   through a **freshly constructed** `RankDecomposition`.
 - [ ] **AC6 — Diagnostics.** `Exhausted` carries the per-generation
