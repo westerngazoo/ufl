@@ -153,6 +153,46 @@ mechanics on a solvable known-answer instance) plus the documented blind-GA
 falsification as its honest headline result — which is precisely what AC6 was
 written to capture.
 
+### 4b. Empirical de-risk — what a blind proposer CAN validate (the planted target)
+
+The §4a falsification forced the question: what solvable known-answer instance
+can R-0008 validate the *loop* on? A **planted target** — a tensor built as the
+sum of a fixed set of `{-1,0,+1}` triples, so a low-rank decomposition provably
+exists. The engine must rediscover *a* decomposition blind (it is never handed
+the planted triples).
+
+**The fixed instance** (`d = 4`, the R-0008 test fixture — pin these literals so
+it is RNG-independent and reproducible):
+
+```
+triple 1:  u=[ 0, 0, 1, 0]  v=[ 1, 1, 0, 0]  w=[ 1, 1,-1, 0]
+triple 2:  u=[-1, 1, 0, 0]  v=[-1,-1, 1, 1]  w=[ 1,-1, 0,-1]
+triple 3:  u=[ 0, 0,-1, 0]  v=[-1,-1, 0, 1]  w=[-1, 0,-1, 1]
+triple 4:  u=[ 0, 0, 1, 1]  v=[-1, 0, 1, 1]  w=[ 0, 0, 0, 1]
+triple 5:  u=[ 0, 0, 0, 0]  v=[ 1, 0, 1,-1]  w=[-1, 0, 1, 0]   (u = 0 ⇒ degenerate)
+```
+
+Target `T_planted` = Σ uᵢ⊗vᵢ⊗wᵢ has 39 non-zero entries. **True rank ≤ 4** (triple
+5 is degenerate); searching at **rank 5** gives deliberate slack — appropriate for
+a *solvable loop-validation gate* (we want it reliably findable, not minimal).
+
+**Result — pinned config** (population 300, generations 1500, tournament 5,
+mutation 2, elitism 4): the blind GA recovers an exact (residual 0) rank-5
+decomposition for **8 of seeds 0..=9** (gens 55–1294 to first hit; the two misses
+plateau at residual 2–3). This is the evidence base for AC3's ≥6/10 gate (set
+below the measurement with margin). *Caveat:* this is the Python de-risk's pass
+rate under Python's RNG; the Rust engine uses `SplitMix64`, so its exact pass
+count is independently verified at QA — the instance's *solvability* is what
+transfers, and ≥6/10 is the honest gate.
+
+**The matmul descent signature (the AC4 checkable property).** On the unsolvable
+`T_2` rank-7 case, the same engine on all 10 seeds drives the best residual from
+~52–69 (seed population) down to 2–5 (final) — **strict decrease, terminating
+above 0, every seed.** That is the falsifiable proof the *engine functions* and
+the *landscape* is the wall: a no-op or broken engine would show no decrease.
+AC4 must assert exactly this (initial strict decrease ∧ terminates > 0 for all
+seeds), so "documented either way" cannot launder a broken engine.
+
 ## 5. Architectural implications for the spec chain
 
 1. **The R-0008 forward seam becomes proposer-agnostic.** SPEC-0008 must name a

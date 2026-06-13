@@ -12,9 +12,9 @@
 
 SPEC-0008 builds the seeded genetic **discovery engine** and validates it end to
 end, with its scope set by the **empirical de-risk** in
-[`papers-review.md`](../ufl-discovery/papers-review.md) §4a: three independent
-blind methods cannot drive 2×2 matmul to exact residual 0 (rank-7 0/10), but a
-blind GA recovers a **planted solvable target 8/10**. So:
+[`papers-review.md`](../ufl-discovery/papers-review.md): three independent blind
+methods cannot drive 2×2 matmul to exact residual 0 (rank-7 0/10, §4a), but a
+blind GA recovers a **planted solvable target 8/10** (§4b). So:
 
 - **R-0008 validates the *loop and the seam*** — proposer → `residual` →
   `discharge` accept → certificate — on the **planted target** (a problem a
@@ -95,13 +95,20 @@ expressed `Scheme`.
 ### 2.4 `GaProposer` — the blind proposer (concrete, with pinned config)
 
 ```rust
-/// Pinned defaults — the configuration that recovered the planted target 8/10
-/// in the de-risk (papers-review §4a). Pre-registered so AC3's gate is honest.
 pub struct GaConfig {
-    pub population: usize,      // 300
-    pub tournament_size: usize, // 5
-    pub mutation_count: usize,  // 2
-    pub elitism: usize,         // 4  (REQUIRED ≥ 1 — see AC6)
+    pub population: usize,
+    pub tournament_size: usize,
+    pub mutation_count: usize,
+    pub elitism: usize,         // REQUIRED ≥ 1 — see AC6
+}
+impl GaConfig {
+    /// The single pinned configuration that recovered the planted target 8/10
+    /// in the de-risk (papers-review §4b). One auditable object — AC1/AC3
+    /// reproduce from code, not from prose. `generations` (1500) lives on
+    /// `Config`; this names the rest.
+    pub const fn pinned() -> Self {
+        Self { population: 300, tournament_size: 5, mutation_count: 2, elitism: 4 }
+    }
 }
 ```
 
@@ -160,6 +167,16 @@ pub fn run(config: &Config) -> Result<Outcome, EngineError> {
 construction, so `residual == 0` already implies `discharge == Ok(true)`; the
 `debug_assert` documents that invariant without making it control flow.
 
+**Trajectory & generation semantics (pinned so AC1 golden values are derivable).**
+`trajectory[i]` is the best residual of the population *scored at loop entry `i`*;
+**index 0 is the seed population** (before any `vary`). On `Exhausted` after the
+full budget, `trajectory.len() == generations + 1` (seed + one per generation).
+On `Found`, the accepting population is *not* pushed, so a hit at iteration `k`
+gives `Found { generation: k }` with `trajectory.len() == k` — and
+`generation = k` means **`k` `vary` applications preceded acceptance** (`k = 0` ⇒
+the seed population already contained a solution). AC6's monotonicity covers
+index `0 → 1` onward (elitism ≥ 1 ⇒ each `scored[0]` ≤ the previous).
+
 **Determinism (AC1):** one seeded `SplitMix64` threads `seed` → every `vary`;
 `Outcome` is built only from `Vec`/`Scheme`/`i64` (no `HashMap`, no float order),
 and the tournament tie-break is index-deterministic.
@@ -212,22 +229,31 @@ tangible).
 ## 6. Acceptance criteria
 
 - [ ] **AC1 — Determinism.** Same `(seed, config)` ⇒ identical `Outcome` (run
-  twice, compare).
+  twice, compare). *(The pre-registered seed set 0..=9 is realized in AC3/AC4,
+  which run over it; AC1 is the per-seed determinism property.)*
 - [ ] **AC2 — Fitness is the verifier's arithmetic.** Grading uses
   `RankDecomposition::residual`; `discharge` is *defined in terms of* it. A test
   pins `discharge(s) == Ok(true) ⟺ residual(s) == Ok(0) && rank matches`, and the
   R-0007 acceptance suite stays green.
-- [ ] **AC3 — Loop validation on a solvable known-answer instance.** For a
-  **planted** target (sum of `K = 5` fixed ternary triples) at search rank 5, the
-  engine returns `Found` for **≥ 6 of seeds 0..=9** (`#[ignore]` ladder;
-  evidence-based — measured 8/10). Exercises `Found`, the certificate, and
+- [ ] **AC3 — Loop validation on a solvable known-answer instance.** For the
+  **fixed planted target** (the 5 literal triples pinned in
+  [`papers-review.md`](../ufl-discovery/papers-review.md) §4b — true rank ≤ 4,
+  searched at rank 5) the engine returns `Found` (residual 0, re-discharging
+  `Ok(true)`) for **≥ 6 of seeds 0..=9** (`#[ignore]` ladder; evidence-based —
+  the de-risk measured 8/10 under Python RNG, ≥6/10 is the margin gate the Rust
+  engine must independently clear). Exercises `Found`, the certificate, and
   determinism end-to-end.
-- [ ] **AC4 — Blind-proposer falsification, documented.** The engine runs on
-  `n = 2`, ranks 7 and 8, seeds 0..=9; the outcomes and best-residual
-  trajectories are recorded in a `ufl-discovery/` writeup (`#[ignore]` ladder).
-  The honest result (the plateau, per §4a — or, if blind GA surprises us, a
-  discovery) is written up *either way*. This is the falsifiable experiment, not
-  a guaranteed negative.
+- [ ] **AC4 — Blind-proposer falsification, with a working-engine guard.** The
+  engine runs on `T_2` at ranks 7 and 8, seeds 0..=9; outcomes and
+  best-residual trajectories are recorded in a `ufl-discovery/` writeup
+  (`#[ignore]` ladder). The honest result (the plateau — or, if blind GA
+  surprises us, a discovery) is documented **either way**. **To prove the
+  *engine functions* (so "it plateaued" cannot launder a broken engine), the
+  recorded rank-7 trajectory must satisfy, for every seed: an *initial strict
+  decrease* (final-generation best residual `<` seed-population best) **and**
+  termination `> 0`** — the descend-then-stall signature measured in §4b. A
+  no-op or mis-seeded engine (no decrease) fails AC4. Strassen's scheme appears
+  **only in tests**, never in the engine path.
 - [ ] **AC5 — Certificates.** Every `Found.scheme` re-discharges `Ok(true)`
   through a **freshly constructed** `RankDecomposition`.
 - [ ] **AC6 — Diagnostics.** `Exhausted` carries the per-generation

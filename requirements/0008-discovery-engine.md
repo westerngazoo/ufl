@@ -96,14 +96,18 @@ R-0011's stronger proposer.)*
   0..=9** within the pre-registered budget. (Evidence-based: measured 8/10. This
   exercises the whole loop — propose → residual → discharge → certificate —
   on a problem a blind proposer provably solves.)
-- **AC4 — Blind-proposer falsification, documented.** The engine is run on the
-  matmul target `T_2` at ranks 7 and 8 over seeds 0..=9; outcomes and
-  best-residual trajectories are recorded in a `ufl-discovery/` writeup. The
-  honest result (the residual plateau — or, if blind GA surprises us, a
-  discovery) is documented **either way**. This is a falsifiable *experiment*,
-  not a guaranteed negative; its diagnosed plateau is the empirical motivation
-  for R-0011's stronger proposer. Strassen's scheme appears **only in tests**,
-  never in the engine path.
+- **AC4 — Blind-proposer falsification, with a working-engine guard.** The
+  engine is run on the matmul target `T_2` at ranks 7 and 8 over seeds 0..=9;
+  outcomes and best-residual trajectories are recorded in a `ufl-discovery/`
+  writeup. The honest result (the residual plateau — or, if blind GA surprises
+  us, a discovery) is documented **either way**. To prove the engine *functions*
+  (so "it plateaued" cannot launder a broken engine), the recorded rank-7
+  trajectory must, for every seed, show an **initial strict decrease**
+  (final-generation best `<` seed-population best) **and** terminate `> 0` — the
+  descend-then-stall signature (papers-review §4b). A no-op engine fails. This is
+  a falsifiable *experiment*, not a guaranteed negative; its diagnosed plateau is
+  the empirical motivation for R-0011's stronger proposer. Strassen's scheme
+  appears **only in tests**, never in the engine path.
 - **AC5 — Certificates.** Every discovery emits its scheme, re-discharged
   through a **freshly constructed** `RankDecomposition` to `Ok(true)` — "here is
   the scheme, check it", never "trust me".
