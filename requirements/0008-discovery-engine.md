@@ -35,13 +35,27 @@ literature (CliffordNet, GATr, the Haynes Program-Hypergraph series) validates
 GA-as-neural-primitive and grade-typed hypergraphs but is **gradient-trained, not
 evolved** — neuroevolution is UFL's unproven edge.
 
-R-0008 is the **engine-validation step**: prove the genetic-search +
+R-0008 is the **engine-validation step**: prove the search +
 predicate-discharge-fitness loop on a *known-answer* problem (Strassen) before
-the genotype generalizes to geometric ASTs in R-0011. **Forward seam (a
-breadcrumb, not a speculative abstraction):** SPEC-0008 should name the
-genotype / mutation / fitness boundary so R-0011 can swap the candidate type
-(`Scheme` → geometric AST) and the operators without rewriting the search loop —
-without abstracting it prematurely here.
+the genotype generalizes to geometric ASTs in R-0011.
+
+**Forward seam — proposer-agnostic, verifier-exact** (a breadcrumb, not a
+speculative abstraction; rationale in [`papers-review.md`](../ufl-discovery/papers-review.md)
+§4). The viability analysis of the evidence base concluded that blind genetic
+search likely will not scale past toy problems (the reason AlphaTensor used
+learned guidance), so the engine must not hard-wire *blind GA* as the only
+candidate source. SPEC-0008 names a boundary where:
+
+- the **candidate source** (blind genetic operators here) is one implementation
+  behind an interface — so R-0011 can add the geometric-AST genotype *and* an
+  agentic proposer (the GA-VisAgent pattern) as new sources;
+- **acceptance is always `Predicate::discharge`** — transparency lives in the
+  *verifier*, not the proposer. A blind GA, an LLM agent, or anything may
+  *propose*; only an exact discharge may *accept*.
+
+SPEC-0008 only *builds* the blind-GA proposer (no premature abstraction) — it
+just names the seam so the differentiator ("verified geometric-program discovery,
+proposer-agnostic") survives into R-0011.
 
 ## 2. Rationale
 
