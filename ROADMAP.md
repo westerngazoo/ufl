@@ -99,10 +99,10 @@ forms need the garust multivector.
 |-----|------------|--------|
 | [R-0006](requirements/0006-integer-tensor-core.md) | **Exact integer-tensor core** (`ufl-tensor`) — `T_n`, scheme genotype, exact reconstruction + error. | **Done** (merged, PR #16) |
 | [R-0007](requirements/0007-tensor-predicate.md) | **Tensor-equality predicate** — `P_n,R` as a Hehner discharge (`RankDecomposition`). Closes FINDINGS C1's discharge half. | **Done** (merged, PR #18) |
-| [R-0008](requirements/0008-discovery-engine.md) | **Discovery engine** — seeded GA whose accept step is the R-0007 discharge; **rediscover Strassen** as the engine's known-answer validation. | Accepted (SPEC-0008 next) |
+| [R-0008](requirements/0008-discovery-engine.md) | **Discovery engine** — seeded GA, accept step = the R-0007 discharge. **Re-scoped:** validate the loop + proposer-agnostic seam on a planted solvable target (blind GA solves it 8/10); **document the matmul falsification** (blind search can't rediscover Strassen — empirical de-risk). | Accepted; SPEC-0008 revised (re-review) |
 | R-0009 | **`Cl(3,0,1)` PGA kernel** (real `f64`, via garust) — multivectors, geo/outer/inner products, rotors/motors. Supersedes R-0002 (G(3,0,0)). | Planned |
 | R-0010 | **Geometric s-expr forms + grade inference** — GA ops as forms; the dimensional type system (decidable per Haynes). | Planned |
-| R-0011 | **Neuroevolution over geometric ASTs** — R-0008's engine, genotype = AST; node/dimensional-shift/crossover; fitness = accuracy − parsimony − grade-entropy. Minimal gate: rediscover `R x R̃`. | Planned |
+| R-0011 | **Neuroevolution + the stronger proposer** — R-0008's seam, genotype = AST, **memetic/agentic proposer** (the GA-VisAgent pattern); fitness = accuracy − parsimony − grade-entropy. **Inherits the relocated Strassen prize** + the geometric gate (rediscover `R x R̃`). | Planned |
 
 ### M4 / language-build — *paused for the discovery pivot*
 

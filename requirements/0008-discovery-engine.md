@@ -22,9 +22,15 @@ A *discovery* is registered only when the discharge returns `Ok(true)`, and it
 ships as a **certificate**: the scheme itself, which any third party re-verifies
 by re-discharging it.
 
-The prize (PRD Phase 1): starting from random schemes, **find an exact rank-7
-decomposition of `T_2` without being given Strassen**. Any valid 7-term scheme
-counts — a non-Strassen one is more interesting.
+**Scope (re-scoped 2026-06-12):** R-0008 builds the engine and proves the
+*loop + proposer-agnostic seam* on a **planted solvable target** (which a blind
+proposer recovers, 8/10), and **runs + documents** the matmul experiment whose
+plateau is the honest motivation for a stronger proposer. The Phase-1 prize —
+finding an exact rank-7 decomposition of `T_2` without being given Strassen —
+**relocates to R-0011**, where the proposer is upgraded (memetic / agentic). The
+empirical de-risk ([`papers-review.md`](../ufl-discovery/papers-review.md) §4a)
+showed blind discrete search cannot clear it; the proposer-agnostic seam makes
+the upgrade a proposer swap with the verifier untouched.
 
 ## 1a. Role in the neuroevolution program (2026-06-12 reframe)
 
@@ -70,36 +76,42 @@ landscape-vs-operators falsification question is part of the deliverable.
 
 ## 3. Acceptance criteria
 
-- **AC1 — Deterministic, seeded search.** The engine is driven by a seeded PRNG:
-  the same seed + configuration produces the identical run (trajectory and
-  outcome). All statistical acceptance below is over a **pre-registered seed
-  set (seeds 0..=9, not curated)** — deterministic for qa, falsifiable by
-  construction.
-- **AC2 — Fitness is the verifier's own arithmetic.** The graded fitness of a
-  candidate is the exact integer residual `‖reconstruct(scheme) − T_n‖²`
-  obtained from the *same cached-target computation* as the discharge (the
-  `residual()` extension licensed by SPEC-0007 §4); a candidate is *accepted*
-  iff `RankDecomposition::discharge == Ok(true)`. Fitness and verifier are
-  provably the same computation — no parallel ad-hoc check.
-- **AC3 — Phase-0 gate (machinery runs).** For `n = 2`, rank 8: from seeded
-  random initialization, the engine finds an exact scheme within a fixed
-  generation budget for **≥ 9 of the 10 pre-registered seeds**. (Bounded by
-  generations, not wall clock — the Structural-Frugality convention; the PRD's
-  "<10 s" intent is honoured by the budget being small.)
-- **AC4 — Phase-1 rediscovery (the prize).** For `n = 2`, rank 7: an exact
-  scheme is found within a fixed generation budget for **≥ 3 of the 10
-  pre-registered seeds** — with Strassen's scheme **nowhere in the engine's
-  code path** (the fixture exists only in tests, as the expected-output oracle
-  it has always been). The found scheme need not be Strassen's.
-- **AC5 — Certificates.** Every registered discovery emits the scheme; the test
-  re-discharges it through a **freshly constructed** `RankDecomposition` and
-  gets `Ok(true)` — the "here is the scheme, check it" contract, never
-  "trust me".
-- **AC6 — Falsification diagnostics.** A run that exhausts its budget reports
-  its best-residual trajectory (per-generation best), so a Phase-1 failure is
-  diagnosable as (a) landscape navigability vs (b) operator design — the PRD's
-  evolvability question. The Phase-1 outcome (success, or the diagnosed failure
-  mode) is written up in `ufl-discovery/` either way.
+*(Re-scoped 2026-06-12 after the empirical de-risk —
+[`papers-review.md`](../ufl-discovery/papers-review.md) §4a — proved blind GA
+cannot rediscover Strassen (0/10) but **can** recover a planted solvable target
+(8/10). R-0008 now validates the **loop + seam** on the solvable instance and
+**documents the matmul falsification**; rediscovering Strassen relocates to
+R-0011's stronger proposer.)*
+
+- **AC1 — Deterministic, seeded search.** Same seed + configuration ⇒ identical
+  run (trajectory and outcome). Statistical acceptance is over a
+  **pre-registered seed set (0..=9, not curated)**.
+- **AC2 — Fitness is the verifier's own arithmetic.** Graded fitness is the
+  exact integer residual `‖reconstruct(scheme) − T_n‖²` from the *same cached
+  computation* as the discharge (`residual()`, SPEC-0007 §4); acceptance is
+  `discharge == Ok(true)`. Provably the same computation — no parallel check.
+- **AC3 — Loop validation on a solvable known-answer instance.** For a
+  **planted** target (the sum of `K = 5` fixed `{-1,0,+1}` triples), the engine
+  finds an exact decomposition (residual 0) at search rank 5 for **≥ 6 of seeds
+  0..=9** within the pre-registered budget. (Evidence-based: measured 8/10. This
+  exercises the whole loop — propose → residual → discharge → certificate —
+  on a problem a blind proposer provably solves.)
+- **AC4 — Blind-proposer falsification, documented.** The engine is run on the
+  matmul target `T_2` at ranks 7 and 8 over seeds 0..=9; outcomes and
+  best-residual trajectories are recorded in a `ufl-discovery/` writeup. The
+  honest result (the residual plateau — or, if blind GA surprises us, a
+  discovery) is documented **either way**. This is a falsifiable *experiment*,
+  not a guaranteed negative; its diagnosed plateau is the empirical motivation
+  for R-0011's stronger proposer. Strassen's scheme appears **only in tests**,
+  never in the engine path.
+- **AC5 — Certificates.** Every discovery emits its scheme, re-discharged
+  through a **freshly constructed** `RankDecomposition` to `Ok(true)` — "here is
+  the scheme, check it", never "trust me".
+- **AC6 — Diagnostics.** An exhausted run reports its per-generation
+  best-residual trajectory; with elitism ≥ 1 it is monotone non-increasing, and
+  no genome ever truncates (so the trajectory reflects *landscape*, not engine
+  bugs) — making the matmul plateau (AC4) a trustworthy diagnostic of
+  landscape-vs-operators.
 
 ## 4. Constraints & non-goals
 
@@ -142,6 +154,7 @@ landscape-vs-operators falsification question is part of the deliverable.
 | 2026-06-08 | R-0008 is PRD **Phases 0–1 only** (rank-8 sanity gate + rank-7 rediscovery at n=2); Phase 2+ is a later requirement. | The PRD's own framing: rediscovery proves the mechanism; keep the slice falsifiable and small. |
 | 2026-06-08 | Acceptance statistics are over a **pre-registered seed set** (0..=9). | Deterministic for qa (no flaky tests), and immune to seed-cherry-picking — the falsifiable-experiment discipline. |
 | 2026-06-08 | The accept step is the **R-0007 discharge**; graded fitness is the same cached-target residual. | The thesis: the engine rides UFL's verifier. A parallel fitness path would reopen the gap R-0007 closed. |
+| 2026-06-12 | **Re-scoped to loop-validation + documented falsification** after the empirical de-risk; Strassen rediscovery → R-0011. ACs rewritten (AC3 planted target ≥6/10; AC4 documented matmul experiment). | Three independent blind methods fail exact 2×2 matmul (papers-review §4a, 0/10 rank-7), but blind GA recovers a planted target 8/10. The honest R-0008 validates what a blind proposer *can* + diagnoses the wall; forcing Strassen in would require a real solver/agent, collapsing R-0011 into R-0008. Owner-approved. |
 
 ## Changelog
 

@@ -78,3 +78,21 @@ exists**; the deferral ships with its own un-deferral trigger, which is what
 makes it a rule rather than a shrug. Instance: SPEC-0007 §2.5.
 
 **Decided:** 2026-06-08.
+
+### Verifier-Held Transparency
+
+When a system must accept artifacts from sources of varying trustworthiness (a
+blind search, an LLM agent, a human), put the transparency/correctness guarantee
+in the **acceptance predicate**, not in the **generator**. The generator may be
+opaque, learned, or random; only an exact, re-runnable check may admit a
+candidate. This keeps the accept step auditable while leaving the proposer free
+to become arbitrarily sophisticated — dissolving the false choice between
+*transparency* and *power*. Instances: SPEC-0008's `run` (reaches candidates only
+via `proposer.{seed,vary}`, accepts only via `RankDecomposition::discharge`);
+SPEC-0007's `Predicate::discharge` (origin-agnostic). Companion to *Guard Inside
+the Candidate* — which guards the boundary between an unvalidated genome and the
+validated phenotype via a total `express`.
+
+**Decided:** 2026-06-12 — forced by the R-0008 de-risk: blind GA could not
+rediscover Strassen, but the architecture absorbed it because the verifier, not
+the proposer, holds the guarantee.
