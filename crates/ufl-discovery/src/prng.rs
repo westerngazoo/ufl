@@ -23,14 +23,11 @@ impl SplitMix64 {
     }
 
     /// A value in `0..n` (modulo bias negligible for search; deterministic).
-    // Consumed by the proposer in R-0008 step 5; unused during the red scaffold.
-    #[allow(dead_code)]
     pub(crate) fn below(&mut self, n: usize) -> usize {
         (self.next_u64() % n as u64) as usize
     }
 
     /// A uniform ternary coefficient in `{-1, 0, +1}`.
-    #[allow(dead_code)]
     pub(crate) fn ternary(&mut self) -> i8 {
         [-1, 0, 1][self.below(3)]
     }

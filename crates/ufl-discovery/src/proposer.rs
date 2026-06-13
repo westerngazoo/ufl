@@ -32,9 +32,6 @@ impl GaConfig {
 }
 
 /// The blind proposer: uniform-random seed + tournament/crossover/mutation.
-// Fields + seed/vary are consumed by `engine::run` in R-0008 step 5; unused
-// during the TDD-red scaffold.
-#[allow(dead_code)]
 pub struct GaProposer {
     d: usize,
     rank: usize,
@@ -49,14 +46,12 @@ impl GaProposer {
     }
 
     /// Initial population — each entry uniform `{-1, 0, +1}`.
-    #[allow(dead_code)]
     pub(crate) fn seed(&self, rng: &mut SplitMix64) -> Vec<Genome> {
         (0..self.cfg.population)
             .map(|_| self.random_genome(rng))
             .collect()
     }
 
-    #[allow(dead_code)]
     fn random_genome(&self, rng: &mut SplitMix64) -> Genome {
         let vec = |rng: &mut SplitMix64| (0..self.d).map(|_| rng.ternary()).collect::<Vec<i8>>();
         let triples = (0..self.rank)
@@ -65,11 +60,58 @@ impl GaProposer {
         Genome { triples }
     }
 
-    /// Next generation from scored parents (elitism + tournament-selected
-    /// uniform triple-crossover + point mutation). **R-0008 step 5 — the
-    /// TDD-red search target.**
-    #[allow(dead_code)]
-    pub(crate) fn vary(&self, _scored: &[(Genome, i64)], _rng: &mut SplitMix64) -> Vec<Genome> {
-        unimplemented!("R-0008 step 5 — GA variation, see SPEC-0008 §2.4")
+    /// Next generation from scored parents — **must be sorted ascending by
+    /// residual** (`engine::run` guarantees this). Elitism carries the best
+    /// `elitism` unchanged; the rest are tournament-selected parents joined by
+    /// uniform triple-crossover and point-mutated (SPEC-0008 §2.4).
+    pub(crate) fn vary(&self, scored: &[(Genome, i64)], rng: &mut SplitMix64) -> Vec<Genome> {
+        let mut next: Vec<Genome> = scored
+            .iter()
+            .take(self.cfg.elitism)
+            .map(|(g, _)| g.clone())
+            .collect();
+        while next.len() < self.cfg.population {
+            let a = self.tournament(scored, rng);
+            let b = self.tournament(scored, rng);
+            let child = self.crossover(a, b, rng);
+            next.push(self.mutate(child, rng));
+        }
+        next
+    }
+
+    /// Tournament selection. `scored` is sorted ascending by residual, so the
+    /// best of the sampled candidates is the **lowest index** — which also
+    /// gives the deterministic lower-index tie-break (AC1).
+    fn tournament<'a>(&self, scored: &'a [(Genome, i64)], rng: &mut SplitMix64) -> &'a Genome {
+        let mut best = rng.below(scored.len());
+        for _ in 1..self.cfg.tournament_size {
+            best = best.min(rng.below(scored.len()));
+        }
+        &scored[best].0
+    }
+
+    /// Uniform crossover over the `rank` triples (the scheme is an unordered sum).
+    fn crossover(&self, a: &Genome, b: &Genome, rng: &mut SplitMix64) -> Genome {
+        let triples = (0..self.rank)
+            .map(|i| {
+                if rng.below(2) == 0 {
+                    a.triples[i].clone()
+                } else {
+                    b.triples[i].clone()
+                }
+            })
+            .collect();
+        Genome { triples }
+    }
+
+    /// Point mutation — set `mutation_count` random entries to a fresh ternary.
+    fn mutate(&self, mut g: Genome, rng: &mut SplitMix64) -> Genome {
+        for _ in 0..self.cfg.mutation_count {
+            let t = rng.below(self.rank);
+            let vec = rng.below(3);
+            let idx = rng.below(self.d);
+            g.triples[t][vec][idx] = rng.ternary();
+        }
+        g
     }
 }

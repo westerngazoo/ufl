@@ -17,8 +17,6 @@ pub struct Genome {
 /// Express a genome to its phenotype. Total: validity is enforced here by
 /// `Triple::new` / `Scheme::push`; a malformed genome surfaces as a typed
 /// `SchemeError` rather than degrading fitness (R-0008 AC6).
-// Consumed by `engine::run` in R-0008 step 5; unused during the red scaffold.
-#[allow(dead_code)]
 pub(crate) fn express(g: &Genome) -> Result<Scheme, SchemeError> {
     let mut scheme = Scheme::new();
     for [u, v, w] in &g.triples {
