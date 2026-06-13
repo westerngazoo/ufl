@@ -1,6 +1,6 @@
 # SPEC-0008 — Discovery Engine (loop validation + blind-proposer falsification)
 
-- **Status:** Draft — **three-lens passed** (hater SHIP IT, architect APPROVE, nice-guy STRONG WORK; ready for Draft → Accepted, owner's call)
+- **Status:** Accepted (2026-06-12 — three-lens passed: hater SHIP IT, architect APPROVE, nice-guy STRONG WORK; re-scope owner-approved)
 - **Realizes:** R-0008
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-12
