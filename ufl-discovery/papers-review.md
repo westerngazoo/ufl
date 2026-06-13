@@ -118,6 +118,41 @@ not a retreat from it.
    closed-form geometric solution is provably tiny and exact — a known-high
    ceiling.*
 
+### 4a. Empirical de-risk (2026-06-12) — the canary fired early
+
+Before accepting SPEC-0008, the proposed operators were run against the real
+2×2 problem (throwaway scripts, not product code). **Three independent blind
+methods all failed to reach exact residual 0**, on the *friendly* 2×2 case:
+
+| Method (seeds 0-9 unless noted) | Rank 8 (AC3 wants ≥9/10) | Rank 7 (AC4 wants ≥3/10) |
+|---|---|---|
+| Population GA — the spec's operators (tournament + uniform triple-crossover + point mutation + elitism) | **1/10** | **0/10** |
+| (1+λ)-ES + plateau-restarts + annealing acceptance + variable mutation | 0/10 | 0/10 |
+| Memetic — random-restart + greedy coordinate descent (600 restarts, 4 seeds) | 0/4 | 0/4 |
+
+**Signature:** every method drives the residual ~60 → 1–2 quickly (finds the
+*neighbourhood*) then **plateaus at a small nonzero floor** — the final exact fix
+requires a *coordinated multi-entry* change that single-step blind moves cannot
+make, and the population can't synthesise once converged. This is the deceptive
+low-evolvability landscape §4 named — the exact wall AlphaTensor used learned
+guidance to avoid — reproduced on our own problem in ~70 s per run.
+
+**Verdict:** this is **not** a budget/operator-tuning gap (the trajectories are
+flat at the floor, not slowly descending); blind discrete `{-1,0,+1}` search does
+not solve exact 2×2 matmul decomposition. The literature agrees (Smirnov;
+Heule-Kauers-Seidl used SAT; continuous relaxation + rounding finds Strassen
+readily — none is naive GP). **SPEC-0008's AC3/AC4 are unachievable by a blind
+proposer**, caught for ~5 minutes of experiment instead of a full implementation
+cycle. The proposer-agnostic seam is vindicated: the weakness is isolated to the
+proposer; the verifier is untouched.
+
+**This does not kill the program — it relocates the prize.** Rediscovering
+Strassen belongs to a *stronger* proposer (R-0011's memetic/agentic source).
+R-0008 should be re-scoped to what a blind proposer *can* validate (the loop
+mechanics on a solvable known-answer instance) plus the documented blind-GA
+falsification as its honest headline result — which is precisely what AC6 was
+written to capture.
+
 ## 5. Architectural implications for the spec chain
 
 1. **The R-0008 forward seam becomes proposer-agnostic.** SPEC-0008 must name a
