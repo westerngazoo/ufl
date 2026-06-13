@@ -1,6 +1,6 @@
 # R-0008 — Discovery Engine (GA search for matmul decompositions)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-12 — engine-validation step of the neuroevolution program)
 - **Milestone:** M5 — Discovery
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-06-08
@@ -25,6 +25,23 @@ by re-discharging it.
 The prize (PRD Phase 1): starting from random schemes, **find an exact rank-7
 decomposition of `T_2` without being given Strassen**. Any valid 7-term scheme
 counts — a non-Strassen one is more interesting.
+
+## 1a. Role in the neuroevolution program (2026-06-12 reframe)
+
+UFL's Phase-1 centre of gravity is **neuroevolution of `Cl(3,0,1)` geometric
+ASTs** (see [[project-neuroevolution-direction]]; the follow-on chain R-0009 PGA
+kernel → R-0010 geometric forms + grade inference → R-0011 neuroevolution). The
+literature (CliffordNet, GATr, the Haynes Program-Hypergraph series) validates
+GA-as-neural-primitive and grade-typed hypergraphs but is **gradient-trained, not
+evolved** — neuroevolution is UFL's unproven edge.
+
+R-0008 is the **engine-validation step**: prove the genetic-search +
+predicate-discharge-fitness loop on a *known-answer* problem (Strassen) before
+the genotype generalizes to geometric ASTs in R-0011. **Forward seam (a
+breadcrumb, not a speculative abstraction):** SPEC-0008 should name the
+genotype / mutation / fitness boundary so R-0011 can swap the candidate type
+(`Scheme` → geometric AST) and the operators without rewriting the search loop —
+without abstracting it prematurely here.
 
 ## 2. Rationale
 
