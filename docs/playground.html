@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>UFL — Interactive Architecture &amp; Playground</title>
+<style>
+  :root {
+    --bg:#0f1117; --panel:#171a22; --panel2:#1e222c; --ink:#e6e9ef;
+    --dim:#9aa3b4; --acc:#7aa2f7; --ok:#9ece6a; --bad:#f7768e; --warn:#e0af68;
+    --line:#2a2f3a; --mono:"SF Mono",ui-monospace,Menlo,Consolas,monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+  header { padding:28px 24px 8px; max-width:1080px; margin:0 auto; }
+  h1 { margin:0 0 4px; font-size:26px; letter-spacing:-.01em; }
+  h1 .tau { color:var(--acc); }
+  .sub { color:var(--dim); margin:0 0 4px; }
+  main { max-width:1080px; margin:0 auto; padding:8px 24px 64px; }
+  section { margin:34px 0; }
+  h2 { font-size:18px; border-bottom:1px solid var(--line); padding-bottom:6px; }
+  .mono { font-family:var(--mono); }
+  .muted { color:var(--dim); }
+
+  /* architecture stack */
+  .stack { display:flex; flex-direction:column; gap:8px; }
+  .layer { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; cursor:pointer; transition:.15s; display:flex; gap:12px; align-items:baseline; }
+  .layer:hover { border-color:var(--acc); background:var(--panel2); }
+  .layer.sel { border-color:var(--acc); box-shadow:0 0 0 1px var(--acc) inset; }
+  .layer .crate { font-family:var(--mono); color:var(--acc); font-size:13px; min-width:118px; }
+  .layer .title { font-weight:600; }
+  .layer .atom { font-family:var(--mono); color:var(--warn); margin-left:auto; font-size:13px; }
+  .layer .st { font-size:11px; padding:1px 7px; border-radius:20px; margin-left:10px; }
+  .st.done { background:rgba(158,206,106,.15); color:var(--ok); }
+  .st.wip  { background:rgba(224,175,104,.15); color:var(--warn); }
+  .detail { margin-top:10px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:10px; padding:14px 16px; display:none; }
+  .detail.show { display:block; }
+  .flow { font-family:var(--mono); color:var(--dim); font-size:13px; margin:14px 0 0;
+    text-align:center; letter-spacing:.02em; }
+  .flow b { color:var(--acc); } .flow i { color:var(--warn); font-style:normal; }
+
+  /* playground */
+  .tabs { display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap; }
+  .tab { background:var(--panel); border:1px solid var(--line); color:var(--dim);
+    padding:7px 14px; border-radius:8px; cursor:pointer; font-size:14px; }
+  .tab.sel { color:var(--ink); border-color:var(--acc); background:var(--panel2); }
+  .pane { display:none; } .pane.show { display:block; }
+  .ex { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px; }
+  .ex button { background:var(--panel); border:1px solid var(--line); color:var(--acc);
+    font-family:var(--mono); font-size:12.5px; padding:5px 9px; border-radius:7px; cursor:pointer; }
+  .ex button:hover { border-color:var(--acc); }
+  textarea, input[type=text] { width:100%; background:#0b0d12; color:var(--ink);
+    border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-family:var(--mono);
+    font-size:14px; resize:vertical; }
+  .row { display:flex; gap:10px; align-items:center; margin:8px 0; flex-wrap:wrap; }
+  .row label { color:var(--dim); font-size:13px; min-width:70px; }
+  button.run { background:var(--acc); color:#0b0d12; border:0; border-radius:8px;
+    padding:9px 18px; font-weight:600; cursor:pointer; }
+  .out { margin-top:12px; background:#0b0d12; border:1px solid var(--line); border-radius:8px;
+    padding:12px 14px; font-family:var(--mono); font-size:14px; white-space:pre-wrap; min-height:22px; }
+  .out .ok { color:var(--ok); } .out .bad { color:var(--bad); } .out .lbl { color:var(--dim); }
+  .note { color:var(--dim); font-size:13px; margin-top:8px; }
+  code { font-family:var(--mono); background:var(--panel2); padding:1px 5px; border-radius:4px; }
+  a { color:var(--acc); }
+  .foot { margin-top:40px; color:var(--dim); font-size:13px; border-top:1px solid var(--line); padding-top:14px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>UFL — Interactive Architecture &amp; Playground</h1>
+  <p class="sub">One operator (<span class="mono">eml</span>), one literal (<span class="mono">1</span>) — the continuous LISP. The boundary between hardware and software is an artifact of notation, not physics.</p>
+  <p class="sub muted">This page re-implements UFL's evaluator, predicate checker, and tensor verifier in JavaScript so you can run them live. The logic mirrors the Rust crates; outputs match.</p>
+</header>
+
+<main>
+  <section>
+    <h2>Architecture — click a layer</h2>
+    <div class="stack" id="stack"></div>
+    <div class="detail" id="detail"></div>
+    <p class="flow">text &nbsp;<b>→ read →</b>&nbsp; Sexpr &nbsp;<b>→ lower →</b>&nbsp; Eml &nbsp;<b>→ eval →</b>&nbsp; Value &nbsp;&nbsp;|&nbsp;&nbsp; predicates <i>check</i> · tensors <i>verify</i></p>
+  </section>
+
+  <section>
+    <h2>Playground — it actually runs</h2>
+    <div class="tabs" id="tabs"></div>
+
+    <!-- EML -->
+    <div class="pane show" id="pane-eml">
+      <p class="muted">Evaluate an EML s-expression to a complex value. Grammar: <code>S → 1 | &lt;var&gt; | (eml S S)</code>. Bind variables below.</p>
+      <div class="ex" id="ex-eml"></div>
+      <textarea id="src-eml" rows="2">(eml 1 1)</textarea>
+      <div class="row"><label>bindings</label><input type="text" id="env-eml" placeholder="x=2.5, y=-1" /></div>
+      <button class="run" onclick="runEml()">Evaluate</button>
+      <div class="out" id="out-eml"></div>
+      <p class="note">Only <code>1</code> is a literal; every constant is a derived tree. <code>ln</code> works on negatives via the principal branch (you'll see Euler's identity emerge).</p>
+    </div>
+
+    <!-- PREDICATE -->
+    <div class="pane" id="pane-pred">
+      <p class="muted">Check a Hehner predicate over a pre-state and a post-state. Post-state variables are primed (<code>x'</code>). Returns true/false.</p>
+      <div class="ex" id="ex-pred"></div>
+      <textarea id="src-pred" rows="2">(pred (= x' (eml x 1)))</textarea>
+      <div class="row"><label>pre</label><input type="text" id="pre-pred" placeholder="x=1" /></div>
+      <div class="row"><label>post</label><input type="text" id="post-pred" placeholder="x=2.718281828459045" /></div>
+      <button class="run" onclick="runPred()">Check</button>
+      <div class="out" id="out-pred"></div>
+      <p class="note">Forms: <code>true</code> <code>false</code> <code>(= a b)</code> <code>(and …)</code> <code>(or …)</code> <code>(not p)</code> <code>(pred E)</code>. Equality is exact.</p>
+    </div>
+
+    <!-- DISCOVERY -->
+    <div class="pane" id="pane-disc">
+      <p class="muted">The exact matmul-decomposition verifier (M5 Discovery, Phase 0). A scheme of <code>{-1,0,+1}</code> triples reconstructs the target tensor <code>T_n</code>; a discovery is registered only when the error is exactly 0.</p>
+      <div class="ex" id="ex-disc"></div>
+      <div class="out" id="out-disc"></div>
+      <p class="note">Strassen's 7 multiplications reconstruct <code>T_2</code> exactly — the result AlphaTensor searched for. The engine (R-0008) will search for such schemes at ever-smaller rank.</p>
+    </div>
+  </section>
+
+  <div class="foot">
+    Mirrors crates <span class="mono">ufl-core</span> · <span class="mono">ufl-syntax</span> · <span class="mono">ufl-predicate</span> · <span class="mono">ufl-tensor</span>.
+    See <a href="why-ufl.md">why-ufl.md</a>, <a href="the-shape-of-ufl.md">the-shape-of-ufl.md</a>, <a href="universal-computability.md">universal computability</a> (in <span class="mono">theory/</span>).
+  </div>
+</main>
+
+<script>
+/* ───────────────────────── complex (mirrors num-complex over f64) ───────────────────────── */
+const C = (re, im=0) => ({re, im});
+const cadd=(a,b)=>C(a.re+b.re, a.im+b.im);
+const csub=(a,b)=>C(a.re-b.re, a.im-b.im);
+const cmul=(a,b)=>C(a.re*b.re-a.im*b.im, a.re*b.im+a.im*b.re);
+const cexp=(a)=>{const e=Math.exp(a.re); return C(e*Math.cos(a.im), e*Math.sin(a.im));};
+const cln =(a)=>C(Math.log(Math.hypot(a.re,a.im)), Math.atan2(a.im,a.re)); // principal branch
+const ceq =(a,b)=> a.re===b.re && a.im===b.im;                            // exact IEEE
+const cshow=(v)=> Math.abs(v.im)<1e-12 ? fmt(v.re) : `${fmt(v.re)} + ${fmt(v.im)} i`;
+const fmt=(x)=> (Math.abs(x)<1e-12?0:x).toPrecision(7).replace(/\.?0+$/,'').replace(/\.?0+e/,'e');
+
+class UflError extends Error {}
+
+/* ───────────────────────── reader: text → Sexpr  (Num|Sym|List) ───────────────────────── */
+function read(src){
+  const toks=[]; let i=0;
+  while(i<src.length){
+    const c=src[i];
+    if(c===';'){ while(i<src.length && src[i]!=='\n') i++; }
+    else if(c==='('||c===')'){ toks.push(c); i++; }
+    else if(/\s/.test(c)){ i++; }
+    else { let a=''; while(i<src.length && !/[\s();]/.test(src[i])) a+=src[i++]; toks.push(a); }
+  }
+  if(toks.length===0) throw new UflError("empty input");
+  let p=0;
+  function atom(t){ const n=Number(t); return (t!==''&&isFinite(n))?{Num:n}:{Sym:t}; }
+  function expr(){
+    if(p>=toks.length) throw new UflError("unclosed '('");
+    const t=toks[p];
+    if(t===')') throw new UflError("unexpected ')'");
+    if(t==='('){ p++; const items=[]; while(true){
+        if(p>=toks.length) throw new UflError("unclosed '('");
+        if(toks[p]===')'){ p++; return {List:items}; }
+        items.push(expr()); } }
+    p++; return atom(t);
+  }
+  const e=expr();
+  if(p!==toks.length) throw new UflError("trailing tokens");
+  return e;
+}
+const headOf=(s)=> s.List && s.List[0] && s.List[0].Sym;
+const isBoolForm=(s)=> (s.Sym==="true"||s.Sym==="false") || ["and","or","not","=","pred"].includes(headOf(s));
+
+/* ───────────────────────── numeric eval: Sexpr → Value (mirrors lower+eval, with (if)) ───────────────────────── */
+function evalNum(s, env){
+  if(s.Num!==undefined){ if(s.Num===1) return C(1,0); throw new UflError(`unsupported literal ${s.Num}: only 1 is primitive`); }
+  if(s.Sym!==undefined){ if(s.Sym in env) return env[s.Sym]; throw new UflError(`unbound variable: ${s.Sym}`); }
+  const h=headOf(s), a=s.List.slice(1);
+  if(h==="eml"){ if(a.length!==2) throw new UflError(`eml expects 2 args, got ${a.length}`);
+    return csub(cexp(evalNum(a[0],env)), cln(evalNum(a[1],env))); }
+  if(isBoolForm(s)) throw new UflError(`expected a number, found boolean form \`${h||s.Sym}\``);
+  throw new UflError(`unknown form: \`${h}\``);
+}
+
+/* ───────────────────────── predicate eval: Sexpr → bool (mirrors ufl-predicate) ───────────────────────── */
+function evalPred(s, env){
+  if(s.Sym==="true") return true;
+  if(s.Sym==="false") return false;
+  if(!s.List) throw new UflError(`expected a boolean expression, found ${s.Sym!==undefined?`symbol \`${s.Sym}\``:`number ${s.Num}`}`);
+  const h=headOf(s), a=s.List.slice(1);
+  switch(h){
+    case "pred": if(a.length!==1) throw new UflError(`pred expects 1 arg`); return evalPred(a[0],env);
+    case "not":  if(a.length!==1) throw new UflError(`not expects 1 arg`);  return !evalPred(a[0],env);
+    case "=":    if(a.length!==2) throw new UflError(`= expects 2 args`);
+                 return ceq(evalNumGuard(a[0],env), evalNumGuard(a[1],env));
+    case "and":  for(const p of a){ if(!evalPred(p,env)) return false; } return true;
+    case "or":   for(const p of a){ if( evalPred(p,env)) return true;  } return false;
+    default: throw new UflError(`expected a boolean expression, found form \`${h}\``);
+  }
+}
+function evalNumGuard(s, env){ if(isBoolForm(s)) throw new UflError(`expected a number, found a boolean form`); return evalNum(s,env); }
+function check(predSrc, pre, post){
+  const env={}; for(const k in pre) env[k]=pre[k]; for(const k in post) env[k+"'"]=post[k];
+  return evalPred(read(predSrc), env);
+}
+
+/* ───────────────────────── tensor verifier (mirrors ufl-tensor) ───────────────────────── */
+function target(n){ const d=n*n, t=new Array(d*d*d).fill(0);
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)for(let k=0;k<n;k++) t[((i*n+j)*d+(j*n+k))*d+(i*n+k)]=1; return {d,t}; }
+function reconstruct(scheme){ const d=scheme.length?scheme[0][0].length:0, t=new Array(d*d*d).fill(0);
+  for(const [u,v,w] of scheme) for(let p=0;p<d;p++){ if(!u[p])continue; for(let q=0;q<d;q++){ if(!v[q])continue;
+    for(let r=0;r<d;r++){ const prod=u[p]*v[q]*w[r]; if(prod) t[(p*d+q)*d+r]+=prod; } } } return {d,t}; }
+function schemeError(scheme, n){ const T=target(n), R=reconstruct(scheme);
+  if(R.d!==T.d) return null; let e=0; for(let i=0;i<T.t.length;i++){ const x=R.t[i]-T.t[i]; e+=x*x; } return e; }
+const STRASSEN=[
+  [[1,0,0,1],[1,0,0,1],[1,0,0,1]],[[0,0,1,1],[1,0,0,0],[0,0,1,-1]],
+  [[1,0,0,0],[0,1,0,-1],[0,1,0,1]],[[0,0,0,1],[-1,0,1,0],[1,0,1,0]],
+  [[1,1,0,0],[0,0,0,1],[-1,1,0,0]],[[-1,0,1,0],[1,1,0,0],[0,0,0,1]],
+  [[0,1,0,-1],[0,0,1,1],[1,0,0,0]]];
+function naive(n){ const d=n*n, e=(i)=>{const a=new Array(d).fill(0);a[i]=1;return a;}, s=[];
+  for(let i=0;i<n;i++)for(let j=0;j<n;j++)for(let k=0;k<n;k++) s.push([e(i*n+j),e(j*n+k),e(i*n+k)]); return s; }
+
+/* ───────────────────────── architecture data + UI ───────────────────────── */
+const LAYERS=[
+  {crate:"ufl-core", title:"EML numeric core", atom:"eml · 1", st:"done",
+   desc:"The single operator <code>eml(x,y)=exp(x)−ln(y)</code> over ℂ. Every elementary function is a tree of it. <code>e = (eml 1 1)</code>.",
+   ex:["(eml 1 1) → e","(eml x 1) → eˣ"]},
+  {crate:"ufl-syntax", title:"Homoiconic s-expression surface", atom:"Sexpr", st:"done",
+   desc:"Code is data: one tree type, a reader, and lowering into the typed core. The docs' notation is the runnable syntax.",
+   ex:["text → Sexpr → Eml → Value"]},
+  {crate:"ufl-predicate", title:"Predicate checker", atom:"⟦P⟧", st:"done",
+   desc:"Hehner predicates over pre/post state: <code>= and or not</code>. The boolean substrate control constructions are built from. A gate, a function, a layer — all predicates.",
+   ex:["⟦ x' = (eml x 1) ⟧"]},
+  {crate:"ufl-tensor", title:"Exact matmul-decomposition verifier", atom:"T_n", st:"done",
+   desc:"Pure integer: the target tensor, a scheme of {-1,0,+1} triples, exact reconstruction. A discovery is registered only at error 0. (M5 Discovery, Phase 0.)",
+   ex:["Strassen R=7 → error 0"]},
+  {crate:"ufl-discovery", title:"Discovery engine — GA search", atom:"⊗ search", st:"wip",
+   desc:"Planned (R-0008): search for schemes that drive the verifier's error to 0 at ever-smaller rank — rediscover Strassen, then generalize. The verifier is the Hehner discharge.",
+   ex:["search → rediscover Strassen, then beat it"]},
+];
+const stack=document.getElementById('stack'), detail=document.getElementById('detail');
+LAYERS.forEach((L,idx)=>{ const d=document.createElement('div'); d.className='layer';
+  d.innerHTML=`<span class="crate">${L.crate}</span><span class="title">${L.title}</span>
+    <span class="atom">${L.atom}</span><span class="st ${L.st==='done'?'done':'wip'}">${L.st==='done'?'on main':'planned'}</span>`;
+  d.onclick=()=>{ document.querySelectorAll('.layer').forEach(x=>x.classList.remove('sel')); d.classList.add('sel');
+    detail.className='detail show'; detail.innerHTML=`<b>${L.crate}</b> — ${L.desc}<br><span class="muted mono" style="font-size:13px">`+
+      L.ex.map(e=>'• '+e).join('<br>')+`</span>`; };
+  stack.appendChild(d); });
+
+const TABS=[["eml","EML core"],["pred","Predicate ⟦P⟧"],["disc","Discovery / Strassen"]];
+const tabs=document.getElementById('tabs');
+TABS.forEach(([id,name],i)=>{ const b=document.createElement('div'); b.className='tab'+(i===0?' sel':''); b.textContent=name;
+  b.onclick=()=>{ document.querySelectorAll('.tab').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+    document.querySelectorAll('.pane').forEach(x=>x.classList.remove('show'));
+    document.getElementById('pane-'+id).classList.add('show'); }; tabs.appendChild(b); });
+
+/* examples */
+function setEx(hostId, items, set){ const h=document.getElementById(hostId);
+  items.forEach(([label,fn])=>{ const b=document.createElement('button'); b.textContent=label; b.onclick=fn; h.appendChild(b); }); }
+setEx('ex-eml',[
+  ["e = (eml 1 1)", ()=>{srcEml.value="(eml 1 1)"; envEml.value=""; runEml();}],
+  ["eˣ = (eml x 1)", ()=>{srcEml.value="(eml x 1)"; envEml.value="x=2.5"; runEml();}],
+  ["ln x", ()=>{srcEml.value="(eml 1 (eml (eml 1 x) 1))"; envEml.value="x=2.5"; runEml();}],
+  ["Euler: ln(-1)=iτ/2", ()=>{srcEml.value="(eml 1 (eml (eml 1 x) 1))"; envEml.value="x=-1"; runEml();}],
+]);
+setEx('ex-pred',[
+  ["x'=eˣ  (true)", ()=>{srcPred.value="(pred (= x' (eml x 1)))"; prePred.value="x=1"; postPred.value="x="+Math.E; runPred();}],
+  ["x'=eˣ  (false)", ()=>{srcPred.value="(pred (= x' (eml x 1)))"; prePred.value="x=1"; postPred.value="x=3"; runPred();}],
+  ["(and true (not false))", ()=>{srcPred.value="(and true (not false))"; prePred.value=""; postPred.value=""; runPred();}],
+  ["type error: (= true 1)", ()=>{srcPred.value="(= true 1)"; prePred.value=""; postPred.value=""; runPred();}],
+]);
+setEx('ex-disc',[
+  ["Strassen R=7", ()=>showDisc("strassen")],
+  ["naive R=8", ()=>showDisc("naive")],
+  ["broken (drop 1 triple)", ()=>showDisc("broken")],
+]);
+
+/* parse "x=1, y=-2" → {x:C(1,0), y:C(-2,0)} */
+function parseEnv(str){ const env={}; (str||"").split(',').forEach(p=>{ p=p.trim(); if(!p)return;
+  const [k,v]=p.split('='); env[k.trim()]=C(Number(v),0); }); return env; }
+const srcEml=document.getElementById('src-eml'), envEml=document.getElementById('env-eml'), outEml=document.getElementById('out-eml');
+const srcPred=document.getElementById('src-pred'), prePred=document.getElementById('pre-pred'), postPred=document.getElementById('post-pred'), outPred=document.getElementById('out-pred');
+
+function runEml(){ try{ const v=evalNum(read(srcEml.value), parseEnv(envEml.value));
+    outEml.innerHTML=`<span class="lbl">=</span> <span class="ok">${cshow(v)}</span>`;
+  }catch(e){ outEml.innerHTML=`<span class="bad">! ${e.message}</span>`; } }
+function runPred(){ try{ const b=check(srcPred.value, parseEnv(prePred.value), parseEnv(postPred.value));
+    outPred.innerHTML=`<span class="lbl">⟦P⟧ →</span> <span class="${b?'ok':'bad'}">${b}</span>`;
+  }catch(e){ outPred.innerHTML=`<span class="bad">! ${e.message}</span>`; } }
+function showDisc(which){ let scheme,n=2,label,rank;
+  if(which==="strassen"){ scheme=STRASSEN; label="Strassen"; rank=7; }
+  else if(which==="naive"){ scheme=naive(2); label="naive"; rank=8; }
+  else { scheme=STRASSEN.slice(0,6); label="broken (6 of 7)"; rank=6; }
+  const err=schemeError(scheme,n), ok=err===0;
+  document.getElementById('out-disc').innerHTML=
+    `<span class="lbl">${label}  T_${n}  R=${scheme.length}</span>\n`+
+    `error = <span class="${ok?'ok':'bad'}">${err}</span>   valid@${rank}: `+
+    `<span class="${ok?'ok':'bad'}">${ok}</span>`+
+    (ok?`   <span class="ok">← exact decomposition (a discovery)</span>`:`   <span class="bad">← rejected (error ≠ 0)</span>`);
+}
+
+/* run defaults */
+runEml(); showDisc("strassen");
+document.querySelector('.layer').click();
+</script>
+</body>
+</html>
