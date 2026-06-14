@@ -27,9 +27,10 @@ use ufl_tensor::{error, reconstruct, target, Scheme, SchemeError, Tensor};
 /// assert_eq!(p.discharge(&scheme), Ok(true));
 /// ```
 pub struct RankDecomposition {
-    n: usize,
     rank: usize,
-    /// `T_n`, computed **once** here — never per discharge (SPEC-0007 AC6).
+    /// The target tensor, computed **once** here — never per discharge
+    /// (SPEC-0007 AC6). `target(n)` for matmul; an arbitrary tensor for a
+    /// planted instance (SPEC-0008 AC3).
     target: Tensor,
 }
 
@@ -37,10 +38,40 @@ impl RankDecomposition {
     /// Build the predicate for `n×n` matmul at rank `rank`, caching `T_n`.
     pub fn new(n: usize, rank: usize) -> Self {
         Self {
-            n,
             rank,
             target: target(n),
         }
+    }
+
+    /// Build the predicate for an **arbitrary target** at rank `rank` — the
+    /// planted-instance verifier (SPEC-0008 AC3). Same residual/discharge
+    /// contract; only the cached target differs.
+    pub fn for_target(target: Tensor, rank: usize) -> Self {
+        Self { rank, target }
+    }
+
+    /// The target dimension `d` (the length of each genome vector).
+    pub fn dim(&self) -> usize {
+        self.target.dim()
+    }
+
+    /// The rank `R` this predicate accepts.
+    pub fn rank(&self) -> usize {
+        self.rank
+    }
+
+    /// The graded residual `‖reconstruct(scheme) − target‖²` against the cached
+    /// target — the discovery engine's fitness (SPEC-0008 §2.2). A dim mismatch
+    /// is `Err(DimMismatch)`, the same total contract as `discharge`.
+    /// `discharge` is *defined in terms of* this, so fitness and the accept
+    /// step are provably one computation (R-0008 AC2).
+    pub fn residual(&self, scheme: &Scheme) -> Result<i64, SchemeError> {
+        let recon = reconstruct(scheme);
+        error(&recon, &self.target).ok_or(SchemeError::DimMismatch {
+            n: self.target.dim().isqrt(), // logical matmul n for the matmul case
+            expected: self.target.dim(),
+            got: recon.dim(),
+        })
     }
 }
 
@@ -48,20 +79,12 @@ impl Predicate for RankDecomposition {
     type Candidate = Scheme;
     type Error = SchemeError;
 
-    /// Reconstruct unconditionally, dim-check against the cached target, then
-    /// conjoin the rank bound. A dim/`n` mismatch is **always**
-    /// `Err(DimMismatch)` — independent of the rank field (SPEC-0007 §2.3; the
-    /// review's blocking finding was a short-circuit that flipped the error
-    /// contract on the rank conjunct).
+    /// Derived from [`residual`](RankDecomposition::residual): exact iff the
+    /// residual is 0 *and* the rank matches. A dim/`n` mismatch propagates as
+    /// `Err(DimMismatch)` — always, independent of the rank field (SPEC-0007
+    /// §2.3; the review's blocking finding was a short-circuit that flipped the
+    /// error contract on the rank conjunct).
     fn discharge(&self, scheme: &Scheme) -> Result<bool, SchemeError> {
-        let recon = reconstruct(scheme);
-        match error(&recon, &self.target) {
-            None => Err(SchemeError::DimMismatch {
-                n: self.n,
-                expected: self.target.dim(),
-                got: recon.dim(),
-            }),
-            Some(e) => Ok(e == 0 && scheme.rank() == self.rank),
-        }
+        Ok(self.residual(scheme)? == 0 && scheme.rank() == self.rank)
     }
 }

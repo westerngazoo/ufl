@@ -77,22 +77,32 @@ Predicate (R-0004) is built next by the **main session**; geometric forms
 independent — predicates need booleans + the s-expr core (done); geometric
 forms need the garust multivector.
 
-### M5 — Discovery (matmul decomposition)  ·  *current headline*
+### M5 — Discovery → Geometric Neuroevolution  ·  *current headline*
 
 > **2026-06-04 — pivot.** After the [`ufl-discovery` PRD](https://docs.google.com/document/d/170cdfV8ZvglRa_9jz7Gr8MBV1WFyxNfxXFZ6G2Dxabo)
-> review ([`ufl-discovery/FINDINGS.md`](ufl-discovery/FINDINGS.md)), the new
-> headline is an **AlphaTensor-style discovery engine** — rediscover Strassen's
-> 7-multiplication 2×2 scheme by search + exact verification, then generalize
-> across sizes. Pursued **Path B**: extend the substrate so the verifier *is*
-> the Hehner predicate discharge of `P_n,R` (not a parallel check). The
-> language-build thread (value conditional, GA forms, substrate orchestrator)
-> is **paused** for this.
+> review ([`ufl-discovery/FINDINGS.md`](ufl-discovery/FINDINGS.md)): an
+> **AlphaTensor-style discovery engine** — rediscover Strassen by search + exact
+> verification — built **Path B**, so the verifier *is* the Hehner predicate
+> discharge of `P_n,R`.
+>
+> **2026-06-12 — direction set.** After reviewing the external Clifford-Lisp
+> roadmap + five validating arXiv papers (CliffordNet 2601.06793; the Haynes
+> Program-Hypergraph series 2603.25414 / 2603.18104; GATr/AB-GATr 2605.18816),
+> UFL's Phase-1 centre of gravity is **neuroevolution of `Cl(3,0,1)` geometric
+> ASTs** — the one thing that family of work *doesn't* do (all gradient-trained),
+> and the thing UFL already half-built. The discovery engine is reframed as the
+> **engine-validation step** of that program. *Coefficient field, R-0002
+> supersession, and the minimal geometric gate are proposed (real `f64`;
+> supersede; rediscover the sandwich `R x R̃`) — pending confirmation at R-0009.*
 
 | Req | Capability | Status |
 |-----|------------|--------|
-| [R-0006](requirements/0006-integer-tensor-core.md) | **Exact integer-tensor core** (`ufl-tensor`) — `T_n`, scheme genotype, exact reconstruction + error. PRD Phase 0. | **Done** (merged, PR #16; 33 tests, Strassen gate passes) |
-| [R-0007](requirements/0007-tensor-predicate.md) | **Tensor-equality predicate** — `P_n,R` dischargeable as a Hehner predicate (`RankDecomposition` via the load-bearing `Predicate` trait). Closes FINDINGS C1's discharge half. | In review (`ufl-discovery` green, 19 tests + doctest; Strassen discharged through the trait) |
-| R-0008 | **Discovery engine** (`ufl-discovery`) — GA search; verifier = the predicate discharge. PRD Phases 1–3. | Backlog (needs R-0007) |
+| [R-0006](requirements/0006-integer-tensor-core.md) | **Exact integer-tensor core** (`ufl-tensor`) — `T_n`, scheme genotype, exact reconstruction + error. | **Done** (merged, PR #16) |
+| [R-0007](requirements/0007-tensor-predicate.md) | **Tensor-equality predicate** — `P_n,R` as a Hehner discharge (`RankDecomposition`). Closes FINDINGS C1's discharge half. | **Done** (merged, PR #18) |
+| [R-0008](requirements/0008-discovery-engine.md) | **Discovery engine** — seeded GA, accept step = the R-0007 discharge. **Re-scoped:** validate the loop + proposer-agnostic seam on a planted solvable target; **document the matmul falsification**. | In review (`ufl-discovery` green — planted recovery 7/10, AC4 guard every seed; engine implemented) |
+| R-0009 | **`Cl(3,0,1)` PGA kernel** (real `f64`, via garust) — multivectors, geo/outer/inner products, rotors/motors. Supersedes R-0002 (G(3,0,0)). | Planned |
+| R-0010 | **Geometric s-expr forms + grade inference** — GA ops as forms; the dimensional type system (decidable per Haynes). | Planned |
+| R-0011 | **Neuroevolution + the stronger proposer** — R-0008's seam, genotype = AST, **memetic/agentic proposer** (the GA-VisAgent pattern); fitness = accuracy − parsimony − grade-entropy. **Inherits the relocated Strassen prize** + the geometric gate (rediscover `R x R̃`). | Planned |
 
 ### M4 / language-build — *paused for the discovery pivot*
 
@@ -118,24 +128,26 @@ exploration is shelved on branch `R-0005-value-conditional` (recoverable).
 
 ## Current focus
 
-**M5 Discovery — Path B.** The headline is the matmul-decomposition discovery
-engine (rediscover Strassen, then generalize), built so the verifier is the
-Hehner discharge of `P_n,R`. The Path-B chain, foundational-first:
+**R-0008 — the discovery engine (engine-validation step).** Steps 1–2 of Path B
+are **Done**: R-0006 (the exact integer verifier, Strassen gate) and R-0007 (the
+verifier *is* the Hehner discharge — `P_{2,7}(strassen) → Ok(true)`). The active
+work is the seeded GA that finds an exact rank-7 scheme **without being given
+Strassen**, accepting via the R-0007 discharge and emitting a re-verifiable
+certificate — proving the genetic-search loop on a *known-answer* problem before
+its genotype generalizes to geometric ASTs (R-0011). *Requirement accepted;
+SPEC-0008 next.*
 
-1. **R-0006 — exact integer-tensor core** (`ufl-tensor`): `T_n`, the scheme
-   genotype, exact reconstruction + error, and the **Strassen Phase-0 gate**.
-   Pure integer; no EML/Complex (FINDINGS C3). *Requirement drafted; pending
-   acceptance.*
-2. **R-0007 — tensor-equality predicate**: bridge the core into `ufl-predicate`
-   so `P_n,R` is dischargeable (closes FINDINGS C1).
-3. **R-0008 — discovery engine** (`ufl-discovery`): GA search, verifier = the
-   predicate discharge.
+**The Phase-1 arc (decided 2026-06-12 — [[project-neuroevolution-direction]]):**
+R-0008 (engine) → R-0009 (`Cl(3,0,1)` PGA kernel, real `f64`, supersedes R-0002)
+→ R-0010 (geometric forms + grade inference) → R-0011 (neuroevolution over
+geometric ASTs). The differentiator is **evolution**, which the validating
+literature (CliffordNet, GATr, Haynes) doesn't do.
 
 **Paused:** the language-build thread (R-0005 value conditional shelved on its
-branch; GA forms / substrate / macros / neural / GAPU) — resumable later.
+branch; substrate / macros / GAPU) — resumable later. **R-0002** (G(3,0,0) GA
+core, separate GA flow) is **superseded by R-0009** (the signature moves to
+`Cl(3,0,1)` PGA) — hand-off to be coordinated.
 
-**In parallel (separate GA agent flow):** R-0002 — the garust-based GA core.
-
-**Done:** R-0001 (EML core), R-0003 (s-expr core), R-0004 (predicate checker) —
-100 tests green across three crates. `ufl-discovery/FINDINGS.md` records the PRD
-review that set this direction.
+**Done:** R-0001 (EML core), R-0003 (s-expr core), R-0004 (predicate checker),
+R-0006 (integer-tensor core), R-0007 (tensor predicate) — 153 tests green across
+five crates.

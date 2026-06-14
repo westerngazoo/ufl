@@ -9,9 +9,9 @@ is accepted — nothing here is pre-scaffolded.
 |-------|----------------|----------------|------|--------|
 | `ufl-core` | The EML numeric core: `Eml` tree + reference evaluator over `Complex<f64>` | `eml` · `1` | SPEC-0001 | shipped |
 | `ufl-syntax` | Homoiconic s-expression surface: `Sexpr`, reader, lowering into `Eml` | the AST itself | SPEC-0003 | shipped |
-| `ufl-predicate` | Hehner predicate checker over pre/post state; the `Predicate` discharge trait | `⟦P⟧` — Pillar 3 | SPEC-0004, SPEC-0007 | shipped / in flight |
+| `ufl-predicate` | Hehner predicate checker over pre/post state; the `Predicate` discharge trait | `⟦P⟧` — Pillar 3 | SPEC-0004, SPEC-0007 | shipped |
 | `ufl-tensor` | Exact integer-tensor core for matmul decomposition (`T_n`, schemes, reconstruction) — pure leaf | discovery substrate | SPEC-0006 | shipped |
-| `ufl-discovery` | Discovery bridge + engine: the `RankDecomposition` predicate (SPEC-0007), then the GA search (R-0008) | discovery | SPEC-0007 | in flight |
+| `ufl-discovery` | Discovery bridge + engine: the `RankDecomposition` predicate (SPEC-0007, shipped), growing the GA search (R-0008) | discovery | SPEC-0007, SPEC-0008 | bridge shipped / engine in flight |
 
 Note: the root-level `ufl-discovery/` directory is the discovery thread's
 *research-artifact* home (FINDINGS.md, writeups); the crate lives at
