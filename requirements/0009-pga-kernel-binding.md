@@ -1,6 +1,6 @@
 # R-0009 — `Cl(3,0,1)` PGA Kernel Binding (`ufl-ga`)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-12 — owner)
 - **Milestone:** M5 — Discovery → Geometric Neuroevolution
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-06-12
