@@ -1,6 +1,6 @@
 # SPEC-0009 — `Cl(3,0,1)` PGA Kernel Binding (`ufl-ga`)
 
-- **Status:** Draft (three-lens applied; all findings verified against garust `v0.1.0`)
+- **Status:** Accepted (2026-06-12 — three-lens passed: hater SHIP IT, architect APPROVE, nice-guy STRONG WORK; all findings verified against garust `v0.1.0`)
 - **Realizes:** R-0009
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-12
@@ -195,7 +195,10 @@ requirement's weight is the **acceptance test suite** (§6) — the code is a fa
   `cleaned`): `((e1()*e2())*(−τ/8)).exp().sandwich(&e1()) ≈ e2()` — the
   *algebraic* rotor check (observed error ~`2e-16`). Confirms garust's rotor
   half-angle/sign convention and the sandwich. The geometric analogue of
-  R-0006's Strassen keystone.
+  R-0006's Strassen keystone. **Convention-equivalence (so AC4's raw `exp` and
+  AC5's `Motor::rotor` can't silently disagree):** a test asserts the hand-built
+  versor `((e1()*e2())*(−τ/8)).exp()` equals `Motor::rotor(τ/4, e1()*e2())`'s
+  versor within `ε`.
 - [ ] **AC5 — Motor on a point (rigid-body motion).** Via `Point::transform`:
   `Point::new(0,0,0).transform(&translator(1,2,3)).to_euclidean() ≈ (1,2,3)`
   (translation native via `e₀`); `Point::new(1,0,0).transform(&rotor(τ/4, e₁₂))
