@@ -124,6 +124,7 @@ floating tolerance `ε` — UFL's first GA-layer floating gate, consistent with 
 | 2026-06-12 | **Real `f64`**, a substrate *separate* from the `Complex<f64>` EML core; `ufl-ga` does not depend on `ufl-core`. | Rotors/motors/kinematics are real spatial geometry (matching CliffordNet/GATr and the roadmap); the EML core's complex field serves the analytic/elementary-function role. Two substrates, bridged only in theory. |
 | 2026-06-12 | garust pinned at **`v0.1.0`**; UFL depends on the confirmed contract surface (C1–C11), not garust internals. | The contract is green and CI-guarded by garust's `pga_contract.rs`; pinning a tag fixes the dependency and any churn is a garust major bump. |
 | 2026-06-12 | Acceptance is **geometric correctness to a tolerance `ε`** (not exact), keystone = the rotor sandwich (AC4). | The kernel is floating `f64`; UFL's GA layer is therefore a tolerance gate (like the `Complex` EML core), with the rotor sandwich as the smallest convincing correctness proof. |
+| 2026-06-12 | **"Insulate" (§2.1, §5) reframed** to *a curated, pinned import surface* — **not** a type that re-wraps every garust operation. | Three-lens (SPEC-0009): a transparent alias gives zero API insulation; insulation against garust churn is held by the **version pin** (a `v0.1.0` tag → a locked commit rev), not a wrapping newtype. The newtype that would insulate is the deferred escalation (a second backend / a UFL invariant). Recorded here, not silently reinterpreted by the spec (CLAUDE.md §1). |
 
 ## Changelog
 
