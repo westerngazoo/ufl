@@ -44,7 +44,7 @@ field. The build order across requirements and specs is in
 | [SPEC-0007](0007-tensor-predicate.md) | Tensor-Equality Predicate (the Hehner-discharge bridge) | R-0007 | Implemented (merged) |
 | [SPEC-0008](0008-discovery-engine.md) | Discovery Engine (loop validation + blind-proposer falsification) | R-0008 | Implemented (merged) |
 | [SPEC-0009](0009-pga-kernel-binding.md) | `Cl(3,0,1)` PGA Kernel Binding (`ufl-ga`) | R-0009 | Implemented (merged) |
-| [SPEC-0010](0010-geometric-forms-grade-types.md) | Geometric Forms + the Grade-Type System (`ufl-geo`) | R-0010 | Draft |
+| [SPEC-0010](0010-geometric-forms-grade-types.md) | Geometric Forms + the Grade-Type System (`ufl-geo`) | R-0010 | Accepted |
 
 SPEC-0002 (G(3,0,0) GA core, garust-based) is written by the separate GA agent
 flow against [R-0002](../requirements/0002-geometric-algebra-core.md).

@@ -1,6 +1,6 @@
 # SPEC-0010 — Geometric Forms + the Grade-Type System (`ufl-geo`)
 
-- **Status:** Draft (three-lens applied; grade algebra delegated to garust)
+- **Status:** Accepted (2026-06-18 — three-lens passed: architect APPROVE, hater SHIP IT, nice-guy STRONG WORK)
 - **Realizes:** R-0010
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-18
@@ -17,13 +17,16 @@ grade-type system**. It is to `ufl-ga` what `ufl-syntax`/`ufl-core` are to the
 EML kernel.
 
 **Key design decision (three-lens):** the grade algebra is **not hand-rolled** —
-garust already ships `GradeSet` and `Op::output_grades`, which encode the grade
-rules *correctly* for the real `Cl(3,0,1)` algebra (the Hestenes inner-product
-convention where scalars contribute nothing, the degenerate-`e₀` contractions
-that vanish, the pseudoscalar grade wrap-down). The first draft hand-wrote these
-rules and got three of them wrong against the actual kernel. So `ufl-geo`'s grade
-inference **delegates to `Op::output_grades`** for the catalog forms and rides
-garust's `GradeSet`; only the three forms garust has no `Op` for — `Sandwich`,
+garust already ships `GradeSet` and `Op::output_grades`, which give the correct
+*structural* grade signature for the real `Cl(3,0,1)` algebra (the Hestenes
+inner-product convention where scalars contribute nothing, the correct
+grade-mixing and pseudoscalar wrap-down — a dimension-`n` structural bound).
+`output_grades` is **metric-blind**: it does *not* model the degenerate-`e₀`
+contractions that vanish, so its set can be a strict superset of the realized
+support — which is exactly the **sound over-approximation** a type needs (§2.3).
+The first draft hand-wrote these rules and got three of them wrong against the
+actual kernel. So `ufl-geo`'s grade inference **delegates to `Op::output_grades`**
+for the catalog forms and rides garust's `GradeSet`; only the three forms garust has no `Op` for — `Sandwich`,
 `Exp`, `GradeLift` — get hand-written rules, and those are **sound
 over-approximations** (§2.3). This keeps `ufl-geo` riding garust the same way
 `ufl-ga` does — a facade, not a fork.
@@ -127,9 +130,11 @@ inference; `n = 4` generators):
 | **`Exp(a)`** | `{0}` if `grade(a) ⊆ {0}`; the even subalgebra `{0,2,4}` if `grade(a) ⊆ {0,2}` (exp of an even element is even — covers rotors *and* motors); else `⊤` |
 
 Delegating to `Op::output_grades` makes the Hestenes inner (scalar operands
-contribute nothing), the degenerate-`e₀` vanishing, and the pseudoscalar
-wrap-down **correct by reuse** — the three bugs the first draft shipped are gone
-because the math isn't re-derived. `grade` is total and decidable (finite sets).
+contribute nothing) and the pseudoscalar wrap-down **correct by reuse** — the
+three bugs the first draft shipped are gone because the math isn't re-derived.
+The degenerate-`e₀` vanishing is **not** modeled (`output_grades` is
+metric-blind); it is *absorbed by the over-approximation* — the returned set is a
+sound superset precisely because `e₀`-vanishing is never subtracted. `grade` is total and decidable (finite sets).
 
 ### 2.4 The versor predicate + the keystone (AC4)
 
@@ -226,8 +231,10 @@ proof*).
   Basis(e12)))` (a statically-known versor) and a grade-1 `v`,
   `grade(Sandwich(R, v)) == GradeSet::singleton(1)` — vector → vector — and the
   same form `eval`s to a rotated vector (`eval(...).grade(1)` equals the value
-  within `ε`). A *non*-versor `r` yields the sound product bound (a superset),
-  asserted distinct from `{1}`.
+  within `ε`). A *non*-versor `r` (e.g. `r = Param + Basis(e1)`, grades `{0,1}`)
+  yields the sound product bound — asserted to be a **strict superset** of `{1}`
+  (it contains grade 1 *and more*), pinning that the fallback over-approximates
+  rather than merely differing.
 - [ ] **AC5 — Homoiconic AST (reader deferred).** `GeoExpr` is the code-as-data
   form representation; the textual `Sexpr → GeoExpr` reader is a documented
   non-goal here (§2.6), per R-0010 AC5's pre-authorization + decision-log
@@ -241,7 +248,7 @@ proof*).
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-06-18 | `GeoExpr` AST + `eval` onto `ufl-ga` + `grade`/`typecheck`; **new `ufl-geo` crate over `ufl-ga` only**. | Mirrors `ufl-core`+`ufl-syntax` over the EML kernel; `ufl-ga`-only keeps it a clean leaf (the reader that would pull `ufl-syntax` is deferred). |
-| 2026-06-18 | **Grade algebra delegated to garust's `Op::output_grades` + `GradeSet`** (re-exported via `ufl-ga`); only `Sandwich`/`Exp`/`GradeLift` get hand rules. | The three-lens proved a hand-rolled grade algebra is unsound against the real degenerate `Cl(3,0,1)` (Hestenes inner, vanishing `e₀` contractions, pseudoscalar wrap-down). garust already encodes it correctly and tests it. Reuse, don't fork — the same discipline as `ufl-ga` being a facade. |
+| 2026-06-18 | **Grade algebra delegated to garust's `Op::output_grades` + `GradeSet`** (re-exported via `ufl-ga`); only `Sandwich`/`Exp`/`GradeLift` get hand rules. | The three-lens proved a hand-rolled grade algebra is unsound against the real `Cl(3,0,1)` (the Hestenes inner where scalars drop, the grade-mixing/cap, the pseudoscalar wrap-down). garust gives the correct **structural** signature and tests it; it is metric-blind (the degenerate-`e₀` vanishing is absorbed by the over-approximation, not modeled), which is the sound bound a type needs. Reuse, don't fork — the same discipline as `ufl-ga` being a facade. |
 | 2026-06-18 | `grade` is a **sound over-approximation**, not exact. | A degenerate metric makes the realized support strictly smaller than the structural grade set; a *sound upper bound* is what a type needs (never a false "incoherent") and what `Op::output_grades` provides. AC3 reworded accordingly. |
 | 2026-06-18 | **`Sandwich` grade rule is versor-conditioned** (§2.4): preserve grade only when `r` is a statically-known versor (`Exp` of a bivector / product of versors), else the sound product bound. | `r x ~r` preserves grade *iff `r` is a versor*; `Sandwich` takes an arbitrary `r` and R-0011 mutates it, so a non-versor `r` is the common case. The keystone (AC4) uses the versor case and stays crisp; everything else stays sound. |
 | 2026-06-18 | **`eval` total** — out-of-range `Basis`/grade are typed `GeoError`s, not panics; `GradeLift`'s blade pinned to lowest-index. | `Mv::basis(≥16)` panics; R-0011 generates raw `u8` leaves, so the boundary must guard (the R-0009 totality discipline). Lowest-index `GradeLift` is unambiguous and dodges the null blade. |
