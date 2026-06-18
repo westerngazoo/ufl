@@ -177,10 +177,12 @@ operations) but the loose form; EML is the precise, stronger fact. Adopting it
 The first decision is locked: see
 [`requirements/0001-eml-operator-core.md`](../requirements/0001-eml-operator-core.md)
 (R-0001, Accepted) and [`specs/0001-eml-operator-core.md`](../specs/0001-eml-operator-core.md)
-(SPEC-0001). The numeric layer — the `eml` representation and a reference
-evaluator — is UFL's first executable artifact. The geometric, predicative, and
-substrate layers (atoms `𝒢ₖ`, `∗`, `⟦P⟧`, `⊗`) are designed in the founding
-proposal and will be built, requirement by requirement, on top of it.
+(SPEC-0001, Implemented). The numeric layer — the `eml` representation and a
+reference evaluator — was UFL's first executable artifact. The predicative
+(`⟦P⟧`) and geometric (`𝒢ₖ`, `∗`) layers have since been built on top of it
+(`ufl-predicate`, `ufl-ga`); the substrate orchestrator (`⊗`) is designed in the
+founding proposal and remains to be built. See [`ROADMAP.md`](../ROADMAP.md) and
+§7 below.
 
 A crucial consequence of EML being a *representation* rather than a *domain*:
 `eml(x, 1)` does not produce some special "EML-domain number" — it produces
@@ -267,19 +269,35 @@ language**, early in construction, built under a strict requirement- and
 spec-driven process (see [`CLAUDE.md`](../CLAUDE.md) and
 [`ROADMAP.md`](../ROADMAP.md)).
 
-- **Decided and specified:** EML as the foundational primitive — R-0001
-  (Accepted) and SPEC-0001 (Draft). The numeric core `ufl-core` — the `Eml`
-  representation and a reference evaluator — is the first thing being built.
-- **Designed, not yet built:** the geometric-algebra layer, the Hehner
-  predicate layer, and the substrate orchestrator. These are laid out in the
-  founding proposal [`ufl-first-draft.md`](ufl-first-draft.md) and will each
-  pass through the requirement loop.
-- **Open research questions** remain — branch-cut conventions, predicate
-  expressiveness, the right substrate cost model — tracked alongside the
-  requirements that must resolve them.
+**Built and merged (six crates, on `main`):**
 
-UFL is, at this moment, a thesis with its first stone laid. This document
-explains why the thesis is sound enough to keep laying stones.
+- **EML numeric core** — `ufl-core`, the `eml`/`1` primitive over `Complex<f64>`
+  (R-0001 / SPEC-0001).
+- **Homoiconic s-expression core** — `ufl-syntax`, the code-is-data surface that
+  lowers into the typed core (R-0003).
+- **Hehner predicate checker** — `ufl-predicate`, with the `Predicate` discharge
+  trait (R-0004 / R-0007).
+- **Geometric algebra** — `ufl-ga`, the `Cl(3,0,1)` PGA kernel over real `f64`
+  (R-0009, a thin facade over garust; supersedes the earlier G(3,0,0) plan).
+- **Discovery substrate** — `ufl-tensor` (exact integer matmul-decomposition
+  verifier) and `ufl-discovery` (the verifier *is* the Hehner discharge, plus a
+  seeded-GA discovery engine) (R-0006 / R-0007 / R-0008).
+
+**In progress:** the geometric-neuroevolution arc — geometric s-expr forms +
+a decidable grade-type system (R-0010), then neuroevolution over geometric ASTs
+(R-0011). See [`ROADMAP.md`](../ROADMAP.md) M5.
+
+**Designed, not yet built:** the substrate orchestrator (the `⊗` atom) — paused
+for the discovery pivot.
+
+**Open research questions** remain — branch-cut conventions, the grade-type
+system, the substrate cost model — tracked alongside the requirements that must
+resolve them.
+
+UFL is no longer a thesis with one stone laid: the verifier substrate is proven
+(it even *falsified* its own blind discovery on Strassen, honestly), and the
+geometric substrate is shipped. This document explains why the thesis is sound
+enough to keep building.
 
 ---
 
