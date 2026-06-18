@@ -10,6 +10,7 @@ members = [
     "crates/ufl-predicate",
     "crates/ufl-tensor",
     "crates/ufl-discovery",
+    "crates/ufl-ga",
 ]
 
 [workspace.package]
