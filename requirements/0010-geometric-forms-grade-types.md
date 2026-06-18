@@ -1,6 +1,6 @@
 # R-0010 — Geometric Forms + the Grade-Type System (`ufl-geo`)
 
-- **Status:** Draft
+- **Status:** Accepted (2026-06-18 — owner)
 - **Milestone:** M5 — Discovery → Geometric Neuroevolution
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-06-18
