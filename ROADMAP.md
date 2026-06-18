@@ -40,15 +40,16 @@ The typed cores the s-expression forms lower into. Target crate: `ufl-core`.
 
 | Req | Capability | Atoms / Pillar | Spec | Status |
 |-----|------------|----------------|------|--------|
-| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core (the `eml` lowering target) | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | Done |
-| [R-0002](requirements/0002-geometric-algebra-core.md) | Geometric algebra over G(3,0,0) — *via garust* (the GA lowering target) | 𝒢ₖ ∗ · Pillar 2 | SPEC-0002 (GA flow) | Accepted — building |
+| [R-0001](requirements/0001-eml-operator-core.md) | EML operator core (the `eml` lowering target) | `eml` · numeric core | [SPEC-0001](specs/0001-eml-operator-core.md) | **Done** (merged) |
+| [R-0002](requirements/0002-geometric-algebra-core.md) | Geometric algebra over G(3,0,0) — *via garust* | 𝒢ₖ ∗ · Pillar 2 | — | **Superseded by [R-0009](requirements/0009-pga-kernel-binding.md)** |
 
-R-0002 note: realization **pivoted to garust** (2026-06-02). UFL's GA core is a
-thin layer over `garust::Multivector<Complex<f64>, 3,0,0,8>`, contingent on a
-garust `Scalar` split so `Complex<f64>` is an admissible coefficient. Built by a
-separate **GA agent flow**, not the main session. The hand-rolled attempt
-(frozen branch `c92a38a`) is superseded prior art (rotor oracle + conventions
-carry over).
+R-0002 note: **superseded by R-0009** (2026-06-12). The geometric-neuroevolution
+direction needs `Cl(3,0,1)` **PGA** — its ideal/null generator `e₀² = 0` gives
+translations and rigid-body motors natively, which G(3,0,0) VGA cannot express.
+R-0009 binds garust's `Cl(3,0,1)` kernel over **real `f64`** (the `ufl-ga` crate,
+shipped); the earlier `Complex<f64>`/G(3,0,0) plan is retired. R-0002's prior art
+(the hand-rolled rotor oracle + conventions, frozen branch `c92a38a`) carries
+over as reference.
 
 ### M2 — The s-expression core  ·  *current*
 
@@ -64,18 +65,19 @@ originally-planned surface syntax and evaluator.
 
 ### M3 — Forms on the core
 
-The remaining atoms, each an s-expression *form* lowering into its typed core.
-
 | Req | Capability | Atoms / Pillar | Status |
 |-----|------------|----------------|--------|
 | [R-0004](requirements/0004-predicate-layer.md) | **Predicate form (`⟦P⟧`) — the checker** (boolean substrate for control) | Pillar 3 | **Done** (merged, PR #14; `ufl-predicate`, 34 tests) |
-| R-0005 | Geometric forms (`𝒢ₖ`, `∗`) — lower into R-0002's garust multivector | Pillar 2 | Backlog (after R-0002 GA core) |
-| R-0006 | Substrate form + CPU substrate (`⊗`) | Pillar 4 | Backlog |
 
-Predicate (R-0004) is built next by the **main session**; geometric forms
-(R-0005) wait on the R-0002 GA core (built by the GA flow). The two are
-independent — predicates need booleans + the s-expr core (done); geometric
-forms need the garust multivector.
+R-0004 (the predicate checker) is the one M3 form that shipped. The other
+originally-planned M3 forms were **overtaken by the discovery pivot** (2026-06-04)
+and reframed:
+
+- **Geometric forms** (`𝒢ₖ`, `∗`) → now **R-0010** (lowering onto the R-0009
+  `ufl-ga` PGA kernel), in M5.
+- **R-0005** was reframed as the **value conditional** (`if`) and is **shelved**
+  on its branch (M4, paused).
+- The **substrate form** (`⊗`) remains paused (M4).
 
 ### M5 — Discovery → Geometric Neuroevolution  ·  *current headline*
 
@@ -91,16 +93,17 @@ forms need the garust multivector.
 > UFL's Phase-1 centre of gravity is **neuroevolution of `Cl(3,0,1)` geometric
 > ASTs** — the one thing that family of work *doesn't* do (all gradient-trained),
 > and the thing UFL already half-built. The discovery engine is reframed as the
-> **engine-validation step** of that program. *Coefficient field, R-0002
-> supersession, and the minimal geometric gate are proposed (real `f64`;
-> supersede; rediscover the sandwich `R x R̃`) — pending confirmation at R-0009.*
+> **engine-validation step** of that program. *Confirmed at R-0009 (2026-06-18):
+> real `f64`; R-0002 superseded; the `Cl(3,0,1)` PGA kernel (`ufl-ga`) is shipped,
+> with the rotor-sandwich `R x R̃` validated as its keystone — the same sandwich
+> R-0011's neuroevolution will rediscover by search.*
 
 | Req | Capability | Status |
 |-----|------------|--------|
 | [R-0006](requirements/0006-integer-tensor-core.md) | **Exact integer-tensor core** (`ufl-tensor`) — `T_n`, scheme genotype, exact reconstruction + error. | **Done** (merged, PR #16) |
 | [R-0007](requirements/0007-tensor-predicate.md) | **Tensor-equality predicate** — `P_n,R` as a Hehner discharge (`RankDecomposition`). Closes FINDINGS C1's discharge half. | **Done** (merged, PR #18) |
 | [R-0008](requirements/0008-discovery-engine.md) | **Discovery engine** — seeded GA, accept step = the R-0007 discharge. **Re-scoped:** validate the loop + proposer-agnostic seam on a planted solvable target; **document the matmul falsification**. | **Done** (merged, PR #19; planted recovery 7/10, AC4 working-engine guard every seed) |
-| [R-0009](requirements/0009-pga-kernel-binding.md) | **`Cl(3,0,1)` PGA kernel binding** (`ufl-ga` → garust **v0.1.0**, contract green) — multivectors, geo/outer/inner products, grade projection, rotor sandwich, motors. Supersedes R-0002. | In review (`ufl-ga` green — 15 tests, keystone + bit-exact null + convention-equiv; example runs) |
+| [R-0009](requirements/0009-pga-kernel-binding.md) | **`Cl(3,0,1)` PGA kernel binding** (`ufl-ga` → garust **v0.1.0**, contract green) — multivectors, geo/outer/inner products, grade projection, rotor sandwich, motors. Supersedes R-0002. | **Done** (merged, PR #21; `ufl-ga`, 15 tests — keystone + bit-exact PGA null + convention-equivalence) |
 | R-0010 | **Geometric s-expr forms + grade inference** — GA ops as forms; the dimensional type system (decidable per Haynes). | Planned |
 | R-0011 | **Neuroevolution + the stronger proposer** — R-0008's seam, genotype = AST, **memetic/agentic proposer** (the GA-VisAgent pattern); fitness = accuracy − parsimony − grade-entropy. **Inherits the relocated Strassen prize** + the geometric gate (rediscover `R x R̃`). | Planned |
 
@@ -112,7 +115,7 @@ exploration is shelved on branch `R-0005-value-conditional` (recoverable).
 | Req | Capability | Source | Status |
 |-----|------------|--------|--------|
 | R-0005 | Value conditional (`if b a c`) | control | Shelved (branch) |
-| (lang) | GA s-expr forms (`𝒢ₖ`, `∗`) — lower into R-0002's garust multivector | Pillar 2 | Paused (after GA core) |
+| (lang) | GA s-expr forms (`𝒢ₖ`, `∗`) — now **R-0010**, lowering onto the R-0009 `ufl-ga` kernel | Pillar 2 | Active thread (M5) |
 | (lang) | Substrate form + CPU substrate (`⊗`) | Pillar 4 | Paused |
 | (lang) | Macros / quasiquote; grade-filtered neural layer; GAPU mapping; Log–GA compat | proposal §4/§5, Q1 | Paused |
 
@@ -120,34 +123,33 @@ exploration is shelved on branch `R-0005-value-conditional` (recoverable).
 
 - A requirement enters `Discussing` only when every requirement it depends on is
   `Done`.
-- M3's form requirements (R-0004..R-0006) depend on the R-0003 s-expr core.
-- The proposal's §8 open research questions are tracked inside the requirement
-  that must resolve them (Q1 → R-0010, Q2 → R-0004, Q3 → R-0006).
+- Geometric forms (R-0010) depend on the R-0003 s-expr core (done) **and** the
+  R-0009 PGA kernel (done); the grade-type system tracks the proposal's §8
+  geometric-typing question.
 - This file is updated by the orchestrator whenever a requirement changes state.
-  A full re-numbering/reflow after the pivot is the orchestrator's to finalize.
 
 ## Current focus
 
-**R-0008 — the discovery engine (engine-validation step).** Steps 1–2 of Path B
-are **Done**: R-0006 (the exact integer verifier, Strassen gate) and R-0007 (the
-verifier *is* the Hehner discharge — `P_{2,7}(strassen) → Ok(true)`). The active
-work is the seeded GA that finds an exact rank-7 scheme **without being given
-Strassen**, accepting via the R-0007 discharge and emitting a re-verifiable
-certificate — proving the genetic-search loop on a *known-answer* problem before
-its genotype generalizes to geometric ASTs (R-0011). *Requirement accepted;
-SPEC-0008 next.*
+**R-0010 — geometric s-expr forms + the grade-type system, is next.** With the
+substrate complete (R-0009 `ufl-ga`, the `Cl(3,0,1)` PGA kernel), R-0010 builds
+the geometric s-expression *forms* that lower onto it, plus a **decidable
+grade-type system** (the dimensional types Haynes proved decidable). That gives
+R-0011 a typed geometric AST to evolve.
 
 **The Phase-1 arc (decided 2026-06-12 — [[project-neuroevolution-direction]]):**
-R-0008 (engine) → R-0009 (`Cl(3,0,1)` PGA kernel, real `f64`, supersedes R-0002)
-→ R-0010 (geometric forms + grade inference) → R-0011 (neuroevolution over
-geometric ASTs). The differentiator is **evolution**, which the validating
-literature (CliffordNet, GATr, Haynes) doesn't do.
+R-0008 (engine, **Done**) → R-0009 (`Cl(3,0,1)` PGA kernel, **Done**) → R-0010
+(geometric forms + grade inference, **next**) → R-0011 (neuroevolution over
+geometric ASTs, inheriting the relocated Strassen prize). The differentiator is
+**evolution**, which the validating literature (CliffordNet, GATr, Haynes)
+doesn't do; the engine rides UFL's exact verifier (the predicate discharge), so
+*transparency lives in the verifier, not the proposer* — which let the blind-GA
+proposer's failure on Strassen become a documented result rather than a dead end.
 
 **Paused:** the language-build thread (R-0005 value conditional shelved on its
-branch; substrate / macros / GAPU) — resumable later. **R-0002** (G(3,0,0) GA
-core, separate GA flow) is **superseded by R-0009** (the signature moves to
-`Cl(3,0,1)` PGA) — hand-off to be coordinated.
+branch; substrate `⊗` / macros / GAPU) — resumable later. **R-0002** (G(3,0,0))
+is **superseded by R-0009**.
 
-**Done:** R-0001 (EML core), R-0003 (s-expr core), R-0004 (predicate checker),
-R-0006 (integer-tensor core), R-0007 (tensor predicate) — 153 tests green across
-five crates.
+**Done (on `main`):** R-0001 (EML core), R-0003 (s-expr core), R-0004 (predicate
+checker), R-0006 (integer-tensor verifier), R-0007 (the verifier *is* the Hehner
+discharge), R-0008 (discovery engine + the honest matmul falsification), R-0009
+(`Cl(3,0,1)` PGA kernel). **Six crates, 168 tests green.**

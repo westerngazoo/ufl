@@ -15,9 +15,10 @@ why it can exist — in detail, and with a plain-language appendix for newcomers
 shows what's built today, what writing UFL will look like, and how the same EML
 tree compiles to each substrate (CPU, stack machine, FPGA, analog, neural).
 **Want to *run* it?** Open [`docs/playground.html`](docs/playground.html) in a
-browser — an interactive architecture diagram plus a live playground (a faithful
-JS port of the evaluator, predicate checker, and tensor verifier): evaluate
-`(eml 1 1)`, check `⟦x' = (eml x 1)⟧`, and verify the Strassen scheme.
+browser — an interactive architecture diagram of all six crates plus a live
+playground (a faithful JS port of the evaluator, predicate checker, and tensor
+verifier): evaluate `(eml 1 1)`, check `⟦x' = (eml x 1)⟧`, and verify the
+Strassen scheme.
 
 ## The four pillars
 
@@ -40,6 +41,27 @@ JS port of the evaluator, predicate checker, and tensor verifier): evaluate
 | ∗ | Geo-Product | Geometric product of two multivectors. |
 | ⟦P⟧ | Predicate | Wrap an expression as a Hehner pre/post-state constraint. |
 | ⊗ | Substrate-Bind | Annotate an expression with a substrate hint. |
+
+## Built so far
+
+Six crates on `main`, each through the full eight-step loop (requirement → spec
+→ three-lens review → tests-first → implement → PR → qa sign-off):
+
+| Crate | What it is | Requirement |
+|-------|-----------|-------------|
+| `ufl-core` | The EML numeric core — `eml(x,y)=exp(x)−ln(y)` over `Complex<f64>` | R-0001 |
+| `ufl-syntax` | The homoiconic s-expression surface that lowers into the core | R-0003 |
+| `ufl-predicate` | The Hehner predicate checker + the `Predicate` discharge trait | R-0004 / R-0007 |
+| `ufl-tensor` | Exact integer matmul-decomposition verifier (`T_n`, the Strassen gate) | R-0006 |
+| `ufl-discovery` | The verifier *is* the Hehner discharge + a seeded-GA discovery engine | R-0007 / R-0008 |
+| `ufl-ga` | The `Cl(3,0,1)` PGA geometric kernel — a thin facade over [garust](https://github.com/westerngazoo/garust) | R-0009 |
+
+**Current headline (M5):** a geometric-neuroevolution engine. The discovery
+substrate is proven — and honest: the blind-GA search for Strassen was
+*falsified* (0/10) and documented, because in UFL transparency lives in the
+*verifier*, not the proposer. Next is the geometric s-expr forms + a decidable
+grade-type system (R-0010), then neuroevolution over geometric ASTs (R-0011).
+See [`ROADMAP.md`](ROADMAP.md).
 
 ## How we build it — requirement- and spec-driven
 

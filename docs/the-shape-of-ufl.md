@@ -82,10 +82,13 @@ Verbose, intentionally so — this is the *primitive* API; the surface syntax in
 
 ## 2. Tomorrow — what writing UFL will look like
 
-> Everything in this section is **illustrative only**. There is no parser yet
-> (R-0005) and no GA / predicate / substrate atoms yet (R-0002 / R-0004 /
-> R-0007). The shapes below are the design target — what the corresponding
-> Rust tree-builder reduces to once each layer lands.
+> Everything in this section is **illustrative only** — a design target for the
+> unified surface syntax. The underlying layers are built: the s-expression core
+> (R-0003), the predicate checker (R-0004), and the `Cl(3,0,1)` geometric kernel
+> (R-0009) all ship. What's *not* yet wired is the single surface that lowers
+> these forms together (the geometric s-expr forms are R-0010; the substrate
+> orchestrator `⊗` and the `if` value-conditional are paused). The shapes below
+> are what the corresponding Rust tree-builder reduces to once that surface lands.
 
 ### 2.1 Numeric — the EML layer (already executable in spirit)
 
@@ -104,21 +107,27 @@ Each `let` is an EML tree under a name. `2 ·` and `/2` would be sugar for
 deeper EML subtrees (multiplication is depth 8 per AllEle Table 4). The
 surface is friendly; the core is one operator.
 
-Today's Rust API is the *same* set of trees, written more verbosely. R-0005
-(syntax + AST) and R-0006 (evaluator over the parsed AST) close the gap.
+Today's Rust API is the *same* set of trees, written more verbosely. The
+homoiconic surface (R-0003) ships; lowering the remaining forms onto one surface
+is the open work.
 
-### 2.2 Geometric — multivectors over EML scalars (R-0002)
+### 2.2 Geometric — multivectors over the `Cl(3,0,1)` PGA kernel (R-0009)
 
 ```ufl
 -- promote scalars to multivectors by grade
-let v   = 𝒢₁(eml(3, 1))                            -- vector of magnitude e³
-let R   = exp(𝒢₂(eml(τ/8, 1)))                     -- rotor: τ/4 in e₁∧e₂
+let v   = 𝒢₁(3)                                    -- a grade-1 vector
+let R   = exp(𝒢₂(τ/8))                             -- rotor: τ/4 in e₁∧e₂
 let v'  = R ∗ v ∗ ~R                                -- sandwich rotation
 ```
 
-Coefficients are `Complex<f64>` — the values EML evaluates to. The geometric
-product `∗` is table-driven over G(3,0,0)'s 8 basis blades; `~R` reverses
-grade-2 components (the Clifford reverse).
+The geometric kernel (`ufl-ga`, R-0009) ships as a `Cl(3,0,1)` **PGA** algebra
+over **real `f64`** — 16 basis blades, with the ideal generator `e₀² = 0` giving
+native translations/motors. The geometric product `∗` and the reverse `~R` are
+the kernel's; `𝒢ₖ` is the grade-lift *form* (R-0010, lowering onto this kernel).
+Note this is a **separate substrate** from the `Complex<f64>` EML core — the two
+are bridged only at the theory level ([`theory/log-ga-bridge.md`](../theory/log-ga-bridge.md)),
+not in one coefficient field. The earlier "GA over EML scalars" framing was
+retired with R-0002's supersession.
 
 ### 2.3 Predicates — programs as constraints (R-0004)
 
@@ -134,7 +143,7 @@ A gate, a function, and a neural layer are the *same kind* of thing — a
 predicate. The evaluator is one strategy; a substrate is another. Both must
 *satisfy* the predicate.
 
-### 2.4 Substrate hints — the orchestrator (R-0007)
+### 2.4 Substrate hints — the orchestrator (planned, M4)
 
 ```ufl
 -- annotate an expression with a substrate hint
@@ -208,7 +217,7 @@ Compilation is mechanical: post-order traversal of the EML tree → 3 opcodes
 per node (`exp_arg-bytecode … log_arg-bytecode … EML`). A single-instruction
 ALU is achievable in genuinely tiny silicon — see AllEle §4.2.
 
-Status: ⬜ planned (lands with R-0007 substrate work).
+Status: ⬜ planned (with the substrate orchestrator).
 
 ### 3.3 FPGA / digital silicon — one cell, replicated
 
@@ -235,7 +244,7 @@ replicated.
 This is the structural analogue of *NAND all the way down* — exactly the move
 that made digital logic uniform, lifted to continuous arithmetic.
 
-Status: ⬜ planned. Worth noting: the orchestrator (R-0007) picks this
+Status: ⬜ planned. Worth noting: the orchestrator (planned, M4) picks this
 substrate when the predicate demands high throughput / low jitter and tolerates
 the LUT's quantization noise.
 
@@ -303,7 +312,7 @@ Status: ⬜ planned. Direct port of AllEle's symbolic-regression experiments.
 | Substrate | Element | Compiled form of a tree | Status |
 |---|---|---|---|
 | **CPU / Rust** | `Complex<f64>` calling `.exp()` / `.ln()` | a call chain | ✅ shipped (R-0001) |
-| **Stack machine** | one opcode `EML` + `PUSH 1` / `LOAD` | post-order bytecode | ⬜ R-0007 |
+| **Stack machine** | one opcode `EML` + `PUSH 1` / `LOAD` | post-order bytecode | ⬜ planned (substrate) |
 | **FPGA / silicon** | one digital `eml` cell | pipeline of N cells | ⬜ future |
 | **Analog** | log-conv + V−V subtractor | wired pipeline of cells | ⬜ future |
 | **Differentiable / neural** | parameterised tree + Adam | trainable function | ⬜ future |
@@ -334,7 +343,7 @@ This is the concrete mechanism behind UFL's founding thesis — that the
 hardware/software boundary is *notational*. With a uniform notation, the
 substrate becomes a compilation target, not a design decision.
 
-Status: ⬜ R-0007.
+Status: ⬜ planned (substrate).
 
 ---
 

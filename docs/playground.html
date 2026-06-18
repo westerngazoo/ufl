@@ -120,7 +120,7 @@
   </section>
 
   <div class="foot">
-    Mirrors crates <span class="mono">ufl-core</span> · <span class="mono">ufl-syntax</span> · <span class="mono">ufl-predicate</span> · <span class="mono">ufl-tensor</span>.
+    Mirrors crates <span class="mono">ufl-core</span> · <span class="mono">ufl-syntax</span> · <span class="mono">ufl-predicate</span> · <span class="mono">ufl-tensor</span> · <span class="mono">ufl-discovery</span> · <span class="mono">ufl-ga</span>.
     See <a href="why-ufl.md">why-ufl.md</a>, <a href="the-shape-of-ufl.md">the-shape-of-ufl.md</a>, <a href="universal-computability.md">universal computability</a> (in <span class="mono">theory/</span>).
   </div>
 </main>
@@ -232,9 +232,12 @@ const LAYERS=[
   {crate:"ufl-tensor", title:"Exact matmul-decomposition verifier", atom:"T_n", st:"done",
    desc:"Pure integer: the target tensor, a scheme of {-1,0,+1} triples, exact reconstruction. A discovery is registered only at error 0. (M5 Discovery, Phase 0.)",
    ex:["Strassen R=7 → error 0"]},
-  {crate:"ufl-discovery", title:"Discovery engine — GA search", atom:"⊗ search", st:"wip",
-   desc:"Planned (R-0008): search for schemes that drive the verifier's error to 0 at ever-smaller rank — rediscover Strassen, then generalize. The verifier is the Hehner discharge.",
-   ex:["search → rediscover Strassen, then beat it"]},
+  {crate:"ufl-discovery", title:"Discovery engine — seeded GA", atom:"⊗ search", st:"done",
+   desc:"R-0008 (on main): a seeded GA whose accept step IS the R-0007 Hehner discharge — proposer-agnostic, verifier-exact. Validated on a planted target (7/10); the blind-GA Strassen search was honestly falsified (0/10) and documented, motivating R-0011's stronger proposer.",
+   ex:["propose → residual → discharge → certificate","blind GA can't do Strassen — documented, not hidden"]},
+  {crate:"ufl-ga", title:"Cl(3,0,1) PGA geometric kernel", atom:"𝒢ₖ · ∗", st:"done",
+   desc:"R-0009 (on main): a thin facade over garust's Cl(3,0,1) PGA kernel (real f64). Multivectors, the geometric product, the rotor sandwich, rigid-body motors. The native translator (e₀²=0) no VGA can do; the τ/4 rotor is the EML core's Euler i, as a turn.",
+   ex:["rotor(τ/4, e₁₂).sandwich(e1) → e2","motor: translate a point natively"]},
 ];
 const stack=document.getElementById('stack'), detail=document.getElementById('detail');
 LAYERS.forEach((L,idx)=>{ const d=document.createElement('div'); d.className='layer';
