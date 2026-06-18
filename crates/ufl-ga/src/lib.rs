@@ -30,32 +30,33 @@ pub mod basis {
     use super::Mv;
 
     /// The grade-0 scalar `s`.
-    pub fn scalar(_s: f64) -> Mv {
-        unimplemented!("R-0009 step 5 — see SPEC-0009 §2.2")
+    pub fn scalar(s: f64) -> Mv {
+        Mv::scalar(s)
     }
 
     /// `e1` (`e1² = +1`).
     pub fn e1() -> Mv {
-        unimplemented!("R-0009 step 5 — see SPEC-0009 §2.2")
+        Mv::basis(1)
     }
 
     /// `e2` (`e2² = +1`).
     pub fn e2() -> Mv {
-        unimplemented!("R-0009 step 5 — see SPEC-0009 §2.2")
+        Mv::basis(2)
     }
 
     /// `e3` (`e3² = +1`).
     pub fn e3() -> Mv {
-        unimplemented!("R-0009 step 5 — see SPEC-0009 §2.2")
+        Mv::basis(4)
     }
 
-    /// `e0` — the ideal/null generator (`e0² = 0`).
+    /// `e0` — the ideal/null generator (`e0² = 0`). garust's `Cl(3,0,1)` puts
+    /// the degenerate generator last, so its blade index is `8`.
     pub fn e0() -> Mv {
-        unimplemented!("R-0009 step 5 — see SPEC-0009 §2.2")
+        Mv::basis(8)
     }
 
-    /// The grade-4 pseudoscalar.
+    /// The grade-4 pseudoscalar (blade index `15`).
     pub fn pseudoscalar() -> Mv {
-        unimplemented!("R-0009 step 5 — see SPEC-0009 §2.2")
+        Mv::pseudoscalar()
     }
 }
