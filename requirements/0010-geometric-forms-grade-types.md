@@ -76,10 +76,12 @@ geometric forms + types over it.
   vector*. Tied to the R-0009 keystone: the same sandwich that sends `e₁ → e₂`
   is grade-typed vector → vector. This is the dimensional-type invariant the
   literature touts, made checkable.
-- **AC5 — Homoiconic surface.** Geometric forms are readable as s-expressions
-  (e.g. `(sandwich R (grade-lift 1 x))`) — `read → GeoExpr`, integrating with
-  `ufl-syntax`. *(Scope decision in §5 — may be a minimal reader for the form
-  set, or deferred if the three-lens finds it premature ahead of R-0011.)*
+- **AC5 — Homoiconic surface.** `GeoExpr` is the **code-as-data form
+  representation** (a `Clone`-able, inspectable, constructor-built tree — what
+  `Eml` is before R-0003 added a reader). *The textual `Sexpr → GeoExpr` reader
+  is **deferred** to a future requirement (a human-authoring consumer) — resolved
+  by SPEC-0010 §2.6 + the three-lens (R-0011 evolves the `GeoExpr` AST directly,
+  so it consumes the AST, not text). See the decision log.*
 - **AC6 — Grade-coherence check.** A grade-incoherent program is detectable:
   `grade` flags (or a `typecheck` returns an error for) a form that cannot carry
   a sensible grade (e.g. grade-project to an absent grade) — the decidable
@@ -91,7 +93,8 @@ geometric forms + types over it.
 - The kernel is **R-0009's `ufl-ga` `Cl(3,0,1)` PGA over real `f64`**; grade sets
   range over `0..4` (16-blade algebra). Eval correctness is to `ε` (the R-0009
   tolerance); grade inference is exact/structural.
-- `ufl-geo` depends only on `ufl-syntax` + `ufl-ga` (not `ufl-core`).
+- `ufl-geo` depends only on `ufl-ga` (not `ufl-core`; the textual reader that
+  would pull in `ufl-syntax` is deferred — see AC5 / the decision log).
 
 **Non-goals** (later requirements)
 - **The evolution itself** — the genotype operators (mutation/crossover over
@@ -127,6 +130,7 @@ geometric forms + types over it.
 | 2026-06-18 | R-0010 = the **typed geometric expression layer** (forms + eval + grade inference), the genotype R-0011 evolves — *not* the evolution itself. | Keeps R-0010 a coherent, testable unit (a typed core), and separates "the thing evolved + its type" (R-0010) from "the evolver" (R-0011), per the proposer-agnostic discipline. |
 | 2026-06-18 | The **grade-type system** is built here, as decidable grade *inference* over `0..4`, with the **sandwich grade-preservation** keystone (AC4). | This is UFL's realization of the Haynes "decidable dimensional type" — and the source of R-0011's grade-parsimony fitness. The sandwich-preserves-grade invariant is the smallest convincing proof, tied to the R-0009 keystone. |
 | 2026-06-18 | Form set scoped to the **`Mv`-over-rotations core** (grade-lift, products, reverse, project, sandwich, exp); motors/`Point` deferred. | The de-risk validated structure-evolution on exactly this core; rigid-body motor forms add surface R-0011's first gate (rediscover `R x R̃`) doesn't need. |
+| 2026-06-18 | **AC5 amended: the textual `Sexpr → GeoExpr` reader is deferred**; AC5 delivers `GeoExpr` as the homoiconic AST, not a textual reader. The §4 dependency is narrowed to **`ufl-ga`-only** accordingly. | Three-lens (SPEC-0010 §2.6): R-0011 evolves the AST directly (no text consumer yet); a reader now is premature (CLAUDE.md §2), and mirrors `Eml` (R-0001) preceding its reader (R-0003). Recorded here so the spec is not silently redefining an accepted AC (the SPEC-0007/0009 discipline). The reader returns when a human-authoring use case appears, re-adding the `ufl-syntax` (dev-)dependency. |
 
 ## Changelog
 
