@@ -2,7 +2,7 @@
 
 **From:** UFL (Gustavo Delgadillo / westerngazoo) — the `ufl-ga` binding (R-0009).
 **To:** the garust team.
-**Status:** Draft — for the garust team to confirm / amend.
+**Status:** ✅ **Confirmed by garust** — pin tag `v0.1.0` (`main` @ `292bce5`). See §7.
 **Verified against:** garust `5a31c44` (the `Cl(3,0,1)` PGA kernel — every item
 below was located in the source at this commit; see the cited paths).
 
@@ -90,8 +90,48 @@ For context, so you can see how the surface is used:
   fitness/accept step is verified exactly (UFL's predicate discharge), with the
   garust kernel doing the geometry.
 
+## 7. garust team response — Confirmed
+
+**Confirmed for garust `v0.1.0`** (git tag `v0.1.0`, `main` @ `292bce5`).
+
+1. **Version to pin (§4.2, §5.1).** garust is not yet on crates.io; pin the git
+   tag:
+   ```toml
+   [dependencies]
+   garust = { git = "https://github.com/westerngazoo/garust", tag = "v0.1.0" }
+   ```
+   UFL needs only the default build (`std` + `f64`) — no extra features. A
+   crates.io release will reuse the `0.1.0` version string when published (the
+   ordered publish steps live in garust's `RELEASING.md`).
+
+2. **C1–C11 are supported public API under semver (§4.1, §5.2).** A conformance
+   test — `crates/garust-geo/tests/pga_contract.rs` — exercises every capability
+   and asserts the §3 invariants on every CI run, so the surface is
+   machine-guarded, not merely documented. A change that breaks it is a
+   breaking change and warrants a major-version bump.
+
+3. **§3 semantics are guaranteed** (intended, not incidental): the `Cl(3,0,1)`
+   signature (`e1,e2,e3 → +1`, the ideal `e0 → 0`, 16 blades), sandwich / `exp`
+   rotor- and motor-correctness, the standard grade algebra, and
+   purity/determinism — each asserted by the conformance test.
+
+4. **Nothing on C1–C11 is slated for reshaping (§5.3)** — depend on all of it.
+   Additive changes since the `5a31c44` audit, none of which alter the pinned
+   surface's signatures or semantics:
+   - `Default` for `Motor` / `Conformal` (= identity);
+   - `#[must_use]` on the typed value types (`Motor`, `Conformal`, and the
+     `pga` / `cga` objects) — a lint only: ignoring a produced value now warns;
+   - `Motor::to_matrix()` — new and additive: a column-major homogeneous 4×4
+     for matrix-speed bulk transforms (not part of the contract, available if
+     UFL wants the throughput bridge).
+
+5. **Batch apply (§5.4)** — `Motor::apply_each` / `Conformal::apply_each` (and,
+   behind the optional `simd` feature, `apply_each_simd`) are present whenever
+   UFL wants the point-cloud path.
+
 ---
 
-*Prepared from a direct source audit of garust at `5a31c44`. Everything UFL
-needs is already implemented; this contract asks for confirmation and a
-stability commitment, not new work.*
+*Prepared from a direct source audit of garust at `5a31c44`; confirmed and
+pinned at `v0.1.0` (`292bce5`). Everything UFL needs was already implemented —
+this contract asked for confirmation and a stability commitment, now granted
+and CI-enforced.*
