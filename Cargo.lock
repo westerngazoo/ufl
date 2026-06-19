@@ -134,6 +134,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufl-geo"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+ "ufl-ga",
+]
+
+[[package]]
 name = "ufl-predicate"
 version = "0.1.0"
 dependencies = [
