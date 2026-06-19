@@ -60,7 +60,6 @@ impl Env {
 /// The lowest-index grade-`k` blade index (pinned, SPEC-0010 §2.2): `0→0`
 /// (scalar), `1→1` (e1), `2→3` (e12), `3→7` (e123), `4→15` (pseudoscalar).
 /// `None` for `k > 4`. Lowest-index dodges the null `e₀`-bearing blades.
-#[allow(dead_code)] // consumed by `eval` in R-0010 step 5
 pub(crate) fn lowest_blade(k: u8) -> Option<u8> {
     match k {
         0 => Some(0),
