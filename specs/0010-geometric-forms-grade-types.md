@@ -85,7 +85,7 @@ Each form lowers onto its `ufl_ga::Mv` operation:
 | `Param(s)` | `Mv::scalar(s)` | — |
 | `Basis(i)` | `Mv::basis(i)` | `BadBlade(i)` if `i ≥ 16` (garust `basis` panics ≥ DIM) |
 | `Var(n)` | `env[n]` | `Unbound(n)` |
-| `GradeLift(k, e)` | `eval(e)` (scalar) × `lowest_blade(k)` | `BadGrade(k)` if `k > 4` |
+| `GradeLift(k, e)` | `eval(e).grade(0)` (the **scalar part**) × `lowest_blade(k)` | `BadGrade(k)` if `k > 4` |
 | `GeoProduct(a,b)` | `eval(a) * eval(b)` | — |
 | `Wedge / Inner` | `a.wedge(&b)` / `a.inner(&b)` | — |
 | `Reverse(a)` | `a.reverse()` | — |
@@ -97,7 +97,10 @@ Each form lowers onto its `ufl_ga::Mv` operation:
 (`Mv::basis(i)` for `i ≥ 16`) is guarded by a typed `GeoError` first. `lowest_blade(k)`
 is the **lowest-index grade-`k` blade** (k=0→`1`, 1→`e1`, 2→`e12`, 3→`e123`,
 4→pseudoscalar) — pinned, so `GradeLift`'s value is unambiguous and never lands
-on a null blade.
+on a null blade. `GradeLift` lifts the child's **scalar part** (`eval(e).grade(0)`):
+`𝒢ₖ` is "scalar × blade", so the result is genuinely pure grade `k` and `grade`'s
+`{k}` rule stays sound for *any* child (a non-scalar child contributes only its
+grade-0 component) — the soundness fix the review-stage audit forced (§7).
 
 ### 2.3 The grade-type system — `GradeSet` + inference (sound over-approximation)
 
@@ -125,7 +128,7 @@ inference; `n = 4` generators):
 | `GradeLift(k, _)` | `singleton(k)` (`⊤` if `k > 4`) |
 | `Wedge / Inner / GeoProduct` | `Op::{Wedge,Inner,Geometric}.output_grades(&[grade(a), grade(b)], 4)` |
 | `Reverse(a)` | `Op::Reverse.output_grades(&[grade(a)], 4)` (preserves) |
-| `GradeProject(k, a)` | `Op::GradeProject(k).output_grades(&[grade(a)], 4)` (`= {k}∩grade(a)`, possibly `∅`) |
+| `GradeProject(k, a)` | `Op::GradeProject(k).output_grades(&[grade(a)], 4)` (`= {k}∩grade(a)`, possibly `∅`); **`∅` if `k > 4`** — guarded before garust, whose `singleton(k) = 1<<k` overflows `u32` for `k ≥ 32` (§7) |
 | **`Sandwich(r, x)`** | **`grade(x)` iff `r` is a *statically-known versor*** (§2.4); else the sound product bound `Geometric.output_grades(&[Geometric.output_grades(&[grade(r), grade(x)], 4), grade(r)], 4)` |
 | **`Exp(a)`** | `{0}` if `grade(a) ⊆ {0}`; the even subalgebra `{0,2,4}` if `grade(a) ⊆ {0,2}` (exp of an even element is even — covers rotors *and* motors); else `⊤` |
 
@@ -253,6 +256,8 @@ proof*).
 | 2026-06-18 | **`Sandwich` grade rule is versor-conditioned** (§2.4): preserve grade only when `r` is a statically-known versor (`Exp` of a bivector / product of versors), else the sound product bound. | `r x ~r` preserves grade *iff `r` is a versor*; `Sandwich` takes an arbitrary `r` and R-0011 mutates it, so a non-versor `r` is the common case. The keystone (AC4) uses the versor case and stays crisp; everything else stays sound. |
 | 2026-06-18 | **`eval` total** — out-of-range `Basis`/grade are typed `GeoError`s, not panics; `GradeLift`'s blade pinned to lowest-index. | `Mv::basis(≥16)` panics; R-0011 generates raw `u8` leaves, so the boundary must guard (the R-0009 totality discipline). Lowest-index `GradeLift` is unambiguous and dodges the null blade. |
 | 2026-06-18 | **Textual s-expr reader deferred** (§2.6); R-0010 AC5 amended + decision-logged. | R-0011 evolves the AST directly (no text consumer); building the reader now is premature. Pre-authorized by R-0010 AC5. |
+| 2026-06-20 | **`GradeLift` `eval` projects the child to its scalar part** (`eval(e).grade(0) × blade_k`), not a raw geometric product. | Review-stage audit (4 lenses, ~280k fuzzed trees) found `grade(GradeLift(k,_))={k}` was *unsound* against the raw-product `eval` for a non-scalar child (`GradeLift(1,e1) → e1*e1 = scalar {0}`, inferred `{1}`; `GradeLift(2,e34) →` pseudoscalar `{4}`). The spec's eval table already read the child "(scalar)"; the impl forgot the projection. Projecting restores `realized ⊆ grade` and keeps `{k}` exact (R-0010 AC3). The keystone/AC tests are unchanged (`Param` children are already scalar). |
+| 2026-06-20 | **`grade(GradeProject(k,_))` guards `k > 4 → ∅`** before delegating to garust. | The same audit found `grade`/`typecheck` *panicked* (`attempt to shift left with overflow`) for `k ≥ 32`: garust's `singleton(k) = 1<<k` overflows `u32`. `eval` already guarded `k > 4`; `grade` did not. Guarding restores the §2.3/AC3 totality guarantee. Projection onto an absent grade is `∅` (consistent with garust's own `5..31` behaviour). |
 
 ## 8. Companion edits (this branch)
 
@@ -273,3 +278,10 @@ proof*).
   no panic); `GradeLift` blade pinned to lowest-index; `Exp` rule widened to the
   even subalgebra; `Env`/`GradeCtx` specified; the de-risk "evolved this" wording
   softened to "findings motivate"; R-0010 AC5 amendment recorded.
+- 2026-06-20 — implemented to green; **review-stage adversarial soundness audit**
+  (architect + 4 fuzz lenses, ~280k trees) found and fixed two defects in the
+  first cut — `GradeLift` `eval` now projects the child to its scalar part (was an
+  unsound under-approximation), and `grade(GradeProject)` guards `k > 4` (was a
+  `1<<k` overflow panic). Both are decision-logged; `tests/r_0010_soundness.rs` is
+  the permanent regression gate. Exp / versor-Sandwich / delegated catalog forms
+  were confirmed sound (0 violations).
