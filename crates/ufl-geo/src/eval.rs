@@ -35,8 +35,11 @@ pub fn eval(e: &GeoExpr, env: &Env) -> Result<Mv, GeoError> {
         }
         GeoExpr::Var(name) => env.get(name).ok_or_else(|| GeoError::Unbound(name.clone())),
         GeoExpr::GradeLift(k, a) => {
+            // 𝒢ₖ lifts the child's SCALAR part to the lowest grade-`k` blade
+            // (SPEC-0010 §2.2 — the child is read "(scalar)"), so the value is
+            // genuinely pure grade `k` and `grade`'s `{k}` rule stays sound.
             let blade = lowest_blade(*k).ok_or(GeoError::BadGrade(*k))?;
-            Ok(eval(a, env)? * Mv::basis(blade as usize))
+            Ok(eval(a, env)?.grade(0) * Mv::basis(blade as usize))
         }
         GeoExpr::GeoProduct(a, b) => Ok(eval(a, env)? * eval(b, env)?),
         GeoExpr::Wedge(a, b) => Ok(eval(a, env)?.wedge(&eval(b, env)?)),

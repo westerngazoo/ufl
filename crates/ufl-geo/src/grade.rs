@@ -107,7 +107,16 @@ pub fn grade(e: &GeoExpr, ctx: &GradeCtx) -> GradeSet {
         GeoExpr::Wedge(a, b) => Op::Wedge.output_grades(&[grade(a, ctx), grade(b, ctx)], N),
         GeoExpr::Inner(a, b) => Op::Inner.output_grades(&[grade(a, ctx), grade(b, ctx)], N),
         GeoExpr::Reverse(a) => Op::Reverse.output_grades(&[grade(a, ctx)], N),
-        GeoExpr::GradeProject(k, a) => Op::GradeProject(*k).output_grades(&[grade(a, ctx)], N),
+        GeoExpr::GradeProject(k, a) => {
+            // Guard the raw `u8` before garust (its `singleton(k) = 1 << k`
+            // overflows `u32` for `k ≥ 32`): projecting onto a grade the algebra
+            // lacks (`k > 4`) is the empty set. Keeps `grade` total (SPEC-0010 §2.3).
+            if *k > 4 {
+                GradeSet::EMPTY
+            } else {
+                Op::GradeProject(*k).output_grades(&[grade(a, ctx)], N)
+            }
+        }
         GeoExpr::Sandwich(r, x) => {
             if is_versor(r, ctx) {
                 // A versor sandwich preserves the operand's grade.
