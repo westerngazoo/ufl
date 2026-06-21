@@ -11,6 +11,7 @@ members = [
     "crates/ufl-tensor",
     "crates/ufl-discovery",
     "crates/ufl-ga",
+    "crates/ufl-geo",
 ]
 
 [workspace.package]

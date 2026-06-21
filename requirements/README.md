@@ -42,3 +42,4 @@ the requirement(s) it satisfies. The mapping is maintained in
 | [R-0007](0007-tensor-predicate.md) | Tensor-equality predicate (the Hehner-discharge bridge) | M5 — Discovery | Met (merged, PR #18) |
 | [R-0008](0008-discovery-engine.md) | Discovery engine — loop validation + blind-proposer falsification | M5 — Discovery | Met (merged, PR #19) |
 | [R-0009](0009-pga-kernel-binding.md) | `Cl(3,0,1)` PGA kernel binding (`ufl-ga` → garust v0.1.0) | M5 — Discovery | Met (merged, PR #21; 15 tests) |
+| [R-0010](0010-geometric-forms-grade-types.md) | Geometric forms + the grade-type system (`ufl-geo`) | M5 — Discovery | Accepted; impl green in PR #23 (review-stage soundness audit passed) |

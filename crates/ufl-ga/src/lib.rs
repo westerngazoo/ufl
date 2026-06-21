@@ -23,6 +23,12 @@ pub type Mv = garust::Pga3;
 pub use garust::pga::Point;
 pub use garust::Motor;
 
+/// The grade alphabet (re-exported from garust, additively — SPEC-0010): the
+/// grade bitmask `GradeSet` and the operator catalog `Op`, whose
+/// `Op::output_grades` is the correct structural grade inference `ufl-geo`
+/// (R-0010) delegates to.
+pub use garust::{GradeSet, Op};
+
 /// UFL-named basis constructors for `Cl(3,0,1)`. The blade indices are pinned to
 /// garust's convention (the degenerate generator is last); each is total — every
 /// index is `< DIM (16)`, so `Mv::basis` cannot panic (SPEC-0009 §2.2).
