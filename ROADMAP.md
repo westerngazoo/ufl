@@ -106,6 +106,7 @@ and reframed:
 | [R-0009](requirements/0009-pga-kernel-binding.md) | **`Cl(3,0,1)` PGA kernel binding** (`ufl-ga` → garust **v0.1.0**, contract green) — multivectors, geo/outer/inner products, grade projection, rotor sandwich, motors. Supersedes R-0002. | **Done** (merged, PR #21; `ufl-ga`, 15 tests — keystone + bit-exact PGA null + convention-equivalence) |
 | R-0010 | **Geometric s-expr forms + grade inference** — GA ops as forms; the dimensional type system (decidable per Haynes). | Planned |
 | R-0011 | **Neuroevolution + the stronger proposer** — R-0008's seam, genotype = AST, **memetic/agentic proposer** (the GA-VisAgent pattern); fitness = accuracy − parsimony − grade-entropy. **Inherits the relocated Strassen prize** + the geometric gate (rediscover `R x R̃`). | Planned |
+| [R-0012](requirements/0012-f2-boolean-deduction.md) | **Boolean deduction over 𝔽₂** (the discrete-logic lane) — logic-as-polynomial-ring (XOR=+, AND=·, idemp x²=x); entailment = ideal membership; **equality saturation (egg) ≡ Buchberger/Gröbner**. A falsifiable spike with a **SAT baseline** (AC2/AC4). Orthogonal to the EML + geometric lanes; **new engine, not a reuse**. | Draft (does not block R-0011; spike after/parallel at owner discretion) |
 
 ### M4 / language-build — *paused for the discovery pivot*
 
