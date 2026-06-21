@@ -1,0 +1,12 @@
+[package]
+name = "ufl-geo"
+version = "0.1.0"
+description = "UFL — geometric forms (GeoExpr) + the decidable grade-type system over the ufl-ga Cl(3,0,1) kernel (SPEC-0010)."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+ufl-ga = { path = "../ufl-ga" }
+thiserror = "2"
