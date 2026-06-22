@@ -43,5 +43,5 @@ the requirement(s) it satisfies. The mapping is maintained in
 | [R-0008](0008-discovery-engine.md) | Discovery engine — loop validation + blind-proposer falsification | M5 — Discovery | Met (merged, PR #19) |
 | [R-0009](0009-pga-kernel-binding.md) | `Cl(3,0,1)` PGA kernel binding (`ufl-ga` → garust v0.1.0) | M5 — Discovery | Met (merged, PR #21; 15 tests) |
 | [R-0010](0010-geometric-forms-grade-types.md) | Geometric forms + the grade-type system (`ufl-geo`) | M5 — Discovery | Met (merged, PR #23; 18 tests — 14 AC + 4 soundness) |
-| [R-0011](0011-geometric-neuroevolution.md) | Geometric neuroevolution — evolve the `GeoExpr` genotype (sandwich-rediscovery gate + the IK-beats-MLP headline) | M5 — Discovery (**headline**) | Draft (full-headline scope; tree-GA; Strassen deferred) |
+| [R-0011](0011-geometric-neuroevolution.md) | Geometric neuroevolution — evolve the `GeoExpr` genotype (sandwich-rediscovery gate + the equivariant-OOD-generalization headline) | M5 — Discovery (**headline**) | Draft (SPEC-0011 drafted; three-lens + §2.6 de-risk done → headline reframed; pending architect re-review + acceptance) |
 | [R-0012](0012-f2-boolean-deduction.md) | Boolean deduction via equality saturation over 𝔽₂ (the egg↔Gröbner bridge; discrete-logic lane) | M5 — Discovery (reasoning) | Draft (falsifiable spike; new `egg` + SAT engine, **not** a reuse) |
