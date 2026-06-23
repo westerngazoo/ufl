@@ -99,7 +99,16 @@ leaves):
   `exp` is linear-unbounded and a mixed "screw" `exp` hits a Taylor path —
   unbounded magnitudes just score worst via §2.3, but bounding the sampler keeps
   the search well-conditioned).
-- **Subtree replacement** / **subtree crossover** — depth-bounded.
+- **Subtree replacement** / **subtree crossover** — depth-bounded, **size-capped**
+  (a runaway `Sandwich` nests exponentially — the §2.8 pilot hit an 11 MB render
+  without a cap).
+- **Local `Param` refinement on the elites (memetic step)** — the §2.8 pilot's
+  load-bearing finding: a pure tree-GA reliably assembles the right *structure*
+  but lands on the wrong *constants* (e.g. the sandwich shape with a mis-tuned
+  angle). Hill-climbing the `Param` leaves of each elite ("fit the constants once
+  the shape is right") is what crosses the exact bar. The proposer is therefore
+  **memetic** (structure search + numeric refinement), not a pure GA — the
+  evidenced form of R-0011's "stronger proposer."
 
 **Grade used two ways (the R-0010 payoff), neither as an entropy penalty:**
 1. **Pruning filter** — a grade-**incoherent** candidate (`typecheck` → `∅` grade,
@@ -235,6 +244,28 @@ recorded as an open negative, and the proposer (or the genotype) is reconsidered
 *before* sinking the build. This is the R-0008 falsification discipline — and the
 "Reachability-Before-Search" convention (nice-guy) — applied to the *search*, not
 just the target.
+
+**Gate-1 pilot RESULT (run 2026-06-23, throwaway, repo clean).** An answer-blind
+tree-GA (uniform-over-arity sampling, no `Sandwich` prior, `typecheck` grade
+filter) **discovered exact rotations by search** and the prototype printer
+translated them back to GA notation — the whole-thesis loop closed end-to-end on
+the smallest case:
+- **Success: 3/12 seeds to machine precision** (best `−3.7e-17`), **5/12** within
+  `1e-3`; the other 7 collapse to a `−0.5` local optimum. Real basin, **not** a
+  clean sweep.
+- **Varied valid discoveries**, not a memorized template: the canonical sandwich
+  `R v R̃` (via a `GradeLift` route), a *composed double rotor* (stacked
+  sandwiches summing to the turn), and a *wedge/inner rotation identity* whose
+  discovered constant `−0.785 ≈ −τ/8` is the exact half-angle. Two of three strict
+  winners didn't use a top-level `Sandwich` at all.
+- **Honesty guards held:** a constant (`Basis(2)`) scores `−1.09` (the task forces
+  structure); op-sampling is uniform `1/8`.
+- **Two engineering musts surfaced:** the **memetic `Param`-refinement** step
+  (§2.2 — the reason 3/12 not 9/12) and the **size cap**; plus a fitness note —
+  the residual magnitude must be `√Σcoeff²`, **not** garust's metric-blind `norm()`
+  (it zeros `e₀`-blades — the SPEC-0010 trap). This satisfies the §2.8(a) gate
+  with a documented, reproducible positive (modulo the memetic upgrade now folded
+  into §2.2).
 
 ## 3. Code outline
 
