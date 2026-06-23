@@ -1,8 +1,11 @@
 # SPEC-0011 — Geometric Neuroevolution (`ufl-evolve`)
 
-- **Status:** Draft (revised 2026-06-22 — three-lens applied + the §2.6 de-risk
-  ran; headline reframed to **equivariant generalization** by owner decision.
-  Pending architect re-review → acceptance.)
+- **Status:** Draft — **ready for acceptance** (2026-06-22 — three-lens closed:
+  nice-guy STRONG WORK, **architect APPROVE** (re-review), hater NEEDS WORK →
+  findings addressed: evolvability made an explicit §2.8 pre-implementation gate,
+  the "6/6" downgraded to an unverified prior, the grade-seed-bias restricted to
+  answer-blind input grades. The §2.6 de-risk ran; headline reframed to
+  **equivariant generalization** (owner). Awaiting owner acceptance.)
 - **Realizes:** R-0011 (scope: the geometric headline, reframed — §2.5)
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-21
@@ -102,11 +105,13 @@ leaves):
 1. **Pruning filter** — a grade-**incoherent** candidate (`typecheck` → `∅` grade,
    e.g. a projection onto an absent grade) is **rejected and resampled before
    `eval`** (the decidable signal R-0010 built; an ∅-grade tree can only be zero).
-2. **Seeding bias** (the nice-guy amplification) — the verifier may `declare` the
-   target's grade in a `GradeCtx`; the proposer biases sampling toward operators
-   whose `grade()` intersects it (e.g. a pose target is grades `{0,2,4}` → bias
-   toward `Exp`/`GeoProduct` motors). Turns the type from a gate into a search
-   gradient.
+2. **Seeding bias** (optional; *answer-blind*) — the proposer may bias sampling
+   using only the task's **input** grades (public, from the task signature — e.g.
+   a grade-1 vector input → favor vector-typed subtrees), **never the target/output
+   grade**. Biasing on the *target* grade would hand the answer-blind proposer a
+   hint (a Verifier-Held-Transparency relaxation, a three-lens finding); it is
+   **off by default**, and any gate run that enables it must disclose it. The sound,
+   default role of grade is the pruning *filter* (use 1).
 
 > **Note (three-lens):** the spec deliberately **drops the grade-*entropy* fitness
 > term** from the original design. Over a `GradeSet` (a bitmask) it degenerates to
@@ -135,14 +140,17 @@ fitness(g) = accuracy(g) − λₚ · parsimony(g)
 
 ### 2.4 Gate 1 — rediscover the rotor sandwich (AC4, validation)
 
-Fitness `= −‖eval(g, {}) − e₂‖`. An answer-blind tree-GA must converge on a
-`Sandwich(Exp(…), …)`-shaped program realizing `e₁→e₂` within ε, in a **robust
-fraction of independent seeds** (the de-risk's 6/6 reference; threshold set with
-qa). Expressibility is the R-0009/R-0010 keystone (`hello_geo`), so this is the
-engine's first green. **To keep it honest (three-lens):** the **seed-node sampling
-distribution is reported** alongside the success rate, and a **control with a
-uniform-over-arity sampler** must also find it — otherwise "6/6" would just be
-re-sampling a `Sandwich`/`Exp`-biased prior, not searching.
+The task forces a **general rotation**, not a constant: the genome takes an input
+vector `Var("v")` and must reproduce the `e₁→e₂` rotation *applied to v*, scored
+over several test vectors — `fitness = −(1/|V|) Σ_v ‖eval(g, {v}) − rot(v)‖`
+(a constant like `Basis(2)` fails — it ignores `v`). The global optimum is
+`Sandwich(Exp(Param·e₁₂), Var("v"))` with `Param ≈ −τ/8`. Answer-blind, the tree-GA
+must converge in a **robust fraction of independent seeds** (threshold set by qa).
+Expressibility is the R-0009/R-0010 keystone (`hello_geo`). **Honesty guards
+(three-lens):** the seed-node sampling distribution is reported alongside the
+success rate, and a **uniform-over-arity control** must also find it (so "success"
+isn't re-sampling a `Sandwich`/`Exp`-biased prior). **Whether the GA actually finds
+this is not assumed — it is gated by the §2.8 evolvability pilot.**
 
 ### 2.5 Gate 2 — the equivariant-generalization headline (AC5)
 
@@ -167,11 +175,15 @@ approximates in-distribution and **collapses OOD** (de-risk: OOD floor ~0.3, ~70
 counts, and the per-set RMSE table. The ~10× param advantage is noted as
 secondary.
 
-**Honest scope (three-lens).** §2.6 proved the target is *expressible*; whether
-the tree-GA can *evolve* the full 25-node exact FK (harder than Gate 1's sandwich)
-is what AC5 tests. A documented **partial/negative** result — the search finds a
-good-but-inexact program, with the expressibility proof + the fair-MLP comparison
-standing — **satisfies AC6** (no cherry-picking, the R-0008 discipline).
+**Honest scope (three-lens).** §2.6 proved the target is *expressible*; whether the
+tree-GA can *evolve* the full 25-node exact FK (harder than Gate 1's sandwich) is
+**not assumed** — it is gated by the §2.8 evolvability pilot, and the novelty of
+R-0011 (that evolution *discovers* the structure, not that a hand-built witness
+exists) lives entirely there. **AC5's primary, must-deliver claim is the
+*expressibility proof* + the *fair-MLP OOD comparison*** (both evidenced); evolving
+the full FK structure is an **explicit stretch**, gated by §2.8. A documented
+partial/negative — the search finds a good-but-inexact program — **satisfies AC6**
+(the R-0008 discipline). The spec does not pre-bless evolution as expected.
 
 ### 2.6 The expressibility de-risk — DONE (the §2.6 gate, run 2026-06-22)
 
@@ -200,6 +212,29 @@ Literal IK (and direct rotor construction) need `Normalize`/`Log` forms that
 variants + their `eval`/`grade` rules, three-lens'd, the R-0010 soundness gate
 `realized(eval) ⊆ grade` extended in lockstep). **Out of R-0011 scope** — the
 reframed headline needs none of it.
+
+### 2.8 The evolvability pilot — a pre-implementation gate (the §2.6 sibling)
+
+§2.6 proved the target is *expressible*; this gate proves it is *evolvable* —
+the actual R-0011 thesis, currently **unevidenced in-repo** (the "6/6 sandwich
+rediscovery" is an *unverified external prior* — a throwaway Python run, not yet
+reproduced here; it is **not** cited as evidence and Gate-1's threshold is set
+fresh by qa, three-lens). **Before the full evolver is built**, a throwaway in-repo
+pilot must report hard numbers:
+- **(a) Gate-1 structure discovery** — a minimal tree-GA rediscovers the general
+  rotation (§2.4), answer-blind, across ≥12 seeds: the success rate, generations-
+  to-solve, the winning shapes, the seed-node distribution, **and** the
+  uniform-arity control. This reproduces (or refutes) the "6/6" in-repo.
+- **(b) Gate-2 param-tunability** — with the §2.6 FK structure fixed, a simple
+  optimizer recovers the 4 `Param`s from random inits (the smooth-landscape half of
+  evolvability): success rate + evals-to-converge.
+**Decision rule:** strong pilot → the full evolver + AC4/AC5 structure-evolution
+proceed with evidence; weak/failed pilot → AC5 falls back to its primary deliverable
+(expressibility + the fair-MLP OOD comparison), full-structure evolution is
+recorded as an open negative, and the proposer (or the genotype) is reconsidered
+*before* sinking the build. This is the R-0008 falsification discipline — and the
+"Reachability-Before-Search" convention (nice-guy) — applied to the *search*, not
+just the target.
 
 ## 3. Code outline
 
@@ -242,15 +277,18 @@ witness, promoted) lands **before** the engine.
   the Mv→pose readout is guarded (non-point/non-finite ⇒ worst per-sample error);
   `Fit` is a total order (NaN/inf ⇒ `WORST`), so selection never sees a raw NaN.
   (Unit: a NaN-producing genome ranks last, never corrupts the sort.)
-- [ ] **AC4 — Gate 1: rediscover the sandwich.** Answer-blind, the evolver
-  converges on a sandwich-shaped `GeoExpr` realizing `e₁→e₂` within ε in ≥ the
-  qa-set fraction of seeds; the seed-node distribution **and** a uniform-arity
-  control are reported. (e2e.)
-- [ ] **AC5 — Gate 2: the equivariant-generalization headline.** An evolved
-  `GeoExpr` matches the rigid-body map within ε **on both** in-dist and OOD sets
-  with a small param budget; the **smallest fair MLP** at the same in-dist error
-  is reported with its params + in-dist + **OOD** RMSE; the headline is the **OOD
-  gap** (geometric ≈ exact, MLP collapses). (e2e + the §2.6 witness.)
+- [ ] **AC4 — Gate 1: rediscover the sandwich (gated by §2.8).** Answer-blind, the
+  evolver discovers the general-rotation program (§2.4) within ε in ≥ the qa-set
+  fraction of seeds; the seed-node distribution **and** a uniform-arity control are
+  reported. The §2.8 pilot reproduces this in-repo first (the "6/6" is not assumed).
+  (e2e.)
+- [ ] **AC5 — Gate 2: the equivariant-generalization headline.** **Primary (must
+  deliver):** the **expressibility proof** (the §2.6 4-`Param` exact FK witness) +
+  the **fair-MLP OOD comparison** — the **smallest fair MLP** at the evolved/witness
+  in-dist error, reported with params + in-dist + **OOD** RMSE; the headline is the
+  **OOD gap** (geometric ≈ exact everywhere, MLP collapses OOD). **Stretch (gated by
+  §2.8):** an *evolved* (not hand-built) `GeoExpr` matches the map within ε on both
+  sets. A documented stretch-negative satisfies AC6.
 - [ ] **AC6 — Honest reporting.** Fair (smallest-at-error) MLP baseline; seeds/
   run-counts/success-rates disclosed; a failed/partial gate documented (an honest
   negative satisfies AC6).
@@ -266,6 +304,9 @@ witness, promoted) lands **before** the engine.
 | 2026-06-22 | **Fitness is a total order; the readout is NaN-safe.** | `f64` is not `Ord`; the readout `NaN`s on the non-point `Mv`s a random genome routinely produces, and a raw-NaN `sort` silently corrupts elitism (three-lens, demonstrated). |
 | 2026-06-22 | **MLP baseline = smallest-at-the-evolved-error + OOD reported.** | Prevents the strawman the de-risk exposed; makes AC5 a real, falsifiable gate. |
 | 2026-06-22 | **`Normalize`/`Log` extension (literal IK) deferred to a future requirement** (§2.7). | Not needed for the reframed headline; keeps R-0011 shippable without re-opening `ufl-geo`. |
+| 2026-06-22 | **Evolvability made an explicit §2.8 pre-implementation gate** (hater re-review). | The R-0011 thesis is that evolution *discovers* structure; §2.6 only proved *expressibility*. The hater is right that a hand-built witness + a blessed honest-negative "can't lose." So evolvability is de-risked (a Gate-1 structure-discovery pilot + a Gate-2 param-tunability pilot) *before* the full build — the §2.6/"Reachability-Before-Search" discipline applied to the search. AC5's primary deliverable is expressibility + the fair-MLP comparison; evolved structure is a §2.8-gated stretch. |
+| 2026-06-22 | **"6/6 sandwich rediscovery" downgraded to an unverified external prior** (not cited as evidence; reproduced in-repo by §2.8). | It is a throwaway Python run with no in-repo artifact (hater); using it to calibrate Gate-1's threshold or imply Gate-2 tractability would be an unfalsifiable citation. Gate-1's threshold is set fresh by qa. |
+| 2026-06-22 | **Grade-seed-bias restricted to *input* grades, off by default; target-grade biasing is a disclosed Transparency relaxation, not taken.** | Biasing the answer-blind proposer on the *target* grade leaks a hint (`GradeCtx::declare` is keyed by input var, not a target channel — hater). Grade's sound default role is the pruning filter. |
 
 ## 8. Companion edits (this branch)
 
@@ -285,4 +326,9 @@ witness, promoted) lands **before** the engine.
   smallest-at-error + OOD; bounded `Exp` `Param`s; Gate-1 seed-distribution
   disclosure + control; deferred the `Normalize`/`Log` extension to a future
   literal-IK requirement; recorded the de-risk evidence + the promotable FK
-  witness. Pending architect re-review → acceptance.
+  witness.
+- 2026-06-22 (later) — **three-lens closed**: architect **APPROVE** on re-review
+  (all six prior findings verified resolved); hater **NEEDS WORK** → addressed by
+  making evolvability an explicit §2.8 pre-implementation gate, downgrading the
+  "6/6" to an unverified prior, and restricting the grade-seed-bias to answer-blind
+  input grades. **Status → ready for owner acceptance.**
