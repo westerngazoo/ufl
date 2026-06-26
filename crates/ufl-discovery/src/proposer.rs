@@ -5,7 +5,7 @@
 //! scores them via the verifier (Verifier-Held Transparency).
 
 use crate::genome::Genome;
-use crate::prng::SplitMix64;
+use crate::prng::{MatmulSampling, SplitMix64};
 
 /// GA hyper-parameters. `elitism ≥ 1` is required (AC6) and validated by
 /// `Config::validate`.
@@ -83,9 +83,9 @@ impl GaProposer {
     /// best of the sampled candidates is the **lowest index** — which also
     /// gives the deterministic lower-index tie-break (AC1).
     fn tournament<'a>(&self, scored: &'a [(Genome, i64)], rng: &mut SplitMix64) -> &'a Genome {
-        let mut best = rng.below(scored.len());
+        let mut best = rng.below_usize(scored.len());
         for _ in 1..self.cfg.tournament_size {
-            best = best.min(rng.below(scored.len()));
+            best = best.min(rng.below_usize(scored.len()));
         }
         &scored[best].0
     }
@@ -94,7 +94,7 @@ impl GaProposer {
     fn crossover(&self, a: &Genome, b: &Genome, rng: &mut SplitMix64) -> Genome {
         let triples = (0..self.rank)
             .map(|i| {
-                if rng.below(2) == 0 {
+                if rng.below_usize(2) == 0 {
                     a.triples[i].clone()
                 } else {
                     b.triples[i].clone()
@@ -107,9 +107,9 @@ impl GaProposer {
     /// Point mutation — set `mutation_count` random entries to a fresh ternary.
     fn mutate(&self, mut g: Genome, rng: &mut SplitMix64) -> Genome {
         for _ in 0..self.cfg.mutation_count {
-            let t = rng.below(self.rank);
-            let vec = rng.below(3);
-            let idx = rng.below(self.d);
+            let t = rng.below_usize(self.rank);
+            let vec = rng.below_usize(3);
+            let idx = rng.below_usize(self.d);
             g.triples[t][vec][idx] = rng.ternary();
         }
         g
