@@ -12,6 +12,7 @@ members = [
     "crates/ufl-discovery",
     "crates/ufl-ga",
     "crates/ufl-geo",
+    "crates/ufl-prng",
 ]
 
 [workspace.package]

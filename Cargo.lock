@@ -151,6 +151,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ufl-prng"
+version = "0.1.0"
+
+[[package]]
 name = "ufl-syntax"
 version = "0.1.0"
 dependencies = [
