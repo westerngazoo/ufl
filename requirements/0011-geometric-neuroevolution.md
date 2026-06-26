@@ -1,6 +1,8 @@
 # R-0011 — Geometric Neuroevolution (evolve the `GeoExpr` genotype)
 
-- **Status:** Draft (2026-06-21 — owner chose the full-headline scope; discuss phase)
+- **Status:** Accepted (2026-06-26 — SPEC-0011 Accepted; reframed to equivariant
+  OOD generalization after the §2.6 de-risk; the §2.8 evolvability pilot closed the
+  morph→discover→translate loop end-to-end)
 - **Milestone:** M5 — Discovery → Geometric Neuroevolution (**the headline**)
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-06-21

@@ -1,11 +1,12 @@
 # SPEC-0011 — Geometric Neuroevolution (`ufl-evolve`)
 
-- **Status:** Draft — **ready for acceptance** (2026-06-22 — three-lens closed:
-  nice-guy STRONG WORK, **architect APPROVE** (re-review), hater NEEDS WORK →
-  findings addressed: evolvability made an explicit §2.8 pre-implementation gate,
-  the "6/6" downgraded to an unverified prior, the grade-seed-bias restricted to
-  answer-blind input grades. The §2.6 de-risk ran; headline reframed to
-  **equivariant generalization** (owner). Awaiting owner acceptance.)
+- **Status:** **Accepted** (2026-06-26 — owner) — three-lens closed (nice-guy
+  STRONG WORK, architect APPROVE, hater findings addressed/deferred with
+  decision-log entries); the §2.6 expressibility de-risk *and* the §2.8(a) Gate-1
+  evolvability pilot both ran with documented positives (the loop closed
+  end-to-end: morph → discover → translate-back); headline = equivariant
+  generalization. Implementation: parallel infra in #26/#27/#28 + the lead
+  `ufl-evolve` engine.
 - **Realizes:** R-0011 (scope: the geometric headline, reframed — §2.5)
 - **Author:** Gustavo Delgadillo (Goose) — drafted with Claude
 - **Created:** 2026-06-21
