@@ -18,8 +18,10 @@
 mod eval;
 mod expr;
 mod grade;
+mod render;
 
 pub use eval::{eval, GeoError};
 pub use expr::{Env, GeoExpr};
 pub use grade::{grade, typecheck, GradeCtx, GradeError};
+pub use render::render;
 pub use ufl_ga::GradeSet;
