@@ -1,0 +1,11 @@
+[package]
+name = "ufl-evolve"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "UFL — R-0011 Geometric neuroevolution engine"
+
+[dependencies]
+ufl-prng = { path = "../ufl-prng" }
