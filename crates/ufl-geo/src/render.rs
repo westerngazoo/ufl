@@ -39,6 +39,9 @@ struct Ctx {
 
 impl Ctx {
     fn fresh(&mut self) -> String {
+        // Assumes no input `Var` clashes with these rotor names; true for
+        // R-0011's tasks (the variable is `v`). A future textual *reader* would
+        // need reserved-name handling here (architect note, PR #31).
         const NAMES: [&str; 6] = ["R", "S", "T", "U", "V", "W"];
         let name = NAMES
             .get(self.next)
