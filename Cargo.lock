@@ -122,6 +122,7 @@ dependencies = [
  "thiserror",
  "ufl-core",
  "ufl-predicate",
+ "ufl-prng",
  "ufl-syntax",
  "ufl-tensor",
 ]
@@ -149,6 +150,10 @@ dependencies = [
  "ufl-core",
  "ufl-syntax",
 ]
+
+[[package]]
+name = "ufl-prng"
+version = "0.1.0"
 
 [[package]]
 name = "ufl-syntax"

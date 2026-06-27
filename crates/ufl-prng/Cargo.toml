@@ -1,0 +1,10 @@
+[package]
+name = "ufl-prng"
+version = "0.1.0"
+description = "UFL — a deterministic, seeded SplitMix64 PRNG with uniform-float and Gaussian samplers (the determinism-critical primitive shared by ufl-discovery and ufl-evolve)."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
