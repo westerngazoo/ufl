@@ -92,15 +92,14 @@ impl GaProposer {
 
     /// Uniform crossover over the `rank` triples (the scheme is an unordered sum).
     fn crossover(&self, a: &Genome, b: &Genome, rng: &mut SplitMix64) -> Genome {
-        let triples = (0..self.rank)
-            .map(|i| {
-                if rng.below_usize(2) == 0 {
-                    a.triples[i].clone()
-                } else {
-                    b.triples[i].clone()
-                }
-            })
-            .collect();
+        let mut triples = Vec::with_capacity(self.rank);
+        for i in 0..self.rank {
+            if rng.below_usize(2) == 0 {
+                triples.push(a.triples[i].clone());
+            } else {
+                triples.push(b.triples[i].clone());
+            }
+        }
         Genome { triples }
     }
 
