@@ -48,6 +48,11 @@ pub enum EvalError {
     UnboundVariable(String),
 }
 
+enum Task<'a> {
+    Eval(&'a Eml),
+    ApplyNode,
+}
+
 /// Evaluate an EML expression under the given environment.
 ///
 /// Recursive post-order walk per SPEC-0001 §2.5:
@@ -60,15 +65,34 @@ pub enum EvalError {
 /// Infallible on numeric edge cases (`inf` / `nan` propagate as ordinary
 /// `Value`s); the only failure mode is an unbound variable.
 pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
-    match expr {
-        Eml::One => Ok(Value::new(1.0, 0.0)),
-        Eml::Var(name) => env
-            .get(name)
-            .ok_or_else(|| EvalError::UnboundVariable(name.clone())),
-        Eml::Node { exp_arg, log_arg } => {
-            let x = eval(exp_arg, env)?;
-            let y = eval(log_arg, env)?;
-            Ok(x.exp() - crate::log::ln_eml(y))
+    let mut stack = vec![Task::Eval(expr)];
+    let mut values = Vec::new();
+
+    while let Some(task) = stack.pop() {
+        match task {
+            Task::Eval(e) => match e {
+                Eml::One => {
+                    values.push(Value::new(1.0, 0.0));
+                }
+                Eml::Var(name) => {
+                    let v = env
+                        .get(name)
+                        .ok_or_else(|| EvalError::UnboundVariable(name.clone()))?;
+                    values.push(v);
+                }
+                Eml::Node { exp_arg, log_arg } => {
+                    stack.push(Task::ApplyNode);
+                    stack.push(Task::Eval(log_arg));
+                    stack.push(Task::Eval(exp_arg));
+                }
+            },
+            Task::ApplyNode => {
+                let y = values.pop().unwrap();
+                let x = values.pop().unwrap();
+                values.push(x.exp() - crate::log::ln_eml(y));
+            }
         }
     }
+
+    Ok(values.pop().unwrap())
 }
