@@ -21,6 +21,8 @@ pub enum ReadError {
     EmptyInput,
     #[error("unexpected trailing tokens after the first s-expression")]
     TrailingTokens,
+    #[error("recursion depth exceeded while parsing")]
+    RecursionDepthExceeded,
 }
 
 /// A lexical token. Comments and whitespace are consumed during tokenization
@@ -81,9 +83,16 @@ fn classify(atom: &str) -> Sexpr {
     }
 }
 
+/// Maximum allowed recursion depth for parsing lists to prevent stack overflow.
+const MAX_DEPTH: usize = 128;
+
 /// Parse one s-expression starting at `tokens[*pos]`, advancing `*pos` past it.
 /// Running off the end can only happen inside an unclosed list.
-fn parse_expr(tokens: &[Token], pos: &mut usize) -> Result<Sexpr, ReadError> {
+fn parse_expr(tokens: &[Token], pos: &mut usize, depth: usize) -> Result<Sexpr, ReadError> {
+    if depth > MAX_DEPTH {
+        return Err(ReadError::RecursionDepthExceeded);
+    }
+
     let Some(token) = tokens.get(*pos) else {
         return Err(ReadError::UnclosedList);
     };
@@ -104,7 +113,7 @@ fn parse_expr(tokens: &[Token], pos: &mut usize) -> Result<Sexpr, ReadError> {
                         *pos += 1; // consume ')'
                         return Ok(Sexpr::List(items));
                     }
-                    Some(_) => items.push(parse_expr(tokens, pos)?),
+                    Some(_) => items.push(parse_expr(tokens, pos, depth + 1)?),
                 }
             }
         }
@@ -118,7 +127,7 @@ pub fn read(src: &str) -> Result<Sexpr, ReadError> {
         return Err(ReadError::EmptyInput);
     }
     let mut pos = 0;
-    let expr = parse_expr(&tokens, &mut pos)?;
+    let expr = parse_expr(&tokens, &mut pos, 0)?;
     if pos != tokens.len() {
         return Err(ReadError::TrailingTokens);
     }
