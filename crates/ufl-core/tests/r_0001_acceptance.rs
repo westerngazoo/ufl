@@ -5,12 +5,6 @@
 //! (status update) can map the suite to R-0001's acceptance criteria
 //! mechanically.
 //!
-//! These tests are authored at loop step 3 (test plan) and are expected to
-//! **fail (red)** until R-0001 step 5 (implementation) replaces the `todo!()`
-//! stubs in `eval` and `ln_eml`. AC6's `sin(τ/2) ≠ 0` invariant (a runtime
-//! tripwire) may legitimately pass already — it tests the floating-point
-//! environment, not UFL code.
-//!
 //! See:
 //! - `requirements/0001-eml-operator-core.md` — AC1–AC5
 //! - `specs/0001-eml-operator-core.md` — AC1–AC6 (AC6 added at spec level)
