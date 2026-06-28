@@ -1,0 +1,11 @@
+[package]
+name = "ufl-evolve"
+version = "0.1.0"
+description = "UFL — the evolver over the GeoExpr genotype (R-0011 / SPEC-0011). First module: the fair-MLP Gate-2 baseline; the memetic engine lands next."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+ufl-prng = { path = "../ufl-prng" }

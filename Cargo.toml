@@ -13,6 +13,7 @@ members = [
     "crates/ufl-ga",
     "crates/ufl-geo",
     "crates/ufl-prng",
+    "crates/ufl-evolve",
 ]
 
 [workspace.package]
