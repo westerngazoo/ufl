@@ -566,3 +566,20 @@ fn ac6_read_error_precedes_lowering_for_unclosed_list() {
         Err(UflError::Read(ReadError::UnclosedList))
     );
 }
+
+#[test]
+fn ac2_deeply_nested_list_is_recursion_depth_exceeded() {
+    // 129 open parens and 129 close parens
+    let opens = "(".repeat(129);
+    let closes = ")".repeat(129);
+    let src = format!("{}1{}", opens, closes);
+    assert_eq!(read(&src), Err(ReadError::RecursionDepthExceeded));
+
+    // 128 open parens should be fine (well, the 128th one succeeds, but wait,
+    // let's check exact limit behavior if needed. The 128-deep one would mean
+    // depth 128, which is <= 128, so it doesn't exceed).
+    let opens_ok = "(".repeat(128);
+    let closes_ok = ")".repeat(128);
+    let src_ok = format!("{}1{}", opens_ok, closes_ok);
+    assert!(read(&src_ok).is_ok());
+}
