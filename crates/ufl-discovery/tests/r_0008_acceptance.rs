@@ -540,6 +540,24 @@ fn config_validate_rejects_elitism_exceeding_population() {
     );
 }
 
+#[test]
+fn run_propagates_scheme_error() {
+    let config = Config {
+        predicate: RankDecomposition::new(1, 0),
+        generations: 1,
+        seed: 0,
+        ga: GaConfig::pinned(),
+    };
+    let result = run(&config);
+    if let Err(EngineError::Scheme(ufl_tensor::SchemeError::DimMismatch { n, expected, got })) = result {
+        assert_eq!(n, 1);
+        assert_eq!(expected, 1);
+        assert_eq!(got, 0);
+    } else {
+        panic!("Expected EngineError::Scheme(DimMismatch), got {:?}", result);
+    }
+}
+
 // ===========================================================================
 // SplitMix64 determinism.  [ALL GREEN now: the PRNG is real.]
 //
