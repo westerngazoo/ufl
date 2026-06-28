@@ -57,7 +57,7 @@ fn tokenize(src: &str) -> Vec<Token> {
                 chars.next();
             }
             _ => {
-                let mut atom = String::new();
+                let mut atom = String::with_capacity(16);
                 while let Some(&c) = chars.peek() {
                     if c.is_whitespace() || c == '(' || c == ')' || c == ';' {
                         break;
