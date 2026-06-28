@@ -34,6 +34,9 @@ impl Tensor {
     /// Add `v` at `(p, q, r)`. Internal — callers loop `0..dim`, so the index
     /// is in range by construction.
     pub(crate) fn add_at(&mut self, p: usize, q: usize, r: usize, v: i64) {
+        if p >= self.dim || q >= self.dim || r >= self.dim {
+            return;
+        }
         self.data[(p * self.dim + q) * self.dim + r] += v;
     }
 }
@@ -70,4 +73,27 @@ pub fn error(a: &Tensor, b: &Tensor) -> Option<i64> {
             })
             .sum(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_at_out_of_bounds_does_not_panic() {
+        let mut t = Tensor::zeros(2);
+
+        // Out of bounds on p
+        t.add_at(2, 0, 0, 1);
+
+        // Out of bounds on q
+        t.add_at(0, 2, 0, 1);
+
+        // Out of bounds on r
+        t.add_at(0, 0, 2, 1);
+
+        // Make sure it remains zeros
+        let expected = Tensor::zeros(2);
+        assert_eq!(t, expected);
+    }
 }
