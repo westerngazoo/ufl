@@ -16,12 +16,14 @@
 #![forbid(unsafe_code)]
 
 mod engine;
+mod generic;
 mod genome;
 mod predicate;
 mod prng;
 mod proposer;
 
 pub use engine::{run, Config, EngineError, Outcome};
+pub use generic::{run_generic, run_matmul_generic, Fitness, GenericOutcome, Proposer};
 pub use genome::Genome;
 pub use predicate::RankDecomposition;
 pub use prng::SplitMix64;
