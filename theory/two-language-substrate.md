@@ -106,3 +106,49 @@ The honest remaining make-or-break is **not corruption** (the architecture handl
 it — DGM proves the failure is real and the FFI is the fix) but **efficacy**: NFL /
 L2O say meta-search may simply plateau or fail to generalize off-distribution.
 R-0015's held-out gate *is* that falsification.
+
+## Full verdict (2026-06-29) — object level ✅, the GA-hyperparameter R-0015 ✗
+
+Two object-level shots plus a 3-strand adversarial interrogation of the meta level
+closed the picture.
+
+**Object level — the search discovers real, certified math (✅).** See
+[discovery-results](discovery-results.md). The matmul lane found an **exact rank-7
+T₂ decomposition** (Strassen-grade), verifier-certified two ways + 20,000 matrix
+pairs — via a **flip-graph over exact schemes**, *not* blind GA (which failed at
+25×10⁹ evals). The geometric lane rediscovered the **τ/4 rotor sandwich** (6/16;
+ablation 0/16) and translated it back to `R v ~R`.
+
+**Meta level — evolving the GA's hyperparameters is headroom-free (✗, high
+confidence).** A first probe lost; the interrogation proved *why*, under an
+adversarial fairness check (faithfulness proven — the reimplemented operators are
+byte-identical to the real engine, 7/10 vs 7/10):
+- **Headroom probe (240 forms):** B0 (the hand-tuned `GaProposer`) sits at the
+  **DSL ceiling**. Selection-set "winners" are the expected max of many noisy draws
+  and **regress to at-or-below B0 on every fresh disjoint set**; on a third 200-cell
+  confirmation set B0 = 57/200 and the lone apparent winner flipped to −14/200. No
+  form beats B0 outside ~1 SE.
+- **Widen (24 train tasks):** removes the first probe's overfit collapse — so that
+  earlier negative was *partly* a small-harness artifact — but the champion then
+  **converges to ≈B0 and loses 24/48 vs 26/48**. A flat landscape, not a better
+  operator.
+- **Generalization-aware + richer DSL:** only a within-1-SE tie (pooled +5/96,
+  z = 0.84, p ≈ 0.40).
+
+**The two results lock together.** The matmul lane proved the **proposer *family*
+decides everything** — GA-over-coefficients fails; a structurally different *move*
+(the flip-graph) cracks Strassen. The meta interrogation proved **re-tuning the
+GA's scalar knobs is headroom-free**. Therefore: *if the metacircular win exists, it
+lives in operator **semantics** (the structure of the search move), not operator
+**hyperparameters**.* The flip-graph is the existence proof.
+
+## R-0015 reframed — evolve operator *semantics*, not knobs
+
+**DROP** the hyperparameter framing (`seed/pop/elitism/tournament/crossover/
+mutate` — proven headroom-free). Retarget the outer loop at a **structurally richer
+operator space**: operator *forms* with real move-semantics — flip-graph-style
+tensor-preserving moves, the GeoExpr operator semantics of R-0011 — which is exactly
+what the homoiconic Lisp layer is *for* (a move is a first-class form the system
+composes, not a scalar). Pre-register a beat that clears **2 SE on a disjoint
+confirmation set**, at a budget where the baseline is demonstrably not already
+saturating. This is a *discuss-with-Gustavo* requirement, not yet written.
