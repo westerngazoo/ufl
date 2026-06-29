@@ -39,6 +39,20 @@ coefficient landscape is densely studded with deceptive error-1 traps — the wr
 substrate). The flip-graph over exact schemes did, instantly. *The proposer is the
 result.*
 
+**Not a new theorem — a system demonstration.** By **de Groote's 1978 uniqueness
+theorem**, *every* rank-7 algorithm for ⟨2,2,2⟩ is Strassen's up to the problem's
+symmetry group, so this scheme **cannot be novel** — it is a known-optimal result
+*re-derived* by the engine. The asset is the *engine + exact verifier*, not the
+object. A genuinely new result comes only from pointing the same engine at a tensor
+whose optimal rank is **open** (e.g. ⟨3,3,3⟩).
+
+**Reproducibility debt (honest).** The flip-graph proposer, the blind-GA arm, and
+the 20,000-pair check were **throwaway de-risk harnesses that have been deleted** —
+they are **not yet committed**. Per CLAUDE.md (test-first, trust nothing) the
+results above are **claims pending banked code**. The load-bearing next step is to
+commit the flip-graph as a real `Proposer` behind the R-0008 seam, with the
+certification as a regression test.
+
 ## Geometric — rediscovery of the τ/4 rotor sandwich
 
 A **memetic GA** (tree-structure search + local `Param` refinement) over `GeoExpr`

@@ -152,3 +152,25 @@ what the homoiconic Lisp layer is *for* (a move is a first-class form the system
 composes, not a scalar). Pre-register a beat that clears **2 SE on a disjoint
 confirmation set**, at a budget where the baseline is demonstrably not already
 saturating. This is a *discuss-with-Gustavo* requirement, not yet written.
+
+> ⚠ **Caveat (the non-sequitur to avoid):** that a *human-designed* flip-graph beats
+> a GA is **not** evidence a *meta-search* can evolve such a move. D1 has zero
+> positive efficacy evidence — only the hyperparameter negative. The cheap
+> pure-Rust Rung-1 falsification (can a meta-loop evolve a move that beats a
+> hand-written one, 2 SE on a disjoint set?) must pay **before** the Lisp substrate
+> is built.
+
+## Claim status (honest ledger, 2026-06-29)
+
+The de-risk arc's load-bearing artifacts — the Chez+Rust FFI metacircular loop, the
+flip-graph proposer, the verification harnesses — were **throwaway experiments and
+are not committed**. The results here and in
+[discovery-results](discovery-results.md) are **claims pending banked code**, not
+reproducible repo state; reconcile before they justify a direction.
+
+The **can't-fool-itself "by construction"** claim above is **bounded**: the
+two-language split structurally prevents the DGM *in-scope-monitor* failure (the
+proposer cannot edit its verifier), but the Gate-1 prototype is **same-process FFI,
+which is not true isolation** — a hostile proposer with raw `foreign-ref` could read
+the verifier's memory. The hard guarantee needs **process/sandbox isolation**; until
+then the safety property is *architecturally favored, not proven*.
