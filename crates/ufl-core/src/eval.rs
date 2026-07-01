@@ -48,6 +48,11 @@ pub enum EvalError {
     UnboundVariable(String),
 }
 
+enum Task<'a> {
+    Eval(&'a Eml),
+    ApplyNode,
+}
+
 /// Evaluate an EML expression under the given environment.
 ///
 /// Recursive post-order walk per SPEC-0001 §2.5:
@@ -72,4 +77,6 @@ pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
             Ok(exp_val.exp() - crate::log::ln_eml(log_val))
         }
     }
+
+    Ok(values.pop().unwrap())
 }
