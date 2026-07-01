@@ -53,10 +53,25 @@ impl GaProposer {
     }
 
     fn random_genome(&self, rng: &mut SplitMix64) -> Genome {
-        let vec = |rng: &mut SplitMix64| (0..self.d).map(|_| rng.ternary()).collect::<Vec<i8>>();
-        let triples = (0..self.rank)
-            .map(|_| [vec(rng), vec(rng), vec(rng)])
-            .collect();
+        let mut triples = Vec::with_capacity(self.rank);
+        for _ in 0..self.rank {
+            let mut u = Vec::with_capacity(self.d);
+            for _ in 0..self.d {
+                u.push(rng.ternary());
+            }
+
+            let mut v = Vec::with_capacity(self.d);
+            for _ in 0..self.d {
+                v.push(rng.ternary());
+            }
+
+            let mut w = Vec::with_capacity(self.d);
+            for _ in 0..self.d {
+                w.push(rng.ternary());
+            }
+
+            triples.push([u, v, w]);
+        }
         Genome { triples }
     }
 
