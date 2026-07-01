@@ -65,32 +65,16 @@ enum Task<'a> {
 /// Infallible on numeric edge cases (`inf` / `nan` propagate as ordinary
 /// `Value`s); the only failure mode is an unbound variable.
 pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
-    let mut stack = vec![Task::Eval(expr)];
-    let mut values = Vec::new();
-
-    while let Some(task) = stack.pop() {
-        match task {
-            Task::Eval(e) => match e {
-                Eml::One => {
-                    values.push(Value::new(1.0, 0.0));
-                }
-                Eml::Var(name) => {
-                    let v = env
-                        .get(name)
-                        .ok_or_else(|| EvalError::UnboundVariable(name.clone()))?;
-                    values.push(v);
-                }
-                Eml::Node { exp_arg, log_arg } => {
-                    stack.push(Task::ApplyNode);
-                    stack.push(Task::Eval(log_arg));
-                    stack.push(Task::Eval(exp_arg));
-                }
-            },
-            Task::ApplyNode => {
-                let y = values.pop().unwrap();
-                let x = values.pop().unwrap();
-                values.push(x.exp() - crate::log::ln_eml(y));
-            }
+    // Evaluation post-order walk, per SPEC-0001 §2.5.
+    match expr {
+        Eml::One => Ok(Value::new(1.0, 0.0)),
+        Eml::Var(name) => env
+            .get(name)
+            .ok_or_else(|| EvalError::UnboundVariable(name.clone())),
+        Eml::Node { exp_arg, log_arg } => {
+            let exp_val = eval(exp_arg, env)?;
+            let log_val = eval(log_arg, env)?;
+            Ok(exp_val.exp() - crate::log::ln_eml(log_val))
         }
     }
 

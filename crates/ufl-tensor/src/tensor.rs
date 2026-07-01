@@ -11,9 +11,13 @@ pub struct Tensor {
 impl Tensor {
     /// An all-zero tensor of shape `(dim, dim, dim)`.
     pub fn zeros(dim: usize) -> Self {
+        let capacity = dim
+            .checked_mul(dim)
+            .and_then(|x| x.checked_mul(dim))
+            .expect("tensor capacity overflow");
         Self {
             dim,
-            data: vec![0; dim * dim * dim],
+            data: vec![0; capacity],
         }
     }
 
@@ -42,7 +46,7 @@ impl Tensor {
 /// 1` for all `i,j,k ∈ 0..n`, else 0. The map is injective, so every entry is
 /// 0 or 1.
 pub fn target(n: usize) -> Tensor {
-    let d = n * n;
+    let d = n.checked_mul(n).expect("target dimension overflow");
     let mut t = Tensor::zeros(d);
     for i in 0..n {
         for j in 0..n {
