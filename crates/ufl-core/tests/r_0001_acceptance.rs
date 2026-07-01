@@ -5,8 +5,8 @@
 //! (status update) can map the suite to R-0001's acceptance criteria
 //! mechanically.
 //!
-//! These tests are authored at loop step 3 (test plan) and are expected to
-//! **fail (red)** until R-0001 step 5 (implementation) replaces the `todo!()`
+//! These tests were authored at loop step 3 (test plan) and were expected to
+//! **fail (red)** until R-0001 step 5 (implementation) replaced the `todo!()`
 //! stubs in `eval` and `ln_eml`. AC6's `sin(τ/2) ≠ 0` invariant (a runtime
 //! tripwire) may legitimately pass already — it tests the floating-point
 //! environment, not UFL code.

@@ -17,6 +17,8 @@ use crate::eval::Value;
 /// correction term is needed for `Value = Complex<f64>`: the floating-point
 /// representation of `sin(τ/2)` self-corrects the chain. AC6 is the tripwire.
 pub(crate) fn ln_eml(w: Value) -> Value {
+    // Principal branch complex logarithm — relies on IEEE-754 self-correction
+    // for `sin(τ/2)` as detailed in SPEC-0001 §2.4.
     w.ln()
 }
 
