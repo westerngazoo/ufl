@@ -37,7 +37,7 @@ pub fn eval(e: &GeoExpr, env: &Env) -> Result<Mv, GeoError> {
         GeoExpr::GradeLift(k, a) => {
             // 𝒢ₖ lifts the child's SCALAR part to the lowest grade-`k` blade
             // (SPEC-0010 §2.2 — the child is read "(scalar)"), so the value is
-            // genuinely pure grade `k` and the `grade`'s `{k}` rule stays sound.
+            // genuinely pure grade `k` and `grade`'s `{k}` rule stays sound.
             let blade = lowest_blade(*k).ok_or(GeoError::BadGrade(*k))?;
             Ok(eval(a, env)?.grade(0) * Mv::basis(blade as usize))
         }
