@@ -51,8 +51,20 @@ itself.
 ## Non-goals
 
 - **No new mathematical claim from AC1** — Strassen is known-optimal at rank 7.
-- **No change to the `{−1,0,+1}` `Scheme` type.** The flip-graph uses an internal
-  unrestricted-integer workspace; only a certifiable end state (back in `{−1,0,+1}`)
-  becomes a `ufl_tensor::Scheme`.
+- **No change to the `{−1,0,+1}` `Scheme` type's invariants.** The flip-graph uses
+  an internal unrestricted-integer workspace; only a certifiable end state (back in
+  `{−1,0,+1}`) becomes a `ufl_tensor::Scheme`. (`Triple` gains read-only
+  accessors — SPEC-0013 §2.1 — with the constructor-enforced invariants untouched.)
 - No coupling to R-0015 (the meta-loop) — this bank is a standalone object-level
   proposer.
+
+## Decision log (ported from the superseded draft, PR #43)
+
+| Date | Decision | Rationale |
+|------|----------|-----------|
+| 2026-06-28 | **Moonshot domain = matmul decompositions** (the Strassen prize). | Owner's call over geometric / 𝔽₂. Crispest falsifiable "new math": exact verifier in hand (R-0007), unambiguous win (rank), AlphaTensor precedent, the original UFL prize. |
+| 2026-06-28 | **Reuse R-0006/0007/0008; the only new piece is a stronger proposer.** | The genome + exact verifier + proposer-agnostic seam are merged and green; R-0008 explicitly relocated the Strassen rediscovery to a future requirement (this one). |
+| 2026-06-28 | **Gate 0 (rediscover Strassen) is the load-bearing de-risk / go/no-go.** | AlphaTensor's "recover the known result first" discipline. If a non-blind proposer can't find rank-7 `T_2`, the moonshot is dead — known cheaply, on a laptop. |
+| 2026-06-28 | **First Gate-0 probe inconclusive → the spec must build a fast-search harness.** | The live-verifier-per-eval (Scheme rebuild + `reconstruct` per coordinate flip) timed out before a fair budget. A fast inline residual (certified against the real verifier) + a real method (ALS-rounding / flip-graph / agentic) is the actual Gate-0 work. |
+| 2026-06-28 | **Honest about odds.** Rediscovering Strassen is *plausible* at laptop scale (a real result + the gate); a genuinely *new* useful decomposition is compute-hard, low base-rate — pursued and documented honestly. | Mirrors R-0008's honest falsification; the apparatus is right, the frontier is hard. |
+| 2026-06-29 | **Gate-0 method = the Kauers–Moosbauer flip-graph over exact schemes.** | The de-risk pilot: L2-coefficient basin-hopping failed at 25×10⁹ evals (deceptive error-1 traps); the flip-graph certified rank-7 in 0.16 s, 3/3. The proposer *family* decides everything. |

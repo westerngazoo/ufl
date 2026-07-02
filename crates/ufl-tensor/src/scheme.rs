@@ -71,13 +71,20 @@ impl Triple {
         false
     }
 
-    pub(crate) fn u(&self) -> &[i8] {
+    /// The left factor vector `u` — read-only (SPEC-0013 §2.1 accessor
+    /// promotion: a `Scheme` the language can construct but never read is not
+    /// first-class data; invariants stay constructor-enforced).
+    pub fn u(&self) -> &[i8] {
         &self.u
     }
-    pub(crate) fn v(&self) -> &[i8] {
+
+    /// The right factor vector `v` — read-only, same contract as [`Triple::u`].
+    pub fn v(&self) -> &[i8] {
         &self.v
     }
-    pub(crate) fn w(&self) -> &[i8] {
+
+    /// The output vector `w` — read-only, same contract as [`Triple::u`].
+    pub fn w(&self) -> &[i8] {
         &self.w
     }
 }

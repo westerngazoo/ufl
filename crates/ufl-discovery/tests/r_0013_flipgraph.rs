@@ -8,14 +8,18 @@
 //! theorem — a certified re-derivation, not a new result. The deliverable is the
 //! reproducible engine.
 
-use ufl_discovery::{reduce_matmul, RankDecomposition};
+use ufl_discovery::{
+    flip_at, naive, perturb, reconstruct_int, reduce, reduce_matmul, shared_factor_pairs,
+    target_int, FlipConfig, RankDecomposition, SplitMix64,
+};
 use ufl_predicate::Predicate;
 use ufl_tensor::{Scheme, Triple};
 
-// A seed/budget pinned to a deterministic success (the impl may repin to whatever
-// (seed, budget) reaches rank-7 within a laptop-second — that is legitimate).
-const SEED: u64 = 0xC0FFEE;
-const BUDGET: usize = 2_000_000;
+// Pinned to a deterministic success: seed 5 certifies rank-7 in well under a
+// second (release ~70 ms) at this budget — found by a 24-seed scan, repinned
+// per the spec's explicit license.
+const SEED: u64 = 5;
+const BUDGET: usize = 300_000;
 
 /// AC1 — a certified rank-7 for `T₂`, three independent ways, deterministically.
 #[test]
@@ -58,6 +62,87 @@ fn verifier_is_the_sole_judge() {
     );
 }
 
+/// SPEC-0013 §2.6.2 — every frontier flip preserves the tensor exactly.
+#[test]
+fn flip_preserves_the_tensor() {
+    let s = reduce(&naive(2));
+    let tgt = target_int(2);
+    let frontier = shared_factor_pairs(&s);
+    assert!(!frontier.is_empty(), "naive(2) has flippable pairs");
+    for (pair, variant) in frontier {
+        let flipped = flip_at(&s, pair, variant)
+            .unwrap_or_else(|| panic!("frontier entry {pair:?}/{variant:?} must be applicable"));
+        assert_eq!(
+            reconstruct_int(&flipped),
+            tgt,
+            "flip {pair:?}/{variant:?} broke the tensor",
+        );
+    }
+}
+
+/// SPEC-0013 §2.6.3 — `reduce` never raises rank and preserves the tensor,
+/// exercised along a random 50-flip walk.
+#[test]
+fn reduce_only_drops_rank_and_preserves_tensor() {
+    let tgt = target_int(2);
+    let mut rng = SplitMix64::new(42);
+    let mut s = naive(2);
+    for _ in 0..50 {
+        let pairs = shared_factor_pairs(&s);
+        if pairs.is_empty() {
+            break;
+        }
+        let (pair, variant) = pairs[rng.below(pairs.len() as u64) as usize];
+        if let Some(next) = flip_at(&s, pair, variant) {
+            s = next;
+        }
+        let reduced = reduce(&s);
+        assert!(reduced.rank() <= s.rank(), "reduce raised rank");
+        assert_eq!(reconstruct_int(&reduced), tgt, "reduce broke the tensor");
+    }
+}
+
+/// SPEC-0013 §2.6.5 — the pinned trajectory replays exactly through the
+/// public primitives: the driver is nothing but these moves plus the
+/// documented rng-draw discipline (one `below` per step over the frontier,
+/// one per attempted perturb flip).
+#[test]
+fn trajectory_replays_through_public_primitives() {
+    let driver = reduce_matmul(2, 7, SEED, BUDGET).expect("pinned run certifies");
+
+    let config = FlipConfig::pinned();
+    let mut rng = SplitMix64::new(SEED);
+    let mut s = reduce(&naive(2));
+    let mut best = s.clone();
+    let mut stall = 0usize;
+    let mut replayed = None;
+    for _ in 0..BUDGET {
+        let pairs = shared_factor_pairs(&s);
+        if !pairs.is_empty() {
+            let (pair, variant) = pairs[rng.below(pairs.len() as u64) as usize];
+            if let Some(next) = flip_at(&s, pair, variant) {
+                s = reduce(&next);
+            }
+        }
+        if s.rank() <= 7 && s.is_ternary() {
+            replayed = Some(s.to_scheme().expect("ternary state converts"));
+            break;
+        }
+        if s.rank() < best.rank() {
+            best = s.clone();
+            stall = 0;
+        } else {
+            stall += 1;
+        }
+        if stall >= config.stall_window {
+            s = perturb(&best, config.perturb_flips, &mut rng);
+            stall = 0;
+        }
+    }
+    let replayed = replayed.expect("replay reaches rank-7 like the driver");
+    assert_eq!(driver, replayed, "the primitives are the whole driver");
+}
+
 // ── helpers ────────────────────────────────────────────────────────────────
 
 /// True 2×2 matmul, row-major flattened (`A[i][j]` at `i·2+j`).
@@ -71,8 +156,18 @@ fn matmul(a: &[i64; 4], b: &[i64; 4]) -> [i64; 4] {
 fn apply_scheme(s: &Scheme, a: &[i64; 4], b: &[i64; 4]) -> [i64; 4] {
     let mut c = [0i64; 4];
     for t in s.triples() {
-        let ua: i64 = t.u().iter().enumerate().map(|(p, &up)| up as i64 * a[p]).sum();
-        let vb: i64 = t.v().iter().enumerate().map(|(q, &vq)| vq as i64 * b[q]).sum();
+        let ua: i64 = t
+            .u()
+            .iter()
+            .enumerate()
+            .map(|(p, &up)| up as i64 * a[p])
+            .sum();
+        let vb: i64 = t
+            .v()
+            .iter()
+            .enumerate()
+            .map(|(q, &vq)| vq as i64 * b[q])
+            .sum();
         let m = ua * vb;
         for (r, &wr) in t.w().iter().enumerate() {
             c[r] += wr as i64 * m;

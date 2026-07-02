@@ -35,10 +35,22 @@ impl Tensor {
         Some(self.data[(p * self.dim + q) * self.dim + r])
     }
 
-    /// Add `v` at `(p, q, r)`. Internal — callers loop `0..dim`, so the index
-    /// is in range by construction.
+    /// Add `v` at `(p, q, r)`. Internal — every caller (`target`,
+    /// `reconstruct`) derives its indices from loops bounded by the tensor's
+    /// own `dim`, so an out-of-bounds index here is a caller **bug**, never
+    /// data. Debug builds fail loudly (`debug_assert!`): this accessor sits
+    /// inside the exact verifier, and a silently skipped write is the one
+    /// failure mode the verifier-held discipline forbids (R-0013). Release
+    /// builds stay total and skip the write — no panic path in library code
+    /// (CLAUDE.md §6); the debug gate is what every test run enforces.
     pub(crate) fn add_at(&mut self, p: usize, q: usize, r: usize, v: i64) {
-        if p >= self.dim || q >= self.dim || r >= self.dim {
+        let in_bounds = p < self.dim && q < self.dim && r < self.dim;
+        debug_assert!(
+            in_bounds,
+            "add_at index ({p}, {q}, {r}) out of bounds for dim {}: caller bug",
+            self.dim
+        );
+        if !in_bounds {
             return;
         }
         self.data[(p * self.dim + q) * self.dim + r] += v;
@@ -83,21 +95,26 @@ pub fn error(a: &Tensor, b: &Tensor) -> Option<i64> {
 mod tests {
     use super::*;
 
+    /// An out-of-bounds `add_at` is a caller bug and must fail loudly in
+    /// debug builds — the verifier-integrity precondition (R-0013): a silent
+    /// no-op inside `reconstruct` is silently-wrong verification.
     #[test]
-    fn add_at_out_of_bounds_does_not_panic() {
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "caller bug")]
+    fn add_at_out_of_bounds_fails_loud_in_debug() {
         let mut t = Tensor::zeros(2);
-
-        // Out of bounds on p
         t.add_at(2, 0, 0, 1);
+    }
 
-        // Out of bounds on q
+    /// In release builds `add_at` stays total: the write is skipped, never a
+    /// panic (CLAUDE.md §6 — no panic path in library code).
+    #[test]
+    #[cfg(not(debug_assertions))]
+    fn add_at_out_of_bounds_skips_in_release() {
+        let mut t = Tensor::zeros(2);
+        t.add_at(2, 0, 0, 1);
         t.add_at(0, 2, 0, 1);
-
-        // Out of bounds on r
         t.add_at(0, 0, 2, 1);
-
-        // Make sure it remains zeros
-        let expected = Tensor::zeros(2);
-        assert_eq!(t, expected);
+        assert_eq!(t, Tensor::zeros(2));
     }
 }
