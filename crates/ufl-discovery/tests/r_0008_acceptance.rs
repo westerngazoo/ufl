@@ -549,12 +549,17 @@ fn run_propagates_scheme_error() {
         ga: GaConfig::pinned(),
     };
     let result = run(&config);
-    if let Err(EngineError::Scheme(ufl_tensor::SchemeError::DimMismatch { n, expected, got })) = result {
+    if let Err(EngineError::Scheme(ufl_tensor::SchemeError::DimMismatch { n, expected, got })) =
+        result
+    {
         assert_eq!(n, 1);
         assert_eq!(expected, 1);
         assert_eq!(got, 0);
     } else {
-        panic!("Expected EngineError::Scheme(DimMismatch), got {:?}", result);
+        panic!(
+            "Expected EngineError::Scheme(DimMismatch), got {:?}",
+            result
+        );
     }
 }
 
