@@ -167,7 +167,10 @@ mod tests {
 
         // Unicode and special characters
         assert_eq!(Sexpr::sym("π"), Sexpr::Sym("π".to_string()));
-        assert_eq!(Sexpr::sym("a-b+c*d/e!@#"), Sexpr::Sym("a-b+c*d/e!@#".to_string()));
+        assert_eq!(
+            Sexpr::sym("a-b+c*d/e!@#"),
+            Sexpr::Sym("a-b+c*d/e!@#".to_string())
+        );
 
         // Very long string
         let long_str = "a".repeat(10_000);
