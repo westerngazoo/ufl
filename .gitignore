@@ -4,6 +4,11 @@
 **/*.rs.bk
 *.pdb
 
+# Ad-hoc scratch experiments — compiled binaries and one-off sources never
+# belong at the repo root (a `test_size_hint` binary once slipped in).
+/test_size_hint
+/test_size_hint.rs
+
 # LaTeX build artifacts (theory/papers)
 *.aux
 *.log
