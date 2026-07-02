@@ -80,11 +80,10 @@ impl GaProposer {
     /// `elitism` unchanged; the rest are tournament-selected parents joined by
     /// uniform triple-crossover and point-mutated (SPEC-0008 §2.4).
     pub(crate) fn vary(&self, scored: &[(Genome, i64)], rng: &mut SplitMix64) -> Vec<Genome> {
-        let mut next: Vec<Genome> = scored
-            .iter()
-            .take(self.cfg.elitism)
-            .map(|(g, _)| g.clone())
-            .collect();
+        let mut next: Vec<Genome> = Vec::with_capacity(self.cfg.population);
+        for (g, _) in scored.iter().take(self.cfg.elitism) {
+            next.push(g.clone());
+        }
         while next.len() < self.cfg.population {
             let a = self.tournament(scored, rng);
             let b = self.tournament(scored, rng);
