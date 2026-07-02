@@ -93,9 +93,11 @@ reproduce R-0008's seeded outcomes byte-identically (AC2).
 - **One universal `{eml,+}` substrate that generates all lanes** — refuted (§2).
 - **True metacircularity** (rules as `eml`-forms; the search written in the
   substrate it searches) — a real **reflection gap**: every `eval` is `&AST →
-  Value`, terminal; there is no `quote`/`reify`/`Value→AST`. Rung-1 (rules as Rust
-  data, `AST→AST`) is the achievable layer; metacircularity is a *future*
-  requirement.
+  Value`, terminal; there is no `quote`/`reify`/`Value→AST`. Rules-as-Rust-data
+  (`AST→AST`) is the achievable layer here; metacircularity is a *future*
+  requirement. (Rung numbering is owned by the canonical ladder in
+  `theory/two-language-substrate.md` — the reflection rung is **R-0016**, the
+  operator-semantics probe is **R-0015**.)
 - **The temperature→0 continuous↔discrete / 𝔽₂ bridge** — unbuilt, explicitly
   deferred in R-0012 (only if R-0012 returns positive). **Not** presented as a
   current rung; its own future requirement, gated.
