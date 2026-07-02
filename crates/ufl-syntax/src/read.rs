@@ -83,13 +83,10 @@ fn classify(atom: &str) -> Sexpr {
     }
 }
 
-/// Maximum allowed recursion depth for parsing lists to prevent stack overflow.
-const MAX_DEPTH: usize = 128;
-
 /// Parse one s-expression starting at `tokens[*pos]`, advancing `*pos` past it.
 /// Running off the end can only happen inside an unclosed list.
 fn parse_expr(tokens: &[Token], pos: &mut usize, depth: usize) -> Result<Sexpr, ReadError> {
-    if depth > MAX_DEPTH {
+    if depth > ufl_core::get_max_depth() {
         return Err(ReadError::RecursionDepthExceeded);
     }
 

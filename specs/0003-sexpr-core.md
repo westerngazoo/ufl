@@ -338,6 +338,7 @@ agent's tests verify them.
 | 2026-05-28 | Dispatch is a `match` on the head symbol; the form-table registry is deferred. | One form needs no registry (no premature abstraction, CLAUDE.md §2); the seam is documented for when forms multiply. |
 | 2026-05-28 | Ship a round-trippable `Display` and a `hello_sexpr` example now. | `Display` gives AC1 its round-trip oracle and structural rewrite-diffing; `hello_sexpr` runs the docs' literal strings, demonstrating AC1+AC4 and making the docs' notation runnable (the four-way string identity). |
 | 2026-05-28 | Lists are `Vec`-backed; **no general cons-cell primitive** in R-0003. | `Vec` gives O(1) access, clean slice-pattern lowering, and no `nil`/improper-pair edge cases; the lowered `Eml::Node` already provides core-level binary pairing (`eml` *is* a cons). A general `cons`/`car`/`cdr` becomes valuable only at the metaprogramming layer (manipulating code as data) — there is a clean symmetry there (cons : structure :: `eml` : number :: NAND : Boolean) worth building when macros arrive, evaluated on its merits then. (Owner raised this; recorded for the macro requirement.) |
+| 2026-05-28 | Limit parse recursion depth to 128 (`MAX_DEPTH=128`) and emit `ReadError::RecursionDepthExceeded`. | A temporary security boundary to prevent DoS via stack overflow from unbounded recursion. Note that 128 is not a system-wide bound (e.g. 1000-deep Sexprs are valid constructs), and this is meant to be superseded by a unified one-depth-contract across read/print/eval/drop (coordinating with T6). |
 
 ## Changelog
 

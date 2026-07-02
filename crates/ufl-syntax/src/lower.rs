@@ -24,10 +24,20 @@ pub enum LowerError {
     },
     #[error("not a form: a list must be a non-empty application with a symbol head")]
     NotAForm,
+    #[error("recursion depth exceeded while lowering")]
+    RecursionDepthExceeded,
 }
 
 /// Lower an [`Sexpr`] into R-0001's typed [`Eml`](ufl_core::Eml).
 pub fn lower(s: &Sexpr) -> Result<Eml, LowerError> {
+    lower_internal(s, 0)
+}
+
+fn lower_internal(s: &Sexpr, depth: usize) -> Result<Eml, LowerError> {
+    if depth > ufl_core::get_max_depth() {
+        return Err(LowerError::RecursionDepthExceeded);
+    }
+
     match s {
         // The primitive is the *value* `1` (1.0 is exactly representable), so a
         // bit-pattern comparison is exact, total, and free of the float_cmp
@@ -35,21 +45,21 @@ pub fn lower(s: &Sexpr) -> Result<Eml, LowerError> {
         Sexpr::Num(n) if n.to_bits() == 1.0_f64.to_bits() => Ok(Eml::one()),
         Sexpr::Num(n) => Err(LowerError::UnsupportedLiteral(*n)),
         Sexpr::Sym(name) => Ok(Eml::var(name.as_str())),
-        Sexpr::List(items) => lower_form(items),
+        Sexpr::List(items) => lower_form(items, depth),
     }
 }
 
 /// Lower a list as a form: dispatch on the head symbol. This `match` is the
 /// documented seam where future forms (and the orchestrator/macro layer) plug
 /// in; the form-table registry is deferred until form count warrants it.
-fn lower_form(items: &[Sexpr]) -> Result<Eml, LowerError> {
+fn lower_form(items: &[Sexpr], depth: usize) -> Result<Eml, LowerError> {
     // An empty list or a non-symbol head is not a form.
     let Some((Sexpr::Sym(head), args)) = items.split_first() else {
         return Err(LowerError::NotAForm);
     };
     match head.as_str() {
         "eml" => match args {
-            [a, b] => Ok(Eml::node(lower(a)?, lower(b)?)),
+            [a, b] => Ok(Eml::node(lower_internal(a, depth + 1)?, lower_internal(b, depth + 1)?)),
             _ => Err(LowerError::Arity {
                 form: "eml".to_string(),
                 expected: 2,

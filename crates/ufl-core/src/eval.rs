@@ -46,6 +46,8 @@ impl Env {
 pub enum EvalError {
     #[error("unbound variable: {0}")]
     UnboundVariable(String),
+    #[error("recursion depth exceeded while evaluating")]
+    RecursionDepthExceeded,
 }
 
 /// Evaluate an EML expression under the given environment.
@@ -60,14 +62,22 @@ pub enum EvalError {
 /// Infallible on numeric edge cases (`inf` / `nan` propagate as ordinary
 /// `Value`s); the only failure mode is an unbound variable.
 pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
+    eval_internal(expr, env, 0)
+}
+
+fn eval_internal(expr: &Eml, env: &Env, depth: usize) -> Result<Value, EvalError> {
+    if depth > crate::get_max_depth() {
+        return Err(EvalError::RecursionDepthExceeded);
+    }
+
     match expr {
         Eml::One => Ok(Value::new(1.0, 0.0)),
         Eml::Var(name) => env
             .get(name)
             .ok_or_else(|| EvalError::UnboundVariable(name.clone())),
         Eml::Node { exp_arg, log_arg } => {
-            let x = eval(exp_arg, env)?;
-            let y = eval(log_arg, env)?;
+            let x = eval_internal(exp_arg, env, depth + 1)?;
+            let y = eval_internal(log_arg, env, depth + 1)?;
             Ok(x.exp() - crate::log::ln_eml(y))
         }
     }

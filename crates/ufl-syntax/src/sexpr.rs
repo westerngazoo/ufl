@@ -32,11 +32,27 @@ impl Sexpr {
     }
 }
 
-impl std::fmt::Display for Sexpr {
-    /// Render an `Sexpr` as text. For every `s` the reader produces,
-    /// `read(s.to_string()) == Ok(s)` (the round-trip invariant, scoped to the
-    /// reader's image — SPEC-0003 §2.2).
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Drop for Sexpr {
+    fn drop(&mut self) {
+        let mut stack = Vec::new();
+        if let Sexpr::List(items) = self {
+            stack.extend(std::mem::take(items));
+        }
+
+        while let Some(mut node) = stack.pop() {
+            if let Sexpr::List(items) = &mut node {
+                stack.extend(std::mem::take(items));
+            }
+        }
+    }
+}
+
+impl Sexpr {
+    fn fmt_internal(&self, f: &mut std::fmt::Formatter<'_>, depth: usize) -> std::fmt::Result {
+        if depth > ufl_core::get_max_depth() {
+            return Err(std::fmt::Error);
+        }
+
         match self {
             Sexpr::Num(n) => write!(f, "{n}"),
             Sexpr::Sym(s) => write!(f, "{s}"),
@@ -46,11 +62,20 @@ impl std::fmt::Display for Sexpr {
                     if i > 0 {
                         write!(f, " ")?;
                     }
-                    write!(f, "{item}")?;
+                    item.fmt_internal(f, depth + 1)?;
                 }
                 write!(f, ")")
             }
         }
+    }
+}
+
+impl std::fmt::Display for Sexpr {
+    /// Render an `Sexpr` as text. For every `s` the reader produces,
+    /// `read(s.to_string()) == Ok(s)` (the round-trip invariant, scoped to the
+    /// reader's image — SPEC-0003 §2.2).
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.fmt_internal(f, 0)
     }
 }
 
