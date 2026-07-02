@@ -174,3 +174,23 @@ proposer cannot edit its verifier), but the Gate-1 prototype is **same-process F
 which is not true isolation** — a hostile proposer with raw `foreign-ref` could read
 the verifier's memory. The hard guarantee needs **process/sandbox isolation**; until
 then the safety property is *architecturally favored, not proven*.
+
+## The rung ladder (canonical — the ONE numbering; all other docs point here)
+
+This ladder supersedes the informal "Rung-1" usages that predated it (R-0014 §4
+called *rules-as-Rust-data* "Rung-1"; earlier drafts of this doc called the
+operator-forms enum "Rung-1"). From 2026-06-30, rung numbers mean exactly this:
+
+| Rung | Statement | Requirement | Status |
+|------|-----------|-------------|--------|
+| **0** | Bank what is proven: the answer-blind `Proposer`/`Fitness` seam, the exact verifiers, the flip-graph move primitives | R-0008, R-0014 AC1/AC2, R-0013 Gate-0 | seam + Gate-0 banked; SPEC-0014 owed |
+| **1** | Programs are data: `(quote e)`, `(eval q)`, structural `=`, `raise : &Eml → Sexpr` | **R-0016** | Draft |
+| **2** | The language evaluates itself: a bounded in-UFL eval, differential-tested against the Rust eval (which stays the authority) | future (needs R-0005 + guarded recursion) | unwritten |
+| **3** | The language scores itself: fitness/predicates as UFL forms, discharged through the Rust verifier — never self-graded | future | unwritten |
+| **4** | The language evolves its own operators: move-forms over the R-0013 primitives, pre-registered 2-SE held-out gate | **R-0015** | Draft — **the decision node** |
+| **5** | The two-language substrate: Chez↔Rust FFI + process isolation for the hard VHT guarantee | none — **earned only by a Rung-4 positive** | deliberately unwritten |
+
+Rungs 1–3 (the reflection line) and Rung 4 (the evolution line) are
+**parallelizable**: neither depends on the other's outcome. Rung 5 depends on
+Rung 4's *positive*; a documented Rung-4 negative kills Rung 5 permanently and
+the reflection line stands on its own merits.
