@@ -91,7 +91,7 @@ fn classify(atom: &str) -> Sexpr {
 /// Is `token` a symbol the reader produces verbatim — i.e. does
 /// `read(token) == Ok(Sexpr::Sym(token))`? True iff `token` is non-empty,
 /// contains no delimiter (`(`, `)`, `;`, whitespace), and is **not** a
-/// finite-float spelling (which [`classify`] would read as `Num`).
+/// finite-float spelling (which the reader would classify as `Num`).
 ///
 /// This is the reader's own `Sym` acceptance rule, exposed so a generator can
 /// draw `Sym` payloads from exactly the reader's canonical image without
