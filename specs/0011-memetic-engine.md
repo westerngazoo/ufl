@@ -13,10 +13,17 @@
 > not restate** SPEC-0011's motivation, Gate-2 headline, MLP baseline, or
 > decision log; it cross-references them.
 
-- **Status:** **Draft**
+- **Status:** **Accepted** (2026-07-03) — three-lens complete: nice-guy *strong*,
+  architect *approve-with-changes* (both OQ rulings folded in), hater *needs-work*
+  (the blocking typecheck-invariant overstatement + two majors fixed inline). All
+  findings resolved in §11. Gustavo holds final approval.
 - **Realizes:** **R-0011 Gate-1** (the geometric rediscovery — the validation
   gate, [R-0011 AC4](../requirements/0011-geometric-neuroevolution.md)); also
-  discharges **R-0014 AC2**'s *geometric second instance* of the generic seam.
+  provides **R-0014 AC2**'s *geometric second instance* of the generic seam —
+  scoped precisely: the geometric `Fitness` runs on `run_memetic`, whose
+  `NoRefine` collapse (§2.1) is byte-identical to the `run_generic` AC2 names, so
+  the second-lane-on-one-loop claim holds through that collapse (not by adding a
+  new unproven loop surface).
 - **Author:** main session — drafted with Claude
 - **Created:** 2026-07-03
 - **Depends on:**
@@ -205,12 +212,42 @@ the ablation is clean: disable the refiner (`NoRefine`) and the *only* thing tha
 changes is the elite-improvement pass; the tree-GA, screen, and ledger are
 untouched.
 
+**Collapse precondition (three-lens: architect + hater [major] — the byte-identity
+mechanism, pinned).** `run_generic` returns `Found`/`Exhausted` *before* `vary`
+(`ufl-search/src/lib.rs:188-214`); the refinement pass sits between the sort and
+that return, so a pass that mutates `scored[0]` on the terminal generation would
+change the returned best **even with an identical RNG draw order**. Byte-identity
+therefore requires the pass to be **skipped in full**, not "run inertly":
+
+> When `memetic.elites == 0` **or** the refiner yields `[]` for every elite,
+> `run_memetic` performs **no `score`, no `rng` draw, and no population mutation**
+> — so its `GenericOutcome`, `Ledger`, and `SplitMix64` draw order are identical to
+> `run_generic`'s. Equivalently: **the engine's own hill-climb bookkeeping pulls
+> zero `rng` draws — every refiner-path draw originates inside `Refiner::neighbors`**
+> — and the pass early-`continue`s before touching the population when it has no
+> kept improvement.
+
+`NoRefine` (empty neighbor set) and `MemeticConfig{elites:0}` (loop never entered)
+are the two collapse triggers, and both must land on this skip path. `T-memetic-
+collapse` (§4) asserts byte-identity for **both** triggers **and** on a run that
+reaches `Found` (not only `Exhausted`), since the terminal-generation mutation is
+where drift is most likely. `run_memetic + NoRefine` is the **ablation / collapse-
+proof path**, not a production caller — matmul keeps calling `run_generic`
+unchanged (§3), so the collapse guarantee's lack of a production consumer is by
+design.
+
 > **Answer-blindness argument (mirrors SPEC-0014 §2.4).** `Refiner::neighbors`
-> receives only `&G` and `&mut SplitMix64` — no target, no `Fitness`. A
-> `Refiner` *instance* is constructed from lane data only (the geometric one
-> below carries nothing task-specific — it perturbs grade-{0} slots). Therefore
-> the proposer/refiner pair is answer-blind **by construction**, and the memetic
-> upgrade does not relax Verifier-Held Transparency.
+> receives only `&G` and `&mut SplitMix64` — **no target, no `Fitness`, and no
+> cost `S`** (the signature forbids conditioning on fitness — hater tightening;
+> only the engine's `argmin` consumes cost). A `Refiner` *instance* is constructed
+> from lane data only (the geometric one below carries only `sigma` — nothing
+> task-specific — and perturbs grade-{0} slots). Therefore the proposer/refiner
+> pair is answer-blind **by construction as a signature invariant**, not merely an
+> instance property, and the memetic upgrade does not relax Verifier-Held
+> Transparency. `params_mut` (§2.2) is realized by a lifetime-threaded pre-order
+> walk `collect<'a>(&'a mut GeoExpr, &mut Vec<&'a mut f64>)` — disjoint leaf borrows
+> do not alias, so the naive `Vec<&mut f64>` signature compiles (architect-verified
+> by a compiled probe).
 
 ### 2.2 Typed param-slots (new, in `ufl-geo`) — the first typed quotation site
 
@@ -238,18 +275,33 @@ pub fn params(e: &GeoExpr) -> Vec<f64>;
 **The typecheck-invariant (stated, tested — the load-bearing property):**
 
 > For any `GeoExpr e`, `GradeCtx ctx`, and any reassignment of the `f64` values
-> reachable through `params_mut(&mut e)`, `typecheck(&e, ctx)` returns the same
-> `Result` (same `Ok(GradeSet)` or same `Err`) as before the reassignment.
+> reachable through `params_mut(&mut e)`: **`typecheck(&e, ctx).is_ok()` is
+> invariant, and whenever it is `Ok(g)`, the `GradeSet g` is invariant.** (The
+> `Err` *payload* is deliberately excluded — see the caveat; the screen never
+> reads it.)
 
-*Why it holds by construction.* `typecheck`/`grade` (`grade.rs`) branch on the
-tree's **structure** and on leaf *indices* (`Basis(i)`, `GradeLift(k, _)`,
-`GradeProject(k, _)`), never on a `Param`'s **value**: `grade(Param(_)) =
-singleton(0)` ignores the payload, and no other rule reads a `Param`'s `f64`.
-`is_versor` likewise matches on `Exp`/`GeoProduct`/`Basis`/`Reverse` structure,
-not on any `Param` value. Since `params_mut` yields borrows of **only** `Param`
-payloads (never a `u8` index, never structure), refining through it is invisible
-to `grade`/`typecheck`. The unit test (§4) asserts this against the real
-`typecheck` over a spread of trees.
+*Why the load-bearing part holds by construction.* `grade`/`typecheck`/`is_versor`
+(`grade.rs`) branch on the tree's **structure** and on leaf *indices* (`Basis(i)`,
+`GradeLift(k,_)`, `GradeProject(k,_)`), never on a `Param`'s **value**:
+`grade(Param(_)) = singleton(0)` ignores the payload (`grade.rs:88`), and no
+grade/typecheck/versor *decision* reads a `Param`'s `f64`. Since `params_mut`
+yields borrows of **only** `Param` payloads (never an index, never structure),
+both the *coherence verdict* (`is_ok`) and the *inferred grade* (`Ok(GradeSet)`)
+are invisible to a slot write.
+
+> **Caveat (three-lens, hater [blocking] — why the invariant is scoped to
+> `is_ok`/`GradeSet`, NOT "same `Result`").** `typecheck`'s error case embeds the
+> offending subtree **with its `Param` value**:
+> `Err(GradeError::Incoherent(e.clone()))` (`grade.rs:48,178`). So for a
+> grade-*incoherent* tree (e.g. `GradeProject(2, Param(_))`), refining the `Param`
+> changes the `Err` payload — the full `Result` is **not** invariant (a naive
+> "same `Result`" test goes red immediately; the hater confirmed by running it).
+> This is harmless by design: the geometric `Screen` reads only
+> `typecheck(g, ctx).is_ok()` (§2.3 `GradeScreen::admissible`), never the `Err`
+> payload, and the refiner only ever refines *admissible* (`Ok`) elites — so the
+> design depends **solely** on `is_ok`/`GradeSet` stability, which holds by
+> construction. T-slots-2 asserts exactly that. (Lesson adopted: every "by
+> construction" claim carries a runnable falsification, not just a prose proof.)
 
 > **Honest scope note (this is the whole safety story).** The slot mechanism
 > exposes **grade-{0} `Param` values only**. It **cannot** reach a `Basis`/`GradeLift`/
@@ -420,19 +472,26 @@ Written and failing before the code that satisfies them.
   leaves of a mixed tree (`Sandwich(Exp(GeoProduct(Param, Basis(3))), Var)`, a
   `GradeLift(2, Param)`, nested products) in pre-order; count and order match
   `params`.
-- **T-slots-2 (unit, `ufl-geo`) — the typecheck-invariant.** For a spread of
-  trees, snapshot `typecheck(&e, ctx)`, then write arbitrary `f64`s (incl.
-  `NaN`, `±inf`, `0.0`, large) through `params_mut`, and assert
-  `typecheck(&e, ctx)` is **unchanged** (same `Ok`/`Err`). This is the
-  committed proof of the §2.2 invariant.
+- **T-slots-2 (unit, `ufl-geo`) — the (scoped) typecheck-invariant.** For a spread
+  of trees, **coherent AND incoherent**, snapshot `typecheck(&e, ctx)`, then write
+  arbitrary `f64`s (incl. `NaN`, `±inf`, `0.0`, large) through `params_mut`, and
+  assert **`typecheck(&e, ctx).is_ok()` is unchanged, and when `Ok(g)` the
+  `GradeSet g` is unchanged**. It deliberately does **NOT** assert "same `Err`" —
+  the `Incoherent` payload embeds the refined `Param` (§2.2 caveat), so an
+  incoherent tree's `Err` *does* change. This is the committed proof of the scoped
+  §2.2 invariant, and a regression guard on the exact property `GradeScreen` reads.
 - **T-refiner-blind (unit, `ufl-search`).** A spy `Fitness` proves
   `Refiner::neighbors` is never handed the target and never scores: only
   `run_memetic` calls `score`. A screened-out neighbor never reaches `score`
   (extends SPEC-0014's spy-fitness test to the refinement pass).
-- **T-memetic-collapse (unit, `ufl-search`).** `run_memetic` with `NoRefine`
-  (or `elites:0`) yields the **byte-identical** `GenericOutcome` + `Ledger` +
-  `SplitMix64` draw order as `run_generic` for the toy lane — the ablation and
-  the matmul re-host both rely on this.
+- **T-memetic-collapse (unit, `ufl-search`) — byte-identity, both triggers, incl.
+  `Found`.** `run_memetic` yields the **byte-identical** `GenericOutcome` +
+  `Ledger` + `SplitMix64` draw order as `run_generic` for the toy lane under
+  **BOTH** collapse triggers — `NoRefine` (empty neighbor set) **and**
+  `MemeticConfig{elites:0}` (pass never entered) — **and** on a configuration that
+  reaches `Found` (not only `Exhausted`), since the terminal-generation
+  population mutation is where drift would surface (§2.1 collapse precondition).
+  The ablation and the matmul re-host both rely on this.
 - **T-monotone (unit, `ufl-search`).** A toy refiner + fitness where refinement
   can only lower cost: assert a refined elite's cost is `<=` its pre-refinement
   cost, every generation (refinement never worsens).
@@ -464,14 +523,30 @@ Written and failing before the code that satisfies them.
 > - `cargo tree -p ufl-discovery` shows no ufl-geo/ufl-ga edge; the r_0014
 >   byte-identical sweep still green post-relocation.
 
+**Gate semantics (three-lens, hater [major] — `≥6/16` is a *reference*, not a hard
+merge bar).** R-0011 AC4 states the sandwich-rediscovery threshold is *"set with
+the qa agent"*, and AC6 guarantees *"a documented honest negative still satisfies
+AC6"*; SPEC-0011's decision log already retired the "6/6" prior to *"unverified,
+threshold set fresh by qa."* So the `≥6/16` transcribed above is the **deleted-pilot
+reference**, not a committed gate: **qa sets the threshold; a faithful
+re-implementation that scores below it and documents the shortfall satisfies
+AC6/R-0011 and still merges** (the honest-negative escape hatch the requirement
+guarantees is *not* overridden by this spec). To keep the number from becoming a
+tuning artifact, `MemeticConfig`'s `sigma`/`elites`/`steps` grid is **pre-registered
+before** the gate run (§9.4), and SPEC-0011 §2.4's uniform-arity control carries
+over to the memetic run — the bar is a target, the *ablation* (0/16 vs. whatever
+the refined run scores) is the committed evidence.
+
 **Added gate (architect suggestion — promote the topology invariant to CI).** The
 `cargo tree -p ufl-discovery` "no `ufl-geo`/`ufl-ga` edge" property is promoted
-from a manual check to a **CI gate**: a CI step runs `cargo tree -p ufl-discovery`
-(or `cargo tree -e no-dev -p ufl-discovery`, invert-checked for `ufl-geo`/`ufl-ga`)
-and **fails the build** if either appears. This makes the `ufl-search`/`ufl-evolve`
-topology (SPEC-0014 §2.1 — the pure engine crate gains no geometric dependency) a
-merge-blocking machine invariant, not a convention that can silently rot when a
-future `use` is added.
+from a manual check to a **CI gate**: a CI step runs
+`cargo tree -p ufl-discovery -e no-dev` (the `no-dev` edge-kind excludes dev-deps,
+which legitimately pull `ufl-core`/`ufl-syntax`), invert-greps the output for
+`ufl-geo`/`ufl-ga`, and **fails the build** if either appears in the production
+graph. This makes the topology (SPEC-0014 §2.1 — the pure engine crate gains no
+geometric dependency) a merge-blocking machine invariant, not a convention that can
+silently rot when a future `use` is added. The same trick guards `ufl-search`
+staying `ufl-prng`-only.
 
 ---
 
@@ -530,25 +605,32 @@ caused it" clause above.
 
 ## 9. Open questions
 
-1. **Where do `GradeScreen`/`GeoParamRefiner` live — `ufl-geo` or `ufl-evolve`?**
-   §2.3 places them in `ufl-geo` (per SPEC-0014 §2.1's lane arrow), which adds a
-   `ufl-geo → ufl-search` dep. The alternative — defining them in `ufl-evolve`
-   (which already deps both) and keeping `ufl-geo` free of `ufl-search` — trades
-   the extra edge for a slightly less "the lane owns its screen" story. **Needs
-   Gustavo's call before the three-lens; T8/SPEC-0014 lean toward `ufl-geo`.**
+1. **RESOLVED (architect ruling) — `GradeScreen`/`GeoParamRefiner` (and
+   `GeoLaneError`) live in `ufl-geo`.** It obeys the Accepted SPEC-0014 §2.1 arrow
+   (`ufl-geo → ufl-search`, acyclic since `ufl-search` is `ufl-prng`-only), and it
+   is the cohesive SOLID factoring — the screen/refiner are pure functions of the
+   `Cl(3,0,1)` algebra + `GeoExpr` structure (carrying no task data), so they
+   belong with `typecheck`/`grade`/`GeoExpr`. `GeoLaneError = Eval(GeoError) |
+   Grade(GradeError)` is **defined in `ufl-geo`** (the lane owns its error,
+   SPEC-0014 §2.2) and imported by `ufl-evolve`'s `GeoFitness` — not orphaned in
+   `ufl-evolve`.
 
-2. **Exact garust coefficient read for `√Σ coeff²`.** Whether `garust::Pga3`
-   exposes a direct 16-coefficient accessor or the magnitude is assembled by
-   summing `grade(k)`-projected parts (`k∈0..=4`) — confirmed against the pinned
-   garust rev at the code-outline step (§3). Does not change the spec's
-   *requirement* (magnitude over blades, not `norm()`), only its spelling.
+2. **CLOSED (hater verified against the pinned garust rev `292bce5`).** `Pga3 =
+   Multivector<Pga3Sig, f64>` exposes a **public `coeffs` field** (`Index`/`IndexMut`,
+   `len() == 16`), so `magnitude = g.coeffs.iter().map(|c| c*c).sum::<f64>().sqrt()`
+   — no projection-summing needed. And `norm()`→`scalar_product` sums
+   `coeffs[i]²·sign` where the degenerate `e₀` metric gives `sign = 0`, so `norm()`
+   genuinely zeros `e₀`-bearing blades (the SPEC-0010 trap). The load-bearing
+   `√Σcoeff²`-not-`norm()` requirement is correct and directly implementable.
 
-3. **`run_memetic` vs. `run_generic` + external pass.** §2.1 specifies a new
-   `run_memetic`. An alternative keeps `run_generic` untouched and exposes a
-   `refine_population` helper the caller interleaves — smaller substrate surface,
-   but pushes the answer-blind hill-climb discipline onto every caller. §2.1's
-   in-engine version is preferred (the discipline lives in one place); confirm at
-   three-lens.
+3. **RESOLVED (architect ruling, 4-to-1) — in-engine `run_memetic`.** The
+   answer-blind discipline (only the `Fitness`-holder scores), the `Ledger`
+   honesty (the engine is the sole scorer, so `evals` stays well-defined for
+   R-0015), and the `NoRefine` byte-identity collapse are all properties *of the
+   engine* — an external `refine_population` helper would push the scored
+   hill-climb onto N callers, each a new place answer-blindness could break. The
+   seam grows by exactly one trait + one fn + one config (`Refiner`/`run_memetic`/
+   `MemeticConfig`) — the minimal generic surface for local refinement on any lane.
 
 4. **Refinement neighborhood shape + `MemeticConfig` defaults.** Per-slot jitter
    vs. joint all-slots jitter; `elites`/`steps`/`sigma` values. The pilot used
@@ -564,6 +646,23 @@ caused it" clause above.
    reproduces the whole memetic trajectory.
 
 ---
+
+## 11. Three-lens resolutions (2026-07-03)
+
+| Finding (lens, severity) | Resolution |
+|---|---|
+| **typecheck-invariant false as written** — `typecheck` embeds the `Param` value in `Err(Incoherent(e.clone()))`, so "same `Result`" is false; T-slots-2 would go red (hater [blocking]) | §2.2 invariant **scoped to `is_ok`/`GradeSet` stability** (the only property `GradeScreen` reads); the `Err`-payload caveat stated; T-slots-2 rewritten to assert the scoped property on coherent **and** incoherent trees. |
+| **`≥6/16` contradicts R-0011 AC4/AC6** (qa sets the threshold; honest negative satisfies AC6) (hater [major]) | §5 "Gate semantics": `≥6/16` is the deleted-pilot **reference**, qa sets the bar, a documented shortfall satisfies AC6/R-0011 and merges; knob grid pre-registered (§9.4); the *ablation* is the committed evidence. |
+| **`NoRefine` collapse under-specified** — refinement between sort and `Found`/`Exhausted` return can drift the returned best even with identical RNG (architect [major-guardrail] + hater [major]) | §2.1 "Collapse precondition": the pass is **skipped in full** (no `score`, no `rng`, no population mutation) when `elites==0` or every neighbor set is `[]`; the engine's hill-climb draws **zero** `rng` of its own; T-memetic-collapse asserts both triggers **and** a `Found` run. |
+| **OQ1 crate placement** (architect ruling) | `GradeScreen`/`GeoParamRefiner`/`GeoLaneError` in **`ufl-geo`** (SPEC-0014 §2.1 arrow; lane cohesion; acyclic). §9.1 records it. |
+| **OQ3 run_memetic placement** (architect ruling) | **in-engine `run_memetic`** (answer-blind discipline + ledger honesty + collapse are engine properties). §9.3 records it. |
+| **OQ2 garust accessor** (hater, closed) | Closed: pinned rev exposes public `coeffs` (16, `Index`/`IndexMut`); `√Σcoeff²` trivial; `norm()` confirmed metric-blind. §9.2 records it. |
+| **`params_mut` borrow feasibility** (architect, resolved) | Confirmed by a compiled probe; the lifetime-threaded `collect<'a>` spelling noted in §2.1. `params`/`params_mut` share **one** traversal (code-outline note). |
+| **answer-blindness a signature invariant** (hater [minor]) | §2.1 tightened: `neighbors` receives no cost/`S`; only the engine's `argmin` consumes cost. |
+| **AC2 over-read** (hater [minor]) | Header scoped: AC2's geometric instance holds **through `run_memetic`'s `NoRefine` collapse** to the `run_generic` AC2 names. |
+| **cargo tree CI flag** (architect [minor]) | §5 pins `cargo tree -p ufl-discovery -e no-dev`, invert-grep for `ufl-geo`/`ufl-ga`. |
+| **register naming / stale "6/6"** (hater [minor]) | R-0011 is now realized by **{SPEC-0011 (headline), SPEC-0011M (Gate-1)}** — ROADMAP/register to note both, and `requirements/0011`'s stale "6/6" fact corrected to the "threshold set by qa" decision. **Flagged for the orchestrator** (register hygiene, out of this spec's file scope). |
+| **nice-guy amplifications** (non-blocking) | Tracked: name the *propose-blind / score-in-engine* triad (`Proposer`/`Screen`/`Refiner`) in `docs/conventions.md` beside VHT; `params`/`params_mut` as a reusable continuous-parameter snapshot/restore primitive; amplify "first real `typecheck` consumer" in the motivation / `docs/why-ufl.md`. Folded into T14 + the build. |
 
 ## 10. Changelog
 
