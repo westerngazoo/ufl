@@ -51,8 +51,12 @@ Rust-side inverse `raise: &Eml → Sexpr` closing the code↔data square
   discharges **without** `UnboundVariable`; and `(quote e)` reached in numeric
   position still fails typed (`UnknownForm` today → the new syntax mode, never a
   silent coercion).
-- **AC3 (structural equality):** `=` on two quoted forms is `Sexpr::PartialEq` —
-  exact, decidable, and distinct from numeric `=` (which stays numeric-only).
+- **AC3 (structural equality):** a **distinct form `(eq? a b)`** compares two
+  quoted forms by `Sexpr::PartialEq` — exact and decidable. Numeric `=` is left
+  **exactly** as SPEC-0004 defines it (numeric-only, untouched). *(Amended
+  2026-07-03 after the three-lens review: overloading `=` silently changed numeric
+  `=` and shipped a classifier that becomes unsound once Rung 2 adds syntax-typed
+  bindings; a separate `eq?` closes both. Gustavo-confirmed.)*
 - **AC4 (the square closes):** `raise ∘ lower = id` on the reader's image,
   property-tested; `raise` emits only reader-image `Sexpr`s for reader-image
   inputs.
