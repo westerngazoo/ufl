@@ -1,7 +1,9 @@
 # SPEC-0016 — Reflection rung 1: quote, eval, raise
 
-- **Status:** Draft (revised after the three-lens review, 2026-07-03; pending
-  R-0016 acceptance — see the decision log in §6)
+- **Status:** **Accepted** (2026-07-03) — three-lens complete: architect
+  *approve-with-nits* (nits N1/N2 folded in), hater findings resolved (§6),
+  nice-guy approved; the three design calls Gustavo-confirmed. Gustavo signs the
+  transition (§1.2).
 - **Realizes:** [R-0016](../requirements/0016-reflection-quote-eval-raise.md)
 - **Author:** main session
 - **Created:** 2026-07-02 · **Revised:** 2026-07-03
@@ -201,9 +203,13 @@ process-wide. AC4 does **not** block on T6; it scopes its generator.
    1)))` is `Ok(true)`; differing forms `Ok(false)`; a non-syntax operand is
    `ExpectedSyntax`. Numeric `=` unaffected: a pinned SPEC-0004 `=` suite still
    passes verbatim.
-4. **`nested_eval_through_one_pipeline`**: `(eval (quote (eml 1 1)))` discharges;
-   `(eval (quote (eval (quote 1))))` — nested eval — discharges to the same value
-   the direct form gives (pins the single-pipeline reuse).
+4. **`eval_body_is_gated_by_the_one_lower`**: `(eval (quote (eml 1 1)))` discharges
+   to `eval(eml 1 1)`; but `(eval (quote (eval (quote 1))))` fails **typed** —
+   the outer `eval`'s quoted body is `(eval (quote 1))`, and `lower` knows only
+   `eml`, so it is `UnknownForm("eval")`, never a silent value. This pins that
+   `(eval q)` reuses the *one* `lower` (which gates the quoted body to the
+   lowerable class), not a second evaluator. *(Nit N1, 2026-07-03: an earlier
+   draft wrongly claimed the nested form discharges to a value.)*
 5. **`raise_lower_round_trips_on_reader_image`** (AC4): for `Sexpr`s generated with
    reader-canonical `Sym` tokens and bounded depth,
    `read(Display(raise(lower(s)))) == read(Display(s))`; plus the explicit
@@ -227,11 +233,13 @@ public error, no new crate, no new control forms.**
 - **No overload of numeric `=`** — structural equality is `eq?` (§2.4).
 - **No head/arg accessors on syntax** beyond `eq?` unless a later AC forces them.
 
-## 5. Open questions
+## 5. Open questions (for code-outline, loop step 4 — not gates)
 
-1. Whether `eval_num` should reject `Mode::Syntax` with an explicit
-   `ExpectedNumber` (clearer) or let `lower` reject `quote`/`eval`-in-quote as
-   `UnknownForm` (already typed). Provisionally the latter; confirm in review.
+1. **Resolved (nit N2):** `eval_num` adds **no** `Mode::Syntax` guard. A bare
+   `(quote e)` in numeric position falls through to `lower`, which returns
+   `UnknownForm("quote")` — already typed (AC2). An explicit `ExpectedNumber`
+   guard is a code-outline nicety, not required; the implementer may add it for a
+   clearer message but the behavior is correct either way.
 2. The exact reader-canonical `Sym` predicate the AC4 generator shares with the
    reader — factor it out of `read.rs` so generator and reader cannot drift.
 

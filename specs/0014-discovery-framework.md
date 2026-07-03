@@ -1,7 +1,9 @@
 # SPEC-0014 — The shared discovery substrate
 
-- **Status:** Draft (revised after the three-lens review, 2026-07-03; pending the
-  three-lens re-confirm — see the decision log in §6)
+- **Status:** **Accepted** (2026-07-03) — three-lens complete: architect
+  *approve* (blockers verified resolved against code; gates green), hater findings
+  resolved (§6), nice-guy approved; the new-`ufl-search`-crate topology
+  Gustavo-confirmed. Gustavo signs the transition (§1.2).
 - **Realizes:** [R-0014](../requirements/0014-discovery-framework.md) (one search
   substrate, per-lane verifier instances)
 - **Author:** main session

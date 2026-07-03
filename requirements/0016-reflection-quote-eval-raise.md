@@ -1,7 +1,8 @@
 # R-0016 — Reflection rung 1: quote, eval, raise
 
-- **Status:** Draft (moves to Accepted via the three-lens review; no code before
-  that — constitution §1)
+- **Status:** **Accepted** (2026-07-03) — three-lens complete (SPEC-0016 carries
+  the coupled review); AC3 amended to `eq?` (numeric `=` untouched),
+  Gustavo-confirmed. SPEC-0016 is Accepted; ready for T5.
 - **Milestone:** the self-eval staircase, **Rung 1** (see the canonical ladder in
   `theory/two-language-substrate.md`)
 - **Depends on:** R-0003 (Sexpr core), R-0004 (predicate layer), the unified

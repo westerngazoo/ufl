@@ -1,7 +1,8 @@
 # R-0015 — Evolve operator semantics (the Rung-4 probe)
 
-- **Status:** Draft (moves to Accepted via the three-lens review; no code before
-  that — constitution §1)
+- **Status:** **Accepted** (2026-07-03) — three-lens complete (SPEC-0014 carries
+  the coupled review); the three-set gate, headroom window, and right-censored
+  meta-fitness Gustavo-confirmed. SPEC-0015 is owed before code.
 - **Milestone:** the self-eval staircase, **Rung 4** (see the canonical ladder in
   `theory/two-language-substrate.md`)
 - **Depends on:** R-0013 Gate-0 (the flip-graph move primitives), R-0014 AC1/AC2
