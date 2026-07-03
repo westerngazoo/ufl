@@ -11,3 +11,9 @@ repository.workspace = true
 ufl-core = { path = "../ufl-core" }
 ufl-syntax = { path = "../ufl-syntax" }
 thiserror = "2"
+
+# Test-only: the R-0016 AC1 (`eval ∘ quote = id`) property test draws
+# bounded-depth `dom(eval)` `Sexpr`s from the shared deterministic PRNG.
+# Production graph unchanged.
+[dev-dependencies]
+ufl-prng = { path = "../ufl-prng" }

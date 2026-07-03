@@ -10,3 +10,9 @@ repository.workspace = true
 [dependencies]
 ufl-core = { path = "../ufl-core" }
 thiserror = "2"
+
+# Test-only: the R-0016 AC4 (`raise`) property test draws bounded-depth
+# reader-image `Sexpr`s from the shared deterministic PRNG. Production graph
+# unchanged.
+[dev-dependencies]
+ufl-prng = { path = "../ufl-prng" }
