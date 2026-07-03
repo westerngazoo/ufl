@@ -1,7 +1,8 @@
 # R-0016 — Reflection rung 1: quote, eval, raise
 
-- **Status:** Draft (moves to Accepted via the three-lens review; no code before
-  that — constitution §1)
+- **Status:** **Accepted** (2026-07-03) — three-lens complete (SPEC-0016 carries
+  the coupled review); AC3 amended to `eq?` (numeric `=` untouched),
+  Gustavo-confirmed. SPEC-0016 is Accepted; ready for T5.
 - **Milestone:** the self-eval staircase, **Rung 1** (see the canonical ladder in
   `theory/two-language-substrate.md`)
 - **Depends on:** R-0003 (Sexpr core), R-0004 (predicate layer), the unified
@@ -51,8 +52,12 @@ Rust-side inverse `raise: &Eml → Sexpr` closing the code↔data square
   discharges **without** `UnboundVariable`; and `(quote e)` reached in numeric
   position still fails typed (`UnknownForm` today → the new syntax mode, never a
   silent coercion).
-- **AC3 (structural equality):** `=` on two quoted forms is `Sexpr::PartialEq` —
-  exact, decidable, and distinct from numeric `=` (which stays numeric-only).
+- **AC3 (structural equality):** a **distinct form `(eq? a b)`** compares two
+  quoted forms by `Sexpr::PartialEq` — exact and decidable. Numeric `=` is left
+  **exactly** as SPEC-0004 defines it (numeric-only, untouched). *(Amended
+  2026-07-03 after the three-lens review: overloading `=` silently changed numeric
+  `=` and shipped a classifier that becomes unsound once Rung 2 adds syntax-typed
+  bindings; a separate `eq?` closes both. Gustavo-confirmed.)*
 - **AC4 (the square closes):** `raise ∘ lower = id` on the reader's image,
   property-tested; `raise` emits only reader-image `Sexpr`s for reader-image
   inputs.
