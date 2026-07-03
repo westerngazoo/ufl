@@ -33,7 +33,10 @@ pub use flipgraph::{
     flip_at, naive, perturb, reconstruct_int, reduce, reduce_matmul, reduce_matmul_with,
     shared_factor_pairs, target_int, FlipConfig, FlipError, IntScheme, IntTriple, Variant,
 };
-pub use generic::{run_generic, run_matmul_generic, Fitness, GenericOutcome, Proposer};
+pub use generic::{
+    run_generic, run_matmul_generic, Fitness, GenericOutcome, Ledger, NoScreen, Proposer, RunError,
+    RunResult, Screen,
+};
 pub use genome::Genome;
 pub use predicate::RankDecomposition;
 pub use prng::SplitMix64;
