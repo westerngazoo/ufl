@@ -1,0 +1,11 @@
+[package]
+name = "ufl-search"
+version = "0.1.0"
+description = "UFL — the pure, lane-agnostic search substrate (SPEC-0014 §2.1): the genome-generic Proposer/Fitness/Screen seam and the hardened run_generic loop. Depends on ufl-prng only; lanes plug in as instances."
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+ufl-prng = { path = "../ufl-prng" }

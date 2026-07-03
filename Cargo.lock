@@ -569,6 +569,7 @@ dependencies = [
  "ufl-core",
  "ufl-predicate",
  "ufl-prng",
+ "ufl-search",
  "ufl-syntax",
  "ufl-tensor",
 ]
@@ -609,6 +610,13 @@ dependencies = [
 [[package]]
 name = "ufl-prng"
 version = "0.1.0"
+
+[[package]]
+name = "ufl-search"
+version = "0.1.0"
+dependencies = [
+ "ufl-prng",
+]
 
 [[package]]
 name = "ufl-syntax"
