@@ -12,7 +12,8 @@
 //! `ufl_core`'s typed [`Eml`](ufl_core::Eml); [`eval_str`] runs the whole path
 //! by reusing `ufl_core::eval` verbatim — so the verified numerics (the branch
 //! convention, the `sin(τ/2)` self-correction) are inherited, never
-//! re-implemented.
+//! re-implemented. [`raise`] is the inverse of [`lower`], closing the code↔data
+//! square on the reader's canonical image (SPEC-0016 §2.5).
 
 #![forbid(unsafe_code)]
 
@@ -20,8 +21,8 @@ mod lower;
 mod read;
 mod sexpr;
 
-pub use lower::{lower, LowerError};
-pub use read::{read, ReadError};
+pub use lower::{lower, raise, LowerError};
+pub use read::{is_reader_canonical_sym, read, ReadError};
 pub use sexpr::Sexpr;
 
 use ufl_core::{Env, EvalError, Value};

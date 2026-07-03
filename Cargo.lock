@@ -602,6 +602,7 @@ version = "0.1.0"
 dependencies = [
  "thiserror",
  "ufl-core",
+ "ufl-prng",
  "ufl-syntax",
 ]
 
@@ -615,6 +616,7 @@ version = "0.1.0"
 dependencies = [
  "thiserror",
  "ufl-core",
+ "ufl-prng",
 ]
 
 [[package]]
