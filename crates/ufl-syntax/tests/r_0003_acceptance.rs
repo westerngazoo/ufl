@@ -566,3 +566,16 @@ fn ac6_read_error_precedes_lowering_for_unclosed_list() {
         Err(UflError::Read(ReadError::UnclosedList))
     );
 }
+
+#[test]
+fn ac2_deeply_nested_list_is_recursion_depth_exceeded() {
+    let opens = "(".repeat(129);
+    let closes = ")".repeat(129);
+    let src = format!("{}1{}", opens, closes);
+    assert_eq!(read(&src), Err(ReadError::RecursionDepthExceeded));
+
+    let opens_ok = "(".repeat(128);
+    let closes_ok = ")".repeat(128);
+    let src_ok = format!("{}1{}", opens_ok, closes_ok);
+    assert!(read(&src_ok).is_ok());
+}

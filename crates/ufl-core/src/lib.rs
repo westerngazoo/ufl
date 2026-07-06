@@ -9,9 +9,11 @@
 
 #![forbid(unsafe_code)]
 
+pub mod depth;
 pub mod eml;
 pub mod eval;
 mod log;
 
+pub use depth::{get_max_depth, set_max_depth};
 pub use eml::Eml;
 pub use eval::{eval, Env, EvalError, Value};

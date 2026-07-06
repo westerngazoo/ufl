@@ -46,6 +46,8 @@ impl Env {
 pub enum EvalError {
     #[error("unbound variable: {0}")]
     UnboundVariable(String),
+    #[error("recursion depth exceeded while evaluating")]
+    RecursionDepthExceeded,
 }
 
 /// Evaluate an EML expression under the given environment.

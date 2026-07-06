@@ -39,6 +39,28 @@ impl Eml {
     }
 }
 
+impl Drop for Eml {
+    fn drop(&mut self) {
+        // Prevent stack overflow on deep trees by dropping iteratively.
+        let mut stack = Vec::new();
+        if let Eml::Node { exp_arg, log_arg } = self {
+            let exp = std::mem::replace(&mut **exp_arg, Eml::One);
+            let log = std::mem::replace(&mut **log_arg, Eml::One);
+            stack.push(exp);
+            stack.push(log);
+        }
+
+        while let Some(mut node) = stack.pop() {
+            if let Eml::Node { exp_arg, log_arg } = &mut node {
+                let exp = std::mem::replace(&mut **exp_arg, Eml::One);
+                let log = std::mem::replace(&mut **log_arg, Eml::One);
+                stack.push(exp);
+                stack.push(log);
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,11 +87,11 @@ mod tests {
     fn ac1_node_constructor() {
         let n = Eml::node(Eml::one(), Eml::var("x"));
         match n {
-            Eml::Node { exp_arg, log_arg } => {
-                assert_eq!(*exp_arg, Eml::One);
-                assert_eq!(*log_arg, Eml::Var("x".into()));
+            Eml::Node { ref exp_arg, ref log_arg } => {
+                assert_eq!(**exp_arg, Eml::One);
+                assert_eq!(**log_arg, Eml::Var("x".into()));
             }
-            other => panic!("expected Eml::Node, got {other:?}"),
+            ref other => panic!("expected Eml::Node, got {other:?}"),
         }
     }
 }

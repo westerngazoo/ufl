@@ -88,17 +88,17 @@ fn ac1_constructors_produce_only_grammar_variants() {
 
     // AC1 — `Eml::var(name)` is a named-variable leaf.
     match Eml::var("x") {
-        Eml::Var(name) => assert_eq!(name, "x"),
-        other => panic!("Eml::var should produce Eml::Var, got {other:?}"),
+        Eml::Var(ref name) => assert_eq!(name, "x"),
+        ref other => panic!("Eml::var should produce Eml::Var, got {other:?}"),
     }
 
     // AC1 — `Eml::node(a, b)` is an `eml` internal node over two subtrees.
     match Eml::node(Eml::one(), Eml::var("y")) {
-        Eml::Node { exp_arg, log_arg } => {
-            assert_eq!(*exp_arg, Eml::One);
-            assert_eq!(*log_arg, Eml::Var("y".into()));
+        Eml::Node { ref exp_arg, ref log_arg } => {
+            assert_eq!(**exp_arg, Eml::One);
+            assert_eq!(**log_arg, Eml::Var("y".into()));
         }
-        other => panic!("Eml::node should produce Eml::Node, got {other:?}"),
+        ref other => panic!("Eml::node should produce Eml::Node, got {other:?}"),
     }
 }
 
