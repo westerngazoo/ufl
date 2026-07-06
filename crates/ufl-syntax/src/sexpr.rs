@@ -164,4 +164,79 @@ mod tests {
     fn ac1_display_renders_empty_list() {
         assert_eq!(Sexpr::list([]).to_string(), "()");
     }
+
+    #[test]
+    fn num_constructor_edge_cases() {
+        // Zeroes
+        assert_eq!(Sexpr::num(0.0), Sexpr::Num(0.0));
+        assert_eq!(Sexpr::num(-0.0), Sexpr::Num(-0.0));
+
+        // Infinities
+        assert_eq!(Sexpr::num(f64::INFINITY), Sexpr::Num(f64::INFINITY));
+        assert_eq!(Sexpr::num(f64::NEG_INFINITY), Sexpr::Num(f64::NEG_INFINITY));
+
+        // NaN (requires special handling since NaN != NaN)
+        let nan_sexpr = Sexpr::num(f64::NAN);
+        if let Sexpr::Num(n) = nan_sexpr {
+            assert!(n.is_nan());
+        } else {
+            panic!("Expected Num variant for NaN");
+        }
+    }
+
+    #[test]
+    fn sym_constructor_edge_cases() {
+        // Empty and whitespace strings
+        assert_eq!(Sexpr::sym(""), Sexpr::Sym("".to_string()));
+        assert_eq!(Sexpr::sym("   "), Sexpr::Sym("   ".to_string()));
+
+        // Unicode and special characters
+        assert_eq!(Sexpr::sym("π"), Sexpr::Sym("π".to_string()));
+        assert_eq!(
+            Sexpr::sym("a-b+c*d/e!@#"),
+            Sexpr::Sym("a-b+c*d/e!@#".to_string())
+        );
+
+        // Very long string
+        let long_str = "a".repeat(10_000);
+        assert_eq!(Sexpr::sym(long_str.clone()), Sexpr::Sym(long_str));
+    }
+
+    #[test]
+    fn list_constructor_edge_cases() {
+        // Deeply nested AST
+        let mut deep_ast = Sexpr::list([]);
+        for _ in 0..1_000 {
+            deep_ast = Sexpr::list([Sexpr::sym("a"), deep_ast]);
+        }
+
+        // Check depth (just walking down one branch to verify structure)
+        let mut current = &deep_ast;
+        let mut depth = 0;
+        while let Sexpr::List(items) = current {
+            if items.is_empty() {
+                break;
+            }
+            assert_eq!(items.len(), 2);
+            assert_eq!(items[0], Sexpr::Sym("a".to_string()));
+            current = &items[1];
+            depth += 1;
+        }
+        assert_eq!(depth, 1_000);
+
+        // Extremely wide list
+        let mut wide_items = Vec::with_capacity(10_000);
+        for i in 0..10_000 {
+            wide_items.push(Sexpr::num(i as f64));
+        }
+
+        let wide_ast = Sexpr::list(wide_items);
+        if let Sexpr::List(items) = wide_ast {
+            assert_eq!(items.len(), 10_000);
+            assert_eq!(items[0], Sexpr::Num(0.0));
+            assert_eq!(items[9999], Sexpr::Num(9999.0));
+        } else {
+            panic!("Expected List variant");
+        }
+    }
 }

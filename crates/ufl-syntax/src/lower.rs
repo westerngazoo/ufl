@@ -69,3 +69,23 @@ fn lower_form(items: &[Sexpr], depth: usize) -> Result<Eml, LowerError> {
         other => Err(LowerError::UnknownForm(other.to_string())),
     }
 }
+
+/// Raise an [`Eml`](ufl_core::Eml) back into its [`Sexpr`] — the transpose of
+/// [`lower`]'s table, and the Rust-side inverse that closes the code↔data square
+/// (SPEC-0016 §2.5). Each row inverts one `lower` case: `One → 1`, `Var → sym`,
+/// `Node → (eml …)`.
+///
+/// `raise` is **total** on `Eml` (no `Result`) — every `Eml` has a structural
+/// image. `raise ∘ lower = id` holds on the **reader's canonical image** (see
+/// [`is_reader_canonical_sym`](crate::is_reader_canonical_sym)); it is *not*
+/// unconditional, because `lower` accepts `Sym` payloads the reader never emits
+/// (e.g. `lower(Sym("1")) = Var("1")`, but `read("1") = Num(1.0)`).
+pub fn raise(e: &Eml) -> Sexpr {
+    match e {
+        Eml::One => Sexpr::num(1.0),
+        Eml::Var(name) => Sexpr::sym(name.as_str()),
+        Eml::Node { exp_arg, log_arg } => {
+            Sexpr::list([Sexpr::sym("eml"), raise(exp_arg), raise(log_arg)])
+        }
+    }
+}

@@ -105,8 +105,12 @@ and reframed:
 | [R-0008](requirements/0008-discovery-engine.md) | **Discovery engine** — seeded GA, accept step = the R-0007 discharge. **Re-scoped:** validate the loop + proposer-agnostic seam on a planted solvable target; **document the matmul falsification**. | **Done** (merged, PR #19; planted recovery 7/10, AC4 working-engine guard every seed) |
 | [R-0009](requirements/0009-pga-kernel-binding.md) | **`Cl(3,0,1)` PGA kernel binding** (`ufl-ga` → garust **v0.1.0**, contract green) — multivectors, geo/outer/inner products, grade projection, rotor sandwich, motors. Supersedes R-0002. | **Done** (merged, PR #21; `ufl-ga`, 15 tests — keystone + bit-exact PGA null + convention-equivalence) |
 | [R-0010](requirements/0010-geometric-forms-grade-types.md) | **Geometric forms + the grade-type system** (`ufl-geo`) — GA ops as forms (the `GeoExpr` genotype R-0011 evolves) lowering onto `ufl-ga`; decidable grade inference (the dimensional type, per Haynes), keystone = the sandwich preserves grade. | **Done** (merged, PR #23; `ufl-geo`, 18 tests — 14 AC + 4 soundness; SPEC-0010 Accepted; architect APPROVE + qa SIGN-OFF; a 4-lens adversarial soundness audit found & fixed two hand-rule defects). |
-| [R-0011](requirements/0011-geometric-neuroevolution.md) | **Geometric neuroevolution** (the headline) — evolve the R-0010 `GeoExpr` genotype on R-0008's seam (generalized to a totally-ordered, NaN-safe real-valued fitness = accuracy − parsimony); grade = a pruning filter + a seeding bias. **Two gates:** rediscover the rotor sandwich `R x R̃` (de-risk 6/6) **and** the **equivariant-OOD-generalization** headline — an evolved, exact, equivariant `GeoExpr` (4 `Param`s, machine-exact in-dist + OOD) vs the smallest fair MLP that collapses OOD (≤145×). *Reframed from "IK-beats-MLP" by the SPEC-0011 §2.6 de-risk: literal IK is inexpressible + the MLP baseline was a strawman.* Agentic proposer, Strassen, and the `Normalize`/`Log` literal-IK extension all **deferred**. | **SPEC-0011 Accepted** (three-lens closed; §2.6 + §2.8 de-risks positive); impl in #26/#27/#28 + the `ufl-evolve` engine |
+| [R-0011](requirements/0011-geometric-neuroevolution.md) | **Geometric neuroevolution** (the headline) — evolve the R-0010 `GeoExpr` genotype on R-0008's seam (generalized to a totally-ordered, NaN-safe real-valued fitness = accuracy − parsimony); grade = a pruning filter + a seeding bias. **Two gates:** rediscover the rotor sandwich `R x R̃` (de-risk 6/6) **and** the **equivariant-OOD-generalization** headline — an evolved, exact, equivariant `GeoExpr` (4 `Param`s, machine-exact in-dist + OOD) vs the smallest fair MLP that collapses OOD (≤145×). *Reframed from "IK-beats-MLP" by the SPEC-0011 §2.6 de-risk: literal IK is inexpressible + the MLP baseline was a strawman.* Agentic proposer, Strassen, and the `Normalize`/`Log` literal-IK extension all **deferred**. | **In progress** — SPEC-0011 Accepted (three-lens closed; §2.6 + §2.8 de-risks positive). Merged: the `GeoExpr` printer (PR #31), the `ufl-prng` deterministic RNG (PR #29), the fair-MLP Gate-2 anti-strawman baseline in `ufl-evolve` (PR #33). **Pending: Gate 1** (rotor-sandwich rediscovery) **and Gate 2** (the equivariant-OOD headline run). |
 | [R-0012](requirements/0012-f2-boolean-deduction.md) | **Boolean deduction over 𝔽₂** (the discrete-logic lane) — logic-as-polynomial-ring (XOR=+, AND=·, idemp x²=x); entailment = ideal membership; **equality saturation (egg) ≡ Buchberger/Gröbner**. A falsifiable spike with a **SAT baseline** (AC2/AC4). Orthogonal to the EML + geometric lanes; **new engine, not a reuse**. | Draft (does not block R-0011; spike after/parallel at owner discretion) |
+| R-0013 | **The matmul-decomposition moonshot** (the relocated Strassen prize) — a stronger-than-blind-GA search over exact integer schemes on the R-0006/0007/0008 verifier stack; **Gate 0** (go/no-go) = rediscover rank-7 Strassen for `T_2`. | **In progress** — Gate-0 flip-graph search in flight on branch `R-0013-flipgraph` (requirement + SPEC-0013 + red test live there; not yet on `main`). The earlier basin-hopping draft (PR #43) is closed as superseded; its decision log is preserved in the PR record and ported to the flipgraph requirement. |
+| [R-0014](requirements/0014-discovery-framework.md) | **The shared discovery framework** — generalize the proposer-agnostic seam into one genome-generic, deterministic search/rewrite loop + the grade/closure harness; the three lanes (R-0011/12/13) become **verifier instances** that KEEP their own atoms. Unifies with R-0012's equality saturation (search = rewrite-under-cost). **First build:** re-host the green matmul GA on the generic loop byte-identically, then add the geometric fitness. | **Merged as Draft** (PR #50) — the generic seam (`ufl-discovery::generic`) + the theory ledger (`theory/two-language-substrate.md`, `theory/discovery-results.md`) are on `main`; **SPEC-0014 is owed** (task 07) before the requirement advances. Design-panel scope stands: the one-`{eml,+}`-substrate-generates-everything claim refuted — unify the harness, not the atoms; metacircularity + temperature bridge deferred. |
+| R-0015 | **Evolve operator *semantics*** (reframed per the 2026-06-29 discovery verdict — not hyperparameter knobs) — staircase requirement. | Planned — in drafting (task 04) |
+| R-0016 | **Reflection rung 1** — `quote` / `eval` / structural `=` / `raise` (code-as-data) — staircase requirement. | Planned — in drafting (task 04) |
 
 ### M4 / language-build — *paused for the discovery pivot*
 
@@ -131,16 +135,24 @@ exploration is shelved on branch `R-0005-value-conditional` (recoverable).
 
 ## Current focus
 
-**R-0010 — geometric s-expr forms + the grade-type system, is next.** With the
-substrate complete (R-0009 `ufl-ga`, the `Cl(3,0,1)` PGA kernel), R-0010 builds
-the geometric s-expression *forms* that lower onto it, plus a **decidable
-grade-type system** (the dimensional types Haynes proved decidable). That gives
-R-0011 a typed geometric AST to evolve.
+**R-0013 + R-0014 are the active front; the execution plan is
+[`docs/tasks/README.md`](docs/tasks/README.md)** (the enumerated task set from
+the 2026-06-30 five-lens review — it sequences the whole backlog below).
+
+- **R-0013** — the matmul moonshot's **Gate 0** (rediscover rank-7 Strassen) is
+  in flight on branch `R-0013-flipgraph` with a flip-graph proposer.
+- **R-0014** — the generic discovery seam is **merged as Draft** (PR #50);
+  **SPEC-0014 is owed** (task 07), then the byte-identical GA re-host claim gets
+  its spec-grade footing.
+- **R-0011** — SPEC accepted, partial merges landed (printer, `ufl-prng`,
+  fair-MLP Gate-2 baseline); **Gate 1 and Gate 2 runs are pending**.
+- **R-0015 / R-0016** — the staircase requirements (operator semantics,
+  reflection rung 1) are **in drafting** (task 04).
 
 **The Phase-1 arc (decided 2026-06-12 — [[project-neuroevolution-direction]]):**
 R-0008 (engine, **Done**) → R-0009 (`Cl(3,0,1)` PGA kernel, **Done**) → R-0010
-(geometric forms + grade inference, **next**) → R-0011 (neuroevolution over
-geometric ASTs, inheriting the relocated Strassen prize). The differentiator is
+(geometric forms + grade inference, **Done**) → R-0011 (neuroevolution over
+geometric ASTs) → R-0013 (the relocated Strassen prize). The differentiator is
 **evolution**, which the validating literature (CliffordNet, GATr, Haynes)
 doesn't do; the engine rides UFL's exact verifier (the predicate discharge), so
 *transparency lives in the verifier, not the proposer* — which let the blind-GA
@@ -153,4 +165,5 @@ is **superseded by R-0009**.
 **Done (on `main`):** R-0001 (EML core), R-0003 (s-expr core), R-0004 (predicate
 checker), R-0006 (integer-tensor verifier), R-0007 (the verifier *is* the Hehner
 discharge), R-0008 (discovery engine + the honest matmul falsification), R-0009
-(`Cl(3,0,1)` PGA kernel). **Six crates, 168 tests green.**
+(`Cl(3,0,1)` PGA kernel), R-0010 (geometric forms + grade types). **Nine crates,
+222 tests green (+5 ignored reproduction runs).**

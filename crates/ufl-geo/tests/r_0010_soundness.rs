@@ -79,15 +79,18 @@ fn gradelift_grade_is_sound_for_nonscalar_children() {
 #[test]
 fn gradelift_lifts_a_scalar_to_grade_k() {
     let env = Env::new();
-    let e = GeoExpr::GradeLift(2, Box::new(GeoExpr::Param(3.0)));
-    let mv = eval(&e, &env).expect("GradeLift of a scalar evaluates");
-    let want = Mv::scalar(3.0) * Mv::basis(3); // 3·e12
-    assert_eq!(
-        (mv - want).cleaned(1e-10),
-        Mv::zero(),
-        "GradeLift(2, 3) must be 3·e12"
-    );
-    assert_eq!(grade(&e, &GradeCtx::new()), GradeSet::singleton(2));
+    let cases = [(0, 0), (1, 1), (2, 3), (3, 7), (4, 15)];
+    for (k, blade_idx) in cases {
+        let e = GeoExpr::GradeLift(k, Box::new(GeoExpr::Param(3.0)));
+        let mv = eval(&e, &env).expect("GradeLift of a scalar evaluates");
+        let want = Mv::scalar(3.0) * Mv::basis(blade_idx);
+        assert_eq!(
+            (mv - want).cleaned(1e-10),
+            Mv::zero(),
+            "GradeLift({k}, 3) must be 3·blade_{blade_idx}"
+        );
+        assert_eq!(grade(&e, &GradeCtx::new()), GradeSet::singleton(k as usize));
+    }
 }
 
 /// Bug 2 — `grade`/`typecheck` are TOTAL on an out-of-range `GradeProject` grade,

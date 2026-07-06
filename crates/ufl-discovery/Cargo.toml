@@ -11,6 +11,7 @@ repository.workspace = true
 ufl-predicate = { path = "../ufl-predicate" }
 ufl-tensor = { path = "../ufl-tensor" }
 ufl-prng = { path = "../ufl-prng" }
+ufl-search = { path = "../ufl-search" }
 thiserror = "2"
 
 # Test-only: the R-0007 acceptance suite exercises the scalar instance too

@@ -53,10 +53,25 @@ impl GaProposer {
     }
 
     fn random_genome(&self, rng: &mut SplitMix64) -> Genome {
-        let vec = |rng: &mut SplitMix64| (0..self.d).map(|_| rng.ternary()).collect::<Vec<i8>>();
-        let triples = (0..self.rank)
-            .map(|_| [vec(rng), vec(rng), vec(rng)])
-            .collect();
+        let mut triples = Vec::with_capacity(self.rank);
+        for _ in 0..self.rank {
+            let mut u = Vec::with_capacity(self.d);
+            for _ in 0..self.d {
+                u.push(rng.ternary());
+            }
+
+            let mut v = Vec::with_capacity(self.d);
+            for _ in 0..self.d {
+                v.push(rng.ternary());
+            }
+
+            let mut w = Vec::with_capacity(self.d);
+            for _ in 0..self.d {
+                w.push(rng.ternary());
+            }
+
+            triples.push([u, v, w]);
+        }
         Genome { triples }
     }
 
@@ -65,11 +80,10 @@ impl GaProposer {
     /// `elitism` unchanged; the rest are tournament-selected parents joined by
     /// uniform triple-crossover and point-mutated (SPEC-0008 §2.4).
     pub(crate) fn vary(&self, scored: &[(Genome, i64)], rng: &mut SplitMix64) -> Vec<Genome> {
-        let mut next: Vec<Genome> = scored
-            .iter()
-            .take(self.cfg.elitism)
-            .map(|(g, _)| g.clone())
-            .collect();
+        let mut next: Vec<Genome> = Vec::with_capacity(self.cfg.population);
+        for (g, _) in scored.iter().take(self.cfg.elitism) {
+            next.push(g.clone());
+        }
         while next.len() < self.cfg.population {
             let a = self.tournament(scored, rng);
             let b = self.tournament(scored, rng);
@@ -92,15 +106,14 @@ impl GaProposer {
 
     /// Uniform crossover over the `rank` triples (the scheme is an unordered sum).
     fn crossover(&self, a: &Genome, b: &Genome, rng: &mut SplitMix64) -> Genome {
-        let triples = (0..self.rank)
-            .map(|i| {
-                if rng.below_usize(2) == 0 {
-                    a.triples[i].clone()
-                } else {
-                    b.triples[i].clone()
-                }
-            })
-            .collect();
+        let mut triples = Vec::with_capacity(self.rank);
+        for i in 0..self.rank {
+            if rng.below_usize(2) == 0 {
+                triples.push(a.triples[i].clone());
+            } else {
+                triples.push(b.triples[i].clone());
+            }
+        }
         Genome { triples }
     }
 

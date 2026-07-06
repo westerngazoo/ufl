@@ -10,3 +10,10 @@ repository.workspace = true
 [dependencies]
 ufl-ga = { path = "../ufl-ga" }
 thiserror = "2"
+
+[dev-dependencies]
+criterion = "0.8.2"
+
+[[bench]]
+name = "render_bench"
+harness = false

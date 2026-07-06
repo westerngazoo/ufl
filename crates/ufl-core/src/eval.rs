@@ -62,23 +62,16 @@ pub enum EvalError {
 /// Infallible on numeric edge cases (`inf` / `nan` propagate as ordinary
 /// `Value`s); the only failure mode is an unbound variable.
 pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
-    eval_internal(expr, env, 0)
-}
-
-fn eval_internal(expr: &Eml, env: &Env, depth: usize) -> Result<Value, EvalError> {
-    if depth > crate::get_max_depth() {
-        return Err(EvalError::RecursionDepthExceeded);
-    }
-
+    // Evaluation post-order walk, per SPEC-0001 §2.5.
     match expr {
         Eml::One => Ok(Value::new(1.0, 0.0)),
         Eml::Var(name) => env
             .get(name)
             .ok_or_else(|| EvalError::UnboundVariable(name.clone())),
         Eml::Node { exp_arg, log_arg } => {
-            let x = eval_internal(exp_arg, env, depth + 1)?;
-            let y = eval_internal(log_arg, env, depth + 1)?;
-            Ok(x.exp() - crate::log::ln_eml(y))
+            let exp_val = eval(exp_arg, env)?;
+            let log_val = eval(log_arg, env)?;
+            Ok(exp_val.exp() - crate::log::ln_eml(log_val))
         }
     }
 }

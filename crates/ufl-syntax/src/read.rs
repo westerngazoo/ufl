@@ -61,7 +61,7 @@ fn tokenize(src: &str) -> Vec<Token> {
             _ => {
                 let mut atom = String::new();
                 while let Some(&c) = chars.peek() {
-                    if c.is_whitespace() || c == '(' || c == ')' || c == ';' {
+                    if is_delimiter(c) {
                         break;
                     }
                     atom.push(c);
@@ -74,6 +74,13 @@ fn tokenize(src: &str) -> Vec<Token> {
     tokens
 }
 
+/// True iff `c` bounds a token: whitespace, `(`, `)`, or the `;` comment start.
+/// The single source of the delimiter set (shared by the tokenizer above and
+/// [`is_reader_canonical_sym`]).
+fn is_delimiter(c: char) -> bool {
+    c.is_whitespace() || c == '(' || c == ')' || c == ';'
+}
+
 /// Classify an atom token: a finite `f64` is `Num`, everything else `Sym`
 /// (so non-finite spellings like `inf`/`nan` are symbols — §2.3).
 fn classify(atom: &str) -> Sexpr {
@@ -81,6 +88,21 @@ fn classify(atom: &str) -> Sexpr {
         Ok(n) if n.is_finite() => Sexpr::Num(n),
         _ => Sexpr::Sym(atom.to_string()),
     }
+}
+
+/// Is `token` a symbol the reader produces verbatim — i.e. does
+/// `read(token) == Ok(Sexpr::Sym(token))`? True iff `token` is non-empty,
+/// contains no delimiter (`(`, `)`, `;`, whitespace), and is **not** a
+/// finite-float spelling (which the reader would classify as `Num`).
+///
+/// This is the reader's own `Sym` acceptance rule, exposed so a generator can
+/// draw `Sym` payloads from exactly the reader's canonical image without
+/// duplicating (and drifting from) the classification logic (SPEC-0016 §2.5,
+/// §5 open question 2).
+pub fn is_reader_canonical_sym(token: &str) -> bool {
+    !token.is_empty()
+        && !token.chars().any(is_delimiter)
+        && matches!(classify(token), Sexpr::Sym(_))
 }
 
 /// Parse one s-expression starting at `tokens[*pos]`, advancing `*pos` past it.

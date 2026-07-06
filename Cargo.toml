@@ -9,10 +9,12 @@ members = [
     "crates/ufl-syntax",
     "crates/ufl-predicate",
     "crates/ufl-tensor",
+    "crates/ufl-prng",
+    "crates/ufl-search",
     "crates/ufl-discovery",
     "crates/ufl-ga",
     "crates/ufl-geo",
-    "crates/ufl-prng",
+    "crates/ufl-evolve",
 ]
 
 [workspace.package]
