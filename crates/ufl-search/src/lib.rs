@@ -114,6 +114,45 @@ impl<G> Screen<G> for NoScreen {
     }
 }
 
+/// Proposes *neighbor* genomes of an elite for the engine to hill-climb — the
+/// memetic seam (SPEC-0011M §2.1). Answer-blind **by signature**, exactly like
+/// [`Screen`]: `neighbors` receives only `&G` and the rng — **no target, no
+/// [`Fitness`], and no cost `S`** — so the refiner cannot condition on fitness and
+/// cannot see the answer. It returns candidates *without scoring them*; only the
+/// engine ([`run_memetic`]) scores, so Verifier-Held Transparency survives the
+/// memetic upgrade. An instance may depend only on the *lane*, never on the *task*.
+pub trait Refiner<G> {
+    /// The local neighborhood of `elite`. May be empty (no move available). The
+    /// engine screens then scores each neighbor and keeps the best strict
+    /// improvement; the refiner only *proposes* moves. **All rng the memetic pass
+    /// draws originates here** — the engine's hill-climb bookkeeping draws none.
+    fn neighbors(&self, elite: &G, rng: &mut SplitMix64) -> Vec<G>;
+}
+
+/// The default refiner: proposes nothing and **draws no rng**. Lanes with no local
+/// move use it, so [`run_memetic`] collapses to [`run_generic`]'s trajectory
+/// byte-for-byte (the ablation harness).
+pub struct NoRefine;
+
+impl<G> Refiner<G> for NoRefine {
+    fn neighbors(&self, _elite: &G, _rng: &mut SplitMix64) -> Vec<G> {
+        Vec::new()
+    }
+}
+
+/// The memetic budget (SPEC-0011M §2.1): how hard the engine hill-climbs each
+/// generation's elites. `elites == 0` **or** `steps == 0` skips the refinement
+/// pass entirely, so [`run_memetic`] is byte-identical to [`run_generic`] (the
+/// same collapse [`NoRefine`] gives with any budget).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MemeticConfig {
+    /// How many cost-lowest elites to refine each generation.
+    pub elites: usize,
+    /// Max hill-climb steps per elite (each step: propose, take the best strict
+    /// improvement, or stop).
+    pub steps: usize,
+}
+
 /// The eval ledger — a plain count of **post-screen** [`Fitness::score`] calls
 /// (SPEC-0014 §2.5); a screened-out genome is *not* an eval. This is R-0015's
 /// meta-fitness unit ("verifier-work to target"). On the Exhausted path under the
@@ -188,6 +227,129 @@ where
         scored.sort_by_key(|(_, s)| *s);
         // Guard the empty population (`seed`/`vary` or the screen admitted
         // nothing) — a typed runtime error, never an index panic (§2.3).
+        let best_score = scored.first().ok_or(RunError::ProposerYieldedEmpty)?.1;
+
+        if fitness.solved(&best_score) {
+            return Ok((
+                GenericOutcome::Found {
+                    genome: scored.swap_remove(0).0,
+                    generation,
+                },
+                Ledger { evals },
+            ));
+        }
+
+        trajectory.push(best_score);
+
+        if generation == generations {
+            return Ok((
+                GenericOutcome::Exhausted {
+                    best: scored.swap_remove(0).0,
+                    best_score,
+                    trajectory,
+                },
+                Ledger { evals },
+            ));
+        }
+
+        pop = proposer.vary(&scored, &mut rng);
+    }
+
+    unreachable!("the loop returns Found or Exhausted at generation == generations")
+}
+
+/// The genome-generic **memetic** search — [`run_generic`]'s loop plus a
+/// per-generation elite-refinement pass driven by a [`Refiner`] and scored by the
+/// engine's [`Fitness`] (SPEC-0011M §2.1). The proposer *and* the refiner are
+/// answer-blind; only this function holds `fitness`.
+///
+/// **The collapse (byte-identity — SPEC-0011M §2.1, the load-bearing property).**
+/// The refinement pass is skipped *in full* when `memetic.elites == 0` or
+/// `memetic.steps == 0`. When it does run, the engine's hill-climb bookkeeping
+/// pulls **zero** `rng` draws — every draw originates inside
+/// [`Refiner::neighbors`] — and [`NoRefine`] yields `[]` (no draw, no score, no
+/// mutation). So with `NoRefine` (or a zero budget) the [`GenericOutcome`],
+/// [`Ledger`], and `SplitMix64` draw order are **identical** to `run_generic`,
+/// *including on a `Found` run* (no population mutation occurs, so the returned
+/// best cannot drift). This is the ablation / collapse-proof path; production
+/// lanes with no local move keep calling `run_generic` directly.
+#[allow(clippy::too_many_arguments)]
+pub fn run_memetic<G, S, P, F, C, R>(
+    proposer: &P,
+    fitness: &F,
+    screen: &C,
+    refiner: &R,
+    memetic: MemeticConfig,
+    generations: usize,
+    seed: u64,
+) -> RunResult<G, S, F::Error>
+where
+    G: Clone,
+    S: Ord + Copy,
+    P: Proposer<G, S>,
+    F: Fitness<G, S>,
+    C: Screen<G>,
+    R: Refiner<G>,
+{
+    let mut rng = SplitMix64::new(seed);
+    let mut pop = proposer.seed(&mut rng);
+    let mut trajectory = Vec::with_capacity(generations + 1);
+    let mut evals: u64 = 0;
+
+    for generation in 0..=generations {
+        let mut scored = pop
+            .into_iter()
+            .filter(|g| screen.admissible(g))
+            .map(|g| {
+                let s = fitness.score(&g)?;
+                Ok::<_, RunError<F::Error>>((g, s))
+            })
+            .collect::<Result<Vec<(G, S)>, RunError<F::Error>>>()?;
+        evals += scored.len() as u64;
+        scored.sort_by_key(|(_, s)| *s);
+
+        // Memetic refinement — skipped in full unless BOTH knobs are positive, so
+        // the `NoRefine`/zero-budget collapse draws no `rng`, scores nothing, and
+        // mutates nothing (byte-identity to `run_generic`, incl. on `Found`).
+        if memetic.elites > 0 && memetic.steps > 0 {
+            let k = memetic.elites.min(scored.len());
+            let mut refined_any = false;
+            for elite in scored.iter_mut().take(k) {
+                for _ in 0..memetic.steps {
+                    // The refiner proposes neighbors (drawing its own `rng`); the
+                    // ENGINE screens then scores them and keeps the best strict
+                    // improvement. `NoRefine` yields `[]` here → no draw, no score.
+                    let neighbors = refiner.neighbors(&elite.0, &mut rng);
+                    let mut best: Option<(G, S)> = None;
+                    for g in neighbors.into_iter().filter(|g| screen.admissible(g)) {
+                        let s = fitness.score(&g)?;
+                        evals += 1;
+                        if s < elite.1 {
+                            match &best {
+                                None => best = Some((g, s)),
+                                Some((_, bs)) if s < *bs => best = Some((g, s)),
+                                _ => {}
+                            }
+                        }
+                    }
+                    match best {
+                        // Keep the strict improvement and try another step.
+                        Some(improved) => {
+                            *elite = improved;
+                            refined_any = true;
+                        }
+                        // No strictly-lower neighbor — this elite is locally done.
+                        None => break,
+                    }
+                }
+            }
+            // Re-rank only if refinement actually moved an elite (a no-op re-sort
+            // would still be stable, but skipping it keeps the collapse obvious).
+            if refined_any {
+                scored.sort_by_key(|(_, s)| *s);
+            }
+        }
+
         let best_score = scored.first().ok_or(RunError::ProposerYieldedEmpty)?.1;
 
         if fitness.solved(&best_score) {
@@ -459,6 +621,160 @@ mod tests {
             ledger.evals,
             (population * (generations + 1)) as u64,
             "evals == population × (generations + 1) on the NoScreen/Exhausted path"
+        );
+    }
+
+    // ── (e) the memetic layer: Refiner seam + run_memetic (SPEC-0011M §2.1) ──
+
+    /// The best cost of an outcome (a solved run is cost 0).
+    fn best_cost(outcome: &GenericOutcome<i64, u64>) -> u64 {
+        match outcome {
+            GenericOutcome::Found { .. } => 0,
+            GenericOutcome::Exhausted { best_score, .. } => *best_score,
+        }
+    }
+
+    /// **The collapse (byte-identity).** `run_memetic` with `NoRefine` — under a
+    /// positive budget (pass entered, yields `[]`) AND with `elites:0` (pass
+    /// skipped) — reproduces `run_generic`'s exact `GenericOutcome` + `Ledger` +
+    /// draw order, on BOTH a `Found` run and an `Exhausted` run (the terminal
+    /// generation, where refinement would otherwise drift the returned best).
+    #[test]
+    fn no_refine_collapses_to_run_generic_byte_identical() {
+        let prop = ToyProposer {
+            start: 50,
+            population: 4,
+        };
+
+        // A run that reaches Found (50 → 42 in 8 generations).
+        let fit_found = ToyFitness { target: 42 };
+        let base_found = run_generic(&prop, &fit_found, &NoScreen, 20, 0);
+        let mem_found_budget = run_memetic(
+            &prop,
+            &fit_found,
+            &NoScreen,
+            &NoRefine,
+            MemeticConfig {
+                elites: 2,
+                steps: 3,
+            },
+            20,
+            0,
+        );
+        let mem_found_zero = run_memetic(
+            &prop,
+            &fit_found,
+            &NoScreen,
+            &NoRefine,
+            MemeticConfig {
+                elites: 0,
+                steps: 3,
+            },
+            20,
+            0,
+        );
+        assert_eq!(
+            mem_found_budget, base_found,
+            "NoRefine (elites>0) == run_generic on a Found run"
+        );
+        assert_eq!(
+            mem_found_zero, base_found,
+            "elites:0 == run_generic on a Found run"
+        );
+
+        // A run that exhausts its budget (−100 is unreachable in 5 generations).
+        let fit_exh = ToyFitness { target: -100 };
+        let base_exh = run_generic(&prop, &fit_exh, &NoScreen, 5, 7);
+        let mem_exh = run_memetic(
+            &prop,
+            &fit_exh,
+            &NoScreen,
+            &NoRefine,
+            MemeticConfig {
+                elites: 2,
+                steps: 3,
+            },
+            5,
+            7,
+        );
+        assert_eq!(
+            mem_exh, base_exh,
+            "NoRefine == run_generic on an Exhausted run"
+        );
+    }
+
+    /// A screened-out **refiner-proposed** neighbor never reaches `score()` — the
+    /// §2.4 screen contract holds for the refinement pass too, while an admissible
+    /// neighbor is scored (proving the refiner path actually ran).
+    #[test]
+    fn refiner_neighbors_are_screened_before_score() {
+        struct DownOrThirteen; // proposes elite−1 (admissible) and 13 (screened)
+        impl Refiner<i64> for DownOrThirteen {
+            fn neighbors(&self, elite: &i64, _rng: &mut SplitMix64) -> Vec<i64> {
+                vec![*elite - 1, 13]
+            }
+        }
+        let prop = ToyProposer {
+            start: 50,
+            population: 3,
+        };
+        let fit = SpyFitness {
+            target: 42,
+            seen: RefCell::new(Vec::new()),
+        };
+        let _ = run_memetic(
+            &prop,
+            &fit,
+            &RejectThirteen,
+            &DownOrThirteen,
+            MemeticConfig {
+                elites: 1,
+                steps: 2,
+            },
+            3,
+            0,
+        )
+        .expect("memetic run");
+        let seen = fit.seen.into_inner();
+        assert!(
+            !seen.contains(&13),
+            "screened refiner-proposed neighbor 13 must never be scored"
+        );
+        assert!(
+            seen.contains(&49),
+            "the admissible refiner neighbor 49 must be scored — the refiner path ran"
+        );
+    }
+
+    /// Refinement never worsens the run: the engine keeps only strict
+    /// improvements, so `run_memetic`'s best cost is `<=` the `NoRefine` baseline's
+    /// at the same budget — even when the refiner also proposes worse neighbors.
+    #[test]
+    fn refinement_never_worsens_the_best() {
+        struct BetterAndWorse; // one strict improvement, one regression
+        impl Refiner<i64> for BetterAndWorse {
+            fn neighbors(&self, elite: &i64, _rng: &mut SplitMix64) -> Vec<i64> {
+                vec![*elite - 1, *elite + 5]
+            }
+        }
+        let prop = ToyProposer {
+            start: 50,
+            population: 4,
+        };
+        let fit = ToyFitness { target: 42 };
+        let cfg = MemeticConfig {
+            elites: 4,
+            steps: 2,
+        };
+        let (refined, _) =
+            run_memetic(&prop, &fit, &NoScreen, &BetterAndWorse, cfg, 3, 0).expect("refined run");
+        let (baseline, _) =
+            run_memetic(&prop, &fit, &NoScreen, &NoRefine, cfg, 3, 0).expect("baseline run");
+        assert!(
+            best_cost(&refined) <= best_cost(&baseline),
+            "refinement never worsens: refined best {} must be <= baseline best {}",
+            best_cost(&refined),
+            best_cost(&baseline),
         );
     }
 }
