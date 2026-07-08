@@ -39,5 +39,6 @@ pub use predicate::RankDecomposition;
 pub use prng::SplitMix64;
 pub use proposer::{GaConfig, GaProposer};
 pub use ufl_search::{
-    run_generic, Fitness, GenericOutcome, Ledger, NoScreen, Proposer, RunError, RunResult, Screen,
+    run_generic, run_memetic, Fitness, GenericOutcome, Ledger, MemeticConfig, NoRefine, NoScreen,
+    Proposer, Refiner, RunError, RunResult, Screen,
 };
