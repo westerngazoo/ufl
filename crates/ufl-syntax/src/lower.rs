@@ -59,7 +59,10 @@ fn lower_form(items: &[Sexpr], depth: usize) -> Result<Eml, LowerError> {
     };
     match head.as_str() {
         "eml" => match args {
-            [a, b] => Ok(Eml::node(lower_internal(a, depth + 1)?, lower_internal(b, depth + 1)?)),
+            [a, b] => Ok(Eml::node(
+                lower_internal(a, depth + 1)?,
+                lower_internal(b, depth + 1)?,
+            )),
             _ => Err(LowerError::Arity {
                 form: "eml".to_string(),
                 expected: 2,

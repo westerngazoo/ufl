@@ -94,7 +94,10 @@ fn ac1_constructors_produce_only_grammar_variants() {
 
     // AC1 — `Eml::node(a, b)` is an `eml` internal node over two subtrees.
     match Eml::node(Eml::one(), Eml::var("y")) {
-        Eml::Node { ref exp_arg, ref log_arg } => {
+        Eml::Node {
+            ref exp_arg,
+            ref log_arg,
+        } => {
             assert_eq!(**exp_arg, Eml::One);
             assert_eq!(**log_arg, Eml::Var("y".into()));
         }

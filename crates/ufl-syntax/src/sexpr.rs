@@ -231,7 +231,7 @@ mod tests {
         }
 
         let wide_ast = Sexpr::list(wide_items);
-        if let Sexpr::List(items) = wide_ast {
+        if let Sexpr::List(ref items) = wide_ast {
             assert_eq!(items.len(), 10_000);
             assert_eq!(items[0], Sexpr::Num(0.0));
             assert_eq!(items[9999], Sexpr::Num(9999.0));
