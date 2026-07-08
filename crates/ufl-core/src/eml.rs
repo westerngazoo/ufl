@@ -87,7 +87,10 @@ mod tests {
     fn ac1_node_constructor() {
         let n = Eml::node(Eml::one(), Eml::var("x"));
         match n {
-            Eml::Node { ref exp_arg, ref log_arg } => {
+            Eml::Node {
+                ref exp_arg,
+                ref log_arg,
+            } => {
                 assert_eq!(**exp_arg, Eml::One);
                 assert_eq!(**log_arg, Eml::Var("x".into()));
             }
