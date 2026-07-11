@@ -240,7 +240,7 @@ design.
 > receives only `&G` and `&mut SplitMix64` — **no target, no `Fitness`, and no
 > cost `S`** (the signature forbids conditioning on fitness — hater tightening;
 > only the engine's `argmin` consumes cost). A `Refiner` *instance* is constructed
-> from lane data only (the geometric one below carries only `sigma` — nothing
+> from lane data only (the geometric one below carries only a fixed constant ladder — nothing
 > task-specific — and perturbs grade-{0} slots). Therefore the proposer/refiner
 > pair is answer-blind **by construction as a signature invariant**, not merely an
 > instance property, and the memetic upgrade does not relax Verifier-Held
@@ -325,11 +325,16 @@ the error's `f64` bits into an ordered key with **non-finite ⇒ maximal cost**
 (the real-seam translation of SPEC-0011 §2.3's `Fit::WORST`; the engine minimizes,
 so "worst" is the top of the order). `solved(&s)` is `s <= ε_solve`.
 
-**(ii) `GeoProposer: Proposer<GeoExpr, S>`** — the tree-GA over `GeoExpr` from
-SPEC-0011 §2.2 (point mutation, subtree replacement/crossover, depth+size caps,
-`Exp` `Param` bounding), answer-blind, using `ufl_prng::SplitMix64`'s
-`f64_unit`/`normal`/`below` (all real, `ufl-prng/src/lib.rs`). **Unchanged in
-kind** from SPEC-0011 — cross-referenced, not restated.
+**(ii) `GeoProposer: Proposer<GeoExpr, S>`** — the tree-GA over `GeoExpr`,
+answer-blind, on `ufl_prng::SplitMix64`. *(Amended 2026-07-04: the realized
+operator set is a **simplification** of SPEC-0011 §2.2's list — elitism +
+tournament + subtree crossover + subtree-replace mutation + depth cap + the
+60-node anti-bloat cap; **no** same-arity op swap and **no** proposer-side
+`Param` perturbation — constant-tuning lives *solely* in the refiner. That is
+what makes the ablation contrast sharp: the arms differ only in `NoRefine`, and
+"refinement is load-bearing" means load-bearing relative to a proposer with no
+other constant-tuning operator. `Exp`-arg bounding is realized as a global
+`N(0,1).clamp(±3)` at Param sampling.)*
 
 **(iii) `GeoFitness: Fitness<GeoExpr, S>`** — the NaN-safe geometric cost.
 
@@ -388,28 +393,36 @@ impl Screen<GeoExpr> for GradeScreen {
 > SPEC-0011 §2.2 grade-seed-bias restriction, applied to the screen).
 
 **(v) `GeoParamRefiner: Refiner<GeoExpr>`** — the memetic step, over slots only.
+*(Amended 2026-07-04 post-review — §9.4 resolved by experiment: the earlier
+Gaussian-jitter sketch is replaced by the realized ±δ ladder.)*
 
 ```rust
-// crates/ufl-geo/src/… — perturbs grade-{0} Param slots; structure-blind.
-pub struct GeoParamRefiner { sigma: f64 }     // step scale; carries NO task data
+// crates/ufl-geo/src/lane.rs — the ±δ geometric ladder; structure-blind.
+pub struct GeoParamRefiner { ladder: Vec<f64> }   // 10⁻¹ … 10⁻¹¹; NO task data
 
 impl Refiner<GeoExpr> for GeoParamRefiner {
-    fn neighbors(&self, elite: &GeoExpr, rng: &mut SplitMix64) -> Vec<GeoExpr> {
-        // For each Param slot (and/or a joint jitter), clone the elite, perturb
-        // that slot by `rng.normal(0.0, self.sigma)` via `params_mut`, and emit
-        // the clone. Structure is never touched — only grade-{0} f64s move.
-        // Returns [] when the elite has no Param slots.
+    fn neighbors(&self, elite: &GeoExpr, _rng: &mut SplitMix64) -> Vec<GeoExpr> {
+        // For each Param slot and each rung δ, emit elite with slot ± δ
+        // (via params_mut). Structure never touched; [] when slot-free.
+        // Draws ZERO rng — so a refined run shares the ablation run's exact
+        // `vary` stream, and the contrast isolates refinement alone.
         // (The ENGINE scores these and keeps strict improvements — §2.1.)
     }
 }
 ```
 
+Why the ladder and not fixed-σ jitter (the realized experiment, PR #73):
+fixed-σ Gaussian jitter has a resolution floor (P[landing within 1e-6] ≈ 1e-6/σ)
+and **plateaued above the 1e-6 solve bar — 0/16**; the multi-scale ladder is the
+"fit the constants once the shape is right" mechanism and scored **6/16** (the
+pilot reference), ablation (`NoRefine`) **2/16** on the identical draw stream.
+
 Because it writes only through `params_mut` (§2.2), every neighbor it emits has
 **the same `typecheck` verdict as the elite** — so it can never turn an
 admissible elite into a screened-out one, and it can never change the genome's
-grade. It is answer-blind (carries only `sigma`) and structure-blind (slots are
-grade-{0} `Param`s). This is precisely the operator whose absence makes the
-ablation score 0/16.
+grade. It is answer-blind (carries only a fixed constant ladder) and structure-blind (slots are
+grade-{0} `Param`s). This is precisely the operator whose absence made the deleted pilot's
+ablation score 0/16 (the realized run: 2/16 — §9.4).
 
 **(vi) The task + translate-back.** The Gate-1 task is SPEC-0011 §2.4's forced
 general rotation: input `Var("v")`, target the `e₁→e₂` rotation applied to `v`,
@@ -448,7 +461,7 @@ crates/ufl-geo/src/{expr.rs|slots.rs}
 crates/ufl-geo/src/… (needs a new `ufl-search` dep — §0.3)
   + enum GeoLaneError { Eval(GeoError), Grade(GradeError) }   // SPEC-0014 §2.2
   + struct GradeScreen { ctx: GradeCtx };  impl Screen<GeoExpr> (typecheck)
-  + struct GeoParamRefiner { sigma: f64 }; impl Refiner<GeoExpr> (params_mut jitter)
+  + struct GeoParamRefiner { ladder: Vec<f64> }; impl Refiner<GeoExpr> (±δ ladder over params_mut)
 
 crates/ufl-evolve/src/
   + RotErr        // Copy+Ord total order over the rotation residual; non-finite ⇒ max
@@ -532,7 +545,7 @@ reference**, not a committed gate: **qa sets the threshold; a faithful
 re-implementation that scores below it and documents the shortfall satisfies
 AC6/R-0011 and still merges** (the honest-negative escape hatch the requirement
 guarantees is *not* overridden by this spec). To keep the number from becoming a
-tuning artifact, `MemeticConfig`'s `sigma`/`elites`/`steps` grid is **pre-registered
+tuning artifact, `MemeticConfig`'s `elites`/`steps` grid and the refiner's ladder are **pre-registered
 before** the gate run (§9.4), and SPEC-0011 §2.4's uniform-arity control carries
 over to the memetic run — the bar is a target, the *ablation* (0/16 vs. whatever
 the refined run scores) is the committed evidence.
@@ -632,10 +645,11 @@ caused it" clause above.
    seam grows by exactly one trait + one fn + one config (`Refiner`/`run_memetic`/
    `MemeticConfig`) — the minimal generic surface for local refinement on any lane.
 
-4. **Refinement neighborhood shape + `MemeticConfig` defaults.** Per-slot jitter
-   vs. joint all-slots jitter; `elites`/`steps`/`sigma` values. The pilot used
-   elite `Param`-refinement; exact defaults are set with qa against the ≥6/16 bar
-   (they are a means to the gate, not the gate).
+4. **RESOLVED by experiment (PR #73, 2026-07-04).** The neighborhood is the
+   per-slot **±δ geometric ladder** (10⁻¹…10⁻¹¹), zero-rng; pinned knobs
+   pop=400 / gens=400 / elites=6 / steps=8, seeds 0..16. Fixed-σ jitter measured
+   0/16 (resolution floor above the 1e-6 bar); the ladder 6/16; ablation 2/16.
+   qa ratifies the threshold at loop step 7 per R-0011 AC4.
 
 5. **Does refined-elite splicing perturb the `SplitMix64` draw order enough to
    shift the tree-GA trajectory vs. a hypothetical pre-memetic baseline?** The
@@ -646,6 +660,14 @@ caused it" clause above.
    reproduces the whole memetic trajectory.
 
 ---
+
+## 10b. Post-review amendments (2026-07-04, PR #73 architect findings)
+
+| Change | Evidence |
+|---|---|
+| §2.3(v): Gaussian-jitter sketch → the realized **±δ ladder** (zero-rng; shared `vary` stream between arms) | fixed-σ jitter **0/16** (plateaus above the 1e-6 bar) → ladder **6/16**, ablation **2/16** — recorded in PR #73's e2e, architect-reproduced |
+| §2.3(ii): the **realized** simplified GA operator set recorded; ablation meaning pinned | finding 6, PR #73 |
+| **Provenance note:** `theory/discovery-results.md` records only "local Param refinement" for the deleted pilot — the *ladder* attribution is recollection of deleted code. The **citeable** evidence for the ladder is PR #73's own 0/16-vs-6/16 experiment (the project's adopted lesson: every claim carries a runnable falsification). | — |
 
 ## 11. Three-lens resolutions (2026-07-03)
 
@@ -666,6 +688,8 @@ caused it" clause above.
 
 ## 10. Changelog
 
+- 2026-07-04 — §10b post-review amendments (PR #73): the ±δ ladder realized,
+  the simplified GA operator set recorded, §9.4 resolved by experiment.
 - 2026-07-03 — created (Draft). Extends Accepted SPEC-0011 with the memetic
   design (the `Refiner` seam, the typed param-slots, the geometric engine
   instances) against the real `ufl-search` (SPEC-0014) seam. Reconciled the T8

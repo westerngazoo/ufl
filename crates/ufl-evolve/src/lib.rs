@@ -9,5 +9,7 @@
 #![forbid(unsafe_code)]
 
 pub mod baseline;
+pub mod memetic;
 
 pub use baseline::{smallest_at, sweep, train_report, ArmFk, MlpReport};
+pub use memetic::{gate1_fitness, magnitude, GeoFitness, GeoProposer, RotErr};

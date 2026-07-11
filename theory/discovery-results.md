@@ -46,24 +46,30 @@ symmetry group, so this scheme **cannot be novel** — it is a known-optimal res
 object. A genuinely new result comes only from pointing the same engine at a tensor
 whose optimal rank is **open** (e.g. ⟨3,3,3⟩).
 
-**Reproducibility debt (honest).** The flip-graph proposer, the blind-GA arm, and
-the 20,000-pair check were **throwaway de-risk harnesses that have been deleted** —
-they are **not yet committed**. Per CLAUDE.md (test-first, trust nothing) the
-results above are **claims pending banked code**. The load-bearing next step is to
-commit the flip-graph as a real `Proposer` behind the R-0008 seam, with the
-certification as a regression test.
+**Debt paid (2026-07-02, PR #55).** The flip-graph is committed as
+`ufl_discovery::reduce_matmul` (SPEC-0013), with the certification, the
+20,000-pair bilinear check, and the trajectory replay as regression tests —
+the results above are banked, reproducible code, not claims.
 
-## Geometric — rediscovery of the τ/4 rotor sandwich
+## Geometric — rediscovery of the τ/4 rotor sandwich (BANKED, PR #73)
 
-A **memetic GA** (tree-structure search + local `Param` refinement) over `GeoExpr`
-rediscovered the τ/4 rotation: **6/16 seeds** (pure-GA §2.8 baseline 3/12; ablation
-without param-refinement **0/16** — refinement is the load-bearing step). Winners
-translate back through the real ufl-geo printer:
+**Committed and regression-gated** (2026-07-04, SPEC-0011M / R-0011 Gate-1): the
+memetic engine — the SPEC-0011 tree-GA on `run_memetic` with grade-`{0}`
+param-slot refinement via a **±δ geometric ladder** (10⁻¹…10⁻¹¹) — rediscovers
+the τ/4 rotation on **6/16 pinned seeds** at pop=400/gens=400 (architect-
+reproduced), with the ablation (`NoRefine`, **identical `vary` stream** — the
+ladder draws zero rng) at **2/16**: refinement triples the rediscovery rate, and
+the contrast isolates refinement alone. Winners render through the real printer:
 
-- seed 0: `Sandwich(Exp(GeoProduct(Param(−0.7854), Basis(3))), Var("v"))`
-  → `let R = exp(−0.785 e₁₂) ; R v ~R`  (−0.785 ≈ −τ/8 — the textbook rotor).
-- seed 4: the same rotation via the grade-lift route, `exp(𝒢₂(−0.785))`.
+- seed 9 (verbatim): `(~((v exp(e₁₂ 0.785)) 1)) exp(e₁₂ 0.785)` — the rotor
+  sandwich `R̃ v R`.
+- seed 8 (verbatim): `e₃ exp(𝒢_2(0.785))` — an alternate route to the same
+  rotation.
 
-**Honest:** robust at gens=400 / pop=400, only marginal at a low budget; a
-self-certified pilot (cargo test green), not yet qa-reviewed. The morph → discover
-→ translate-back loop closed on the real kernel (eval/typecheck/render).
+**Mechanism findings, measured in-repo (PR #73):** fixed-σ Gaussian refinement
+scored **0/16** (a resolution floor above the 1e-6 bar) — the multi-scale ladder
+is load-bearing, not refinement per se; and unbounded crossover stack-overflows
+without the 60-node anti-bloat cap. The earlier deleted-pilot narrative
+(6/16 vs 0/16 ablation, pure-GA 3/12) is retained as provenance only — the
+citeable evidence is the committed e2e (`crates/ufl-evolve/tests/r_0011m_gate1.rs`).
+qa ratifies the Gate-1 threshold at loop step 7 (R-0011 AC4).
