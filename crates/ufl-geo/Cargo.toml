@@ -9,6 +9,8 @@ repository.workspace = true
 
 [dependencies]
 ufl-ga = { path = "../ufl-ga" }
+ufl-prng = { path = "../ufl-prng" }
+ufl-search = { path = "../ufl-search" }
 thiserror = "2"
 
 [dev-dependencies]

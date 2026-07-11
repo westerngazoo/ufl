@@ -41,3 +41,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace
+
+  topology:
+    name: topology
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # SPEC-0011M §5: the pure engine crate must never gain a geometric edge.
+      - run: |
+          if cargo tree -p ufl-discovery -e no-dev | grep -E "ufl-geo|ufl-ga"; then
+            echo "TOPOLOGY VIOLATION: ufl-discovery depends on ufl-geo/ufl-ga" >&2
+            exit 1
+          fi

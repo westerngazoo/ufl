@@ -578,7 +578,9 @@ dependencies = [
 name = "ufl-evolve"
 version = "0.1.0"
 dependencies = [
+ "ufl-geo",
  "ufl-prng",
+ "ufl-search",
 ]
 
 [[package]]
@@ -595,6 +597,8 @@ dependencies = [
  "criterion",
  "thiserror",
  "ufl-ga",
+ "ufl-prng",
+ "ufl-search",
 ]
 
 [[package]]

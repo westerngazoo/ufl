@@ -18,10 +18,14 @@
 mod eval;
 mod expr;
 mod grade;
+mod lane;
 mod render;
+mod slots;
 
 pub use eval::{eval, GeoError};
 pub use expr::{Env, GeoExpr};
 pub use grade::{grade, typecheck, GradeCtx, GradeError};
+pub use lane::{GeoLaneError, GeoParamRefiner, GradeScreen};
 pub use render::render;
-pub use ufl_ga::GradeSet;
+pub use slots::{params, params_mut};
+pub use ufl_ga::{GradeSet, Mv};
