@@ -421,8 +421,8 @@ Because it writes only through `params_mut` (§2.2), every neighbor it emits has
 **the same `typecheck` verdict as the elite** — so it can never turn an
 admissible elite into a screened-out one, and it can never change the genome's
 grade. It is answer-blind (carries only a fixed constant ladder) and structure-blind (slots are
-grade-{0} `Param`s). This is precisely the operator whose absence makes the
-ablation score 0/16.
+grade-{0} `Param`s). This is precisely the operator whose absence made the deleted pilot's
+ablation score 0/16 (the realized run: 2/16 — §9.4).
 
 **(vi) The task + translate-back.** The Gate-1 task is SPEC-0011 §2.4's forced
 general rotation: input `Var("v")`, target the `e₁→e₂` rotation applied to `v`,
@@ -461,7 +461,7 @@ crates/ufl-geo/src/{expr.rs|slots.rs}
 crates/ufl-geo/src/… (needs a new `ufl-search` dep — §0.3)
   + enum GeoLaneError { Eval(GeoError), Grade(GradeError) }   // SPEC-0014 §2.2
   + struct GradeScreen { ctx: GradeCtx };  impl Screen<GeoExpr> (typecheck)
-  + struct GeoParamRefiner { sigma: f64 }; impl Refiner<GeoExpr> (params_mut jitter)
+  + struct GeoParamRefiner { ladder: Vec<f64> }; impl Refiner<GeoExpr> (±δ ladder over params_mut)
 
 crates/ufl-evolve/src/
   + RotErr        // Copy+Ord total order over the rotation residual; non-finite ⇒ max
@@ -545,7 +545,7 @@ reference**, not a committed gate: **qa sets the threshold; a faithful
 re-implementation that scores below it and documents the shortfall satisfies
 AC6/R-0011 and still merges** (the honest-negative escape hatch the requirement
 guarantees is *not* overridden by this spec). To keep the number from becoming a
-tuning artifact, `MemeticConfig`'s `sigma`/`elites`/`steps` grid is **pre-registered
+tuning artifact, `MemeticConfig`'s `elites`/`steps` grid and the refiner's ladder are **pre-registered
 before** the gate run (§9.4), and SPEC-0011 §2.4's uniform-arity control carries
 over to the memetic run — the bar is a target, the *ablation* (0/16 vs. whatever
 the refined run scores) is the committed evidence.
@@ -688,6 +688,8 @@ caused it" clause above.
 
 ## 10. Changelog
 
+- 2026-07-04 — §10b post-review amendments (PR #73): the ±δ ladder realized,
+  the simplified GA operator set recorded, §9.4 resolved by experiment.
 - 2026-07-03 — created (Draft). Extends Accepted SPEC-0011 with the memetic
   design (the `Refiner` seam, the typed param-slots, the geometric engine
   instances) against the real `ufl-search` (SPEC-0014) seam. Reconciled the T8
