@@ -48,9 +48,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      # SPEC-0011M §5: the pure engine crate must never gain a geometric edge.
+      # SPEC-0011M §5: the pure engine crate must never gain a geometric edge,
+      # and the pure seam crate stays ufl-prng-only. Output captured first so a
+      # cargo failure fails the step (never fails open).
       - run: |
-          if cargo tree -p ufl-discovery -e no-dev | grep -E "ufl-geo|ufl-ga"; then
+          set -euo pipefail
+          engine=$(cargo tree -p ufl-discovery -e no-dev)
+          if echo "$engine" | grep -E "ufl-geo|ufl-ga"; then
             echo "TOPOLOGY VIOLATION: ufl-discovery depends on ufl-geo/ufl-ga" >&2
+            exit 1
+          fi
+          seam=$(cargo tree -p ufl-search -e no-dev)
+          if echo "$seam" | grep -E "ufl-geo|ufl-ga|ufl-core|ufl-syntax|ufl-tensor|ufl-evolve|ufl-discovery"; then
+            echo "TOPOLOGY VIOLATION: ufl-search must stay ufl-prng-only" >&2
             exit 1
           fi

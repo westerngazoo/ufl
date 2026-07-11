@@ -55,13 +55,24 @@ fn slots_enumerate_the_same_preorder() {
 fn param_writes_never_change_the_typecheck_verdict() {
     let ctx = ctx_v1();
     let coherent = mixed_tree();
-    let incoherent = GeoExpr::Sandwich(
-        // A non-versor rotor slot: Param is grade {0}, not a versor — this tree
-        // typechecks to an Err regardless of the Param's value.
-        Box::new(GeoExpr::GradeLift(2, Box::new(GeoExpr::Param(0.0)))),
-        Box::new(GeoExpr::Var("v".into())),
-    );
+    // Genuinely incoherent: projecting grade 2 out of a grade-{0} Param is the
+    // empty grade set -> Err(Incoherent(..)) for EVERY Param value (the spec's
+    // canonical example; the Err payload embeds the Param, which is exactly why
+    // the invariant is scoped to is_ok/GradeSet, not "same Err").
+    let incoherent = GeoExpr::GradeProject(2, Box::new(GeoExpr::Param(0.0)));
     let poison = [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, 1e300, -1.0];
+
+    // Guard the fixtures themselves so neither arm can silently degenerate
+    // (the first "incoherent" fixture turned out to typecheck Ok — architect
+    // finding on PR #73): one arm MUST be Ok, the other MUST be Err.
+    assert!(
+        typecheck(&coherent, &ctx).is_ok(),
+        "coherent arm must be Ok"
+    );
+    assert!(
+        typecheck(&incoherent, &ctx).is_err(),
+        "incoherent arm must be Err"
+    );
 
     for tree in [coherent, incoherent] {
         let before = typecheck(&tree, &ctx);
@@ -88,7 +99,6 @@ fn param_writes_never_change_the_typecheck_verdict() {
 /// elite can never refine into a screened-out neighbor.
 #[test]
 fn refiner_neighbors_preserve_the_verdict_and_structure() {
-    let ctx = ctx_v1();
     let screen = GradeScreen::new(ctx_v1());
     let elite = mixed_tree();
     assert!(screen.admissible(&elite), "the elite is admissible");
@@ -125,5 +135,4 @@ fn refiner_neighbors_preserve_the_verdict_and_structure() {
     // A slot-free elite has no neighborhood.
     let bare = GeoExpr::Var("v".into());
     assert!(refiner.neighbors(&bare, &mut rng).is_empty());
-    let _ = ctx; // the shared input-grade context
 }

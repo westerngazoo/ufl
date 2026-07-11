@@ -122,10 +122,7 @@ fn run_one(seed: u64, refine: bool) -> (bool, Option<String>) {
         Ok((GenericOutcome::Found { genome, generation }, _)) => {
             (true, Some(format!("gen {generation}: {}", render(&genome))))
         }
-        Ok((GenericOutcome::Exhausted { best_score, .. }, _)) => {
-            let _ = best_score;
-            (false, None)
-        }
+        Ok((GenericOutcome::Exhausted { .. }, _)) => (false, None),
         Err(e) => panic!("gate-1 run failed structurally: {e}"),
     }
 }
