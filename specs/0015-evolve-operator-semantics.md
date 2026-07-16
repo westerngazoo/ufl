@@ -3,12 +3,13 @@
 - **Realizes:** [R-0015](../requirements/0015-evolve-operator-semantics.md)
   (Accepted) — AC1 (the move-form DSL), AC2 (the pre-registered three-set gate),
   AC2b (the headroom window), AC3 (the kill-criterion), C1–C7.
-- **Status:** **Draft — revised 2026-07-15 after the three-lens.** The hater's
-  mandatory pre-run *empirically refuted* the original ⟨2,2,2⟩→7 family (B0 solves
-  0/200 at budget ≤ 25,600 — no headroom window); Gustavo chose the planted-instance
-  path; the redundancy-scramble family's window was then **measured** (censoring
-  0.79 at splits=2, ~13 ms/search). This revision folds all architect/hater/nice-guy
-  findings (see §12). **Re-review (architect + hater) pending on this revision.**
+- **Status:** **CLOSED — §11 case-1 (no window demonstrated); Rung-5 DEFERRED, not
+  killed** (2026-07-16, Gustavo). The architecture (DSL, meta-loop, gate, decision
+  tree) was three-lens-validated, but the mandatory pre-run found **no headroom
+  window on any substrate UFL has built** — the probe was never armed. See §14 for
+  the measured outcome; the finding is banked in `theory/discovery-results.md`. This
+  spec stands as the **record of the investigation** and the ready-to-arm probe
+  architecture, for if a headroom-bearing substrate ever appears.
 - **Milestone:** the self-eval staircase, **Rung 4** — the *decision node*. A
   positive earns Rung-5 (the Lisp substrate); an *informative* negative kills it
   and redirects to object-level scaling + the reflection line (§11's decision tree
@@ -646,9 +647,40 @@ replaced.
 | **Nice-guy 2** — greedy `FlipBiased` sharpens both outcomes | §10 OQ2 promotes it as an opt-in constructor before arming |
 | **Nice-guy 3** — promote two patterns to `docs/conventions.md` | "Incumbent-in-the-Space" + "assert-the-process" — folded at implementation |
 
+## 14. Outcome (2026-07-16) — the measured negative, §11 case-1
+
+The probe was **never armed**, because the mandatory pre-run (§5.2) found **no
+headroom window** on any substrate built, measured across two:
+
+- **Matmul flip-graph — structurally dead.** rank-7 `T_2` is an isolated fixpoint
+  (`shared_factor_pairs == 0`), so every redundancy-scramble is a move-0 collapse
+  or the rank-8→7 needle; B0 solves **0/203 genuine scrambles at 12× budget**. No
+  scramble makes it graded. (The re-review caught that the first "window" conflated
+  move-0 `reduce` collapses with search solves — verified.)
+- **Geometric lane — B0 at the ceiling.** N=64: B0 ladder **0.375±0.061**; the best
+  N=16 candidate regresses to **0.312**; only *breaking* the ladder resolves as an
+  effect. Proposer hyperparameters spread only within noise. No move-shape clears a
+  2-SE beat over B0.
+
+Per §11's decision tree this is **case-1 (no window) → Rung-5 DEFERRED, not
+killed** — the probe never ran a fair gate, so nothing was decided *against* the
+thesis; there is simply no substrate to arm it on. **The redirect** (Gustavo,
+2026-07-16): R-0016 (reflection) + the object-level geometric record attempt, both
+of which stand independent of the Rung-4 verdict. The full finding — including the
+empty-frontier proof and the N=64 numbers — is banked in
+`theory/discovery-results.md`. One axis is left explicitly untested (novel proposer
+*operator types*); the two-substrate ceiling predicts it flat.
+
+**What this spec is now:** the validated, ready-to-arm probe architecture — kept
+intact so that if a substrate with a *demonstrated* headroom window ever appears,
+the DSL + meta-loop + three-set gate can be pointed at it without redesign.
+
 ## 13. Changelog
 
-- 2026-07-15 — revised after the three-lens: family → planted redundancy-scramble
-  (measured window); §11 decision tree; §3.1 small-step machine; §4 elitism +
-  `Ord`; §5.3 calibrated null; §2 cap clamps; §12 findings ledger. Re-review pending.
+- 2026-07-16 — **CLOSED (§11 case-1)**: pre-run found no headroom window on either
+  substrate (matmul isolated-fixpoint dead; geometric B0-at-ceiling at N=64);
+  Rung-5 deferred, not killed; redirect to R-0016 + object-level. §14 records it.
+- 2026-07-15 — revised after the three-lens: family → planted redundancy-scramble;
+  §11 decision tree; §3.1 small-step machine; §4 elitism + `Ord`; §5.3 calibrated
+  null; §2 cap clamps; §12 findings ledger.
 - 2026-07-14 — created (Draft).
