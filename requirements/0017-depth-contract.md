@@ -8,28 +8,36 @@
   (reflection): R-0016 shipped against a codec that is symmetric only for shallow
   ASTs; this makes it symmetric and panic-free for the deep, machine-generated ASTs
   the reflection loop makes normal.
-- **Supersedes:** the recursion-depth handling in PR #38 (heap-bounded eval — the
-  correct-in-spirit part is salvaged) and PR #40 (which capped only `read` at a
-  hard-coded 128 while the rest stayed unbounded). Both are closed pointing here.
+- **Supersedes:** the recursion-depth handling in PR #40 (which added a shared
+  `MAX_DEPTH = 128` cap consulted by `read`/`lower`/`Display` while `eval`/`eval_pred`
+  stayed uncapped) — this **removes** that cap. PR #38's heap-bounded `eval` was
+  never merged (`eval` is still recursive on `main`); its correct-in-spirit shape is
+  reimplemented here. Both PRs are closed pointing here.
 
 ## Context
 
-Recursion-depth policy on the exact surface the reflection loop owns is three
-uncoordinated accidents:
+Recursion-depth policy on the exact surface the reflection loop owns is a set of
+uncoordinated accidents (verified against `main`, 2026-07-16):
 
-- **`read`** is capped at a hard-coded `MAX_DEPTH = 128` (PR #40), while
-- **`Sexpr` construction**, **`Display`** printing (`sexpr.rs`), **`lower`**
-  (`lower.rs`), **`eval`**, and **`eval_pred`** are unbounded-recursive, and
-- the **`Box`-recursive `Drop`** of `Eml`/`Sexpr` overflows the stack on deep trees
-  (PR #40 fixed only `Sexpr`'s `Drop`; `Eml`'s is still recursive).
+- **`read`** (`read.rs:111`) and **`lower`** (`lower.rs:37`) are recursive and
+  **capped** at the shared `ufl_core::get_max_depth()` (default 128, PR #40),
+  returning `RecursionDepthExceeded`.
+- **`Display::fmt_internal`** (`sexpr.rs:52`) is recursive and capped **returning
+  `fmt::Error`** — a *latent panic*: `Sexpr::to_string()` on a deeper-than-cap tree
+  panics (the `ToString` contract turns a `fmt::Error` into a panic).
+- **`eval`** (`eval.rs`) and **`eval_pred`** (`eval_pred.rs:95,99,116,124`) are
+  recursive and **uncapped** — a genuine **stack overflow** on deep trees.
+- The **`Drop`** of `Eml` (`eml.rs:42`) and `Sexpr` (`sexpr.rs:35`) are **already
+  iterative** (PR #40) — so those are a regression guard, not new work.
 
 The asymmetry is the bug: the system happily *builds* 1000-deep `Sexpr`s (#35's own
-test does), and `Display` happily *prints* them, but `read` **rejects** anything
-deeper than 128 — so `read(print(x))` breaks the **round-trip invariant**
+test does), but `read` **rejects** anything deeper than 128 while `Display` panics
+and `eval` overflows — so `read(print(x))` breaks the **round-trip invariant**
 (`sexpr.rs` — the reader/printer codec) that R-0016's `quote`/`eval` are built on.
 Once programs are machine-generated (the SPEC-0011 pilot already produced an 11 MB
 runaway render), deep ASTs re-read as input are the *normal* case, and a stack
-overflow anywhere is a **panic in library code** — forbidden by CLAUDE.md §6.
+overflow or `to_string` panic anywhere is a **panic in library code** — forbidden by
+CLAUDE.md §6.
 
 ## Requirement
 
@@ -51,12 +59,13 @@ depth: `read` accepts exactly what `Display` emits.
    completes the direction #38 (heap-bounded eval) and #40 (iterative `Sexpr` Drop)
    already started, coherently, instead of mixing an iterative `Drop` with a capped
    `read`.
-2. **Salvage the correct-in-spirit prior work.** Reuse #38's heap-bounded `eval`
-   shape and #40's iterative `Sexpr` `Drop` — but **without** #38's three bare
-   `values.pop().unwrap()`s (§6: no `unwrap` in lib code — use typed
-   unreachable-justified handling or a `Result`), keeping the `log.rs` SPEC-0001
-   §2.4 branch-convention comment and making the doc comments truthful (`eval.rs`
-   must not still say "Recursive post-order walk").
+2. **Reimplement `eval`/`eval_pred`/`read`/`lower`/`Display` iteratively; keep the
+   iterative `Drop`s.** The `Eml`/`Sexpr` `Drop`s are already iterative (regression-
+   guarded, not rewritten). The new iterative `eval` must reproduce #38's
+   heap-bounded shape **without** any bare `values.pop().unwrap()` (§6: no `unwrap`
+   in lib code), **preserve the `eml(exp_arg, log_arg)` post-order convention**
+   (SPEC-0001 §2.4 — exp child before log child, `exp(x) − ln_eml(y)`), and make the
+   doc comments truthful (`eval.rs` must not still say "Recursive post-order walk").
 3. **No new typed error is required by the no-cap policy** — depth is no longer a
    failure mode. Existing parse/lower errors (`ReadError`, `LowerError`) are
    unchanged; this requirement removes a failure mode, it does not add one.
@@ -72,8 +81,9 @@ depth: `read` accepts exactly what `Display` emits.
 - **AC2 (symmetric codec).** For a sweep of depths spanning past the old 128 cap, a
   fuzz test proves `read` **accepts** exactly what `Display` **emits** — the codec
   is symmetric at every depth (no depth at which print-emits but read-rejects).
-- **AC3 (bounded Drop).** A **10⁵-deep** `Eml` **and** a 10⁵-deep `Sexpr` each drop
-  without stack overflow (the leak both PRs missed for `Eml`).
+- **AC3 (bounded Drop — regression guard).** A **10⁵-deep** `Eml` **and** a 10⁵-deep
+  `Sexpr` each drop without stack overflow. (Both `Drop`s are already iterative on
+  `main`; this pins them so a future refactor cannot silently re-recurse.)
 - **AC4 (no panics in lib code).** `grep -rE 'unwrap|expect|panic!' crates/ufl-core/src crates/ufl-syntax/src crates/ufl-predicate/src` shows **zero** hits in library code (test modules excluded), and every remaining `unreachable!` carries a justifying message per §6.
 - **AC5 (doc truthfulness + supersession).** No doc comment describes an iterative
   function as "recursive"; PRs #38 and #40 are **closed with supersession notes**
