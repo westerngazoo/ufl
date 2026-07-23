@@ -43,12 +43,26 @@ CLAUDE.md §6.
 
 Exactly **one** recursion-depth policy across the whole code↔data surface:
 **iterative implementations everywhere, with no depth cap and no magic constant.**
-`read`, `Display`, `lower`, `eval`, `eval_pred`, and the `Drop` of `Eml` and
-`Sexpr` each walk their trees with an explicit heap-allocated work-stack (or
-equivalent), so an AST of any depth the machine can allocate is read, lowered,
-evaluated, printed, re-read, and dropped **without stack overflow and without a
-panic in library code**. The reader/printer codec becomes symmetric at *every*
-depth: `read` accepts exactly what `Display` emits.
+**Every** recursive tree-walk on the `Sexpr`/`Eml` code↔data surface walks with an
+explicit heap work-stack — so an AST of any depth the machine can allocate is read,
+lowered, evaluated, printed, re-read, cloned, compared, raised, and dropped
+**without stack overflow and without a panic in library code**. The class to close
+(scope expanded 2026-07-23 after the three-lens proved the 5-walk scope insufficient
+— see below):
+
+- `read`, `Display` (`Sexpr`), `lower`, `eval`, `eval_pred` — recursive today.
+- **`Sexpr::Clone`/`PartialEq` and `Eml::Clone`/`PartialEq`** — *derived, hence
+  recursive*; **`eq?` compares `Sexpr`s with `==` and `eval_syntax` `.clone()`s
+  quote children** (`eval_pred.rs:110,182`), so `(eq? (quote DEEP))` and
+  `(eval (quote DEEP))` — the reflection forms this requirement exists to harden —
+  currently **abort in library code**. Hand-written iterative `Clone`/`PartialEq`
+  replace the derives.
+- **`raise: &Eml → Sexpr`** (`lower.rs:86`) — recursive, uncapped; the `Eml → Sexpr`
+  leg of the same round-trip codec.
+- `Eml`/`Sexpr` `Drop` — **already iterative** (#40); regression-guarded.
+
+The reader/printer codec becomes symmetric at *every* depth (`read` accepts exactly
+what `Display` emits), and no deep code↔data operation aborts in library code.
 
 ## Load-bearing scoping decisions (stated here so the spec cannot drift)
 
@@ -75,16 +89,25 @@ depth: `read` accepts exactly what `Display` emits.
 
 ## Acceptance criteria
 
-- **AC1 (round-trip at depth).** A `ufl-prng`-generated **depth-10⁵** `Sexpr`
-  survives `read → lower → eval → print → read` with an identical result and **no
-  stack overflow and no panic**. (The reflection loop's deep-AST case, made a test.)
+- **AC1 (round-trip at depth).** A **depth-10⁵** `Sexpr` (built iteratively)
+  survives the codec: `display(read(display(s))) == display(s)` — a **`String`
+  comparison**, since tree `==` is itself recursive (a `10⁵`-deep derived
+  `PartialEq` aborts; that recursion is *in scope* per §Clone/PartialEq above, but
+  AC1 must not depend on it to test the codec). An `(eml x (eml x …))` depth-10⁵
+  spine survives `read → lower → eval` returning a `Value` with no overflow/panic.
 - **AC2 (symmetric codec).** For a sweep of depths spanning past the old 128 cap, a
   fuzz test proves `read` **accepts** exactly what `Display` **emits** — the codec
   is symmetric at every depth (no depth at which print-emits but read-rejects).
 - **AC3 (bounded Drop — regression guard).** A **10⁵-deep** `Eml` **and** a 10⁵-deep
   `Sexpr` each drop without stack overflow. (Both `Drop`s are already iterative on
   `main`; this pins them so a future refactor cannot silently re-recurse.)
-- **AC4 (no panics in lib code).** `grep -rE 'unwrap|expect|panic!' crates/ufl-core/src crates/ufl-syntax/src crates/ufl-predicate/src` shows **zero** hits in library code (test modules excluded), and every remaining `unreachable!` carries a justifying message per §6.
+- **AC4 (no panics in lib code).** The **callsite-anchored** grep
+  `grep -rnE '\.unwrap\(|\.expect\(|panic!\(' crates/{ufl-core,ufl-syntax,ufl-predicate}/src`
+  (test modules excluded) shows **zero** hits — anchored so it does not false-match
+  `unexpected`/`expected` (R-0017's original loose pattern was unsatisfiable). Every
+  remaining `unreachable!` carries a justifying message per §6. **AC4b:**
+  `(eq? (quote DEEP))` and `(eval (quote DEEP))` at depth 10⁵ complete without a
+  library-code abort (the reflection-path guarantee the scope expansion delivers).
 - **AC5 (doc truthfulness + supersession).** No doc comment describes an iterative
   function as "recursive"; PRs #38 and #40 are **closed with supersession notes**
   pointing to this requirement; the one-policy decision (and that there is no
