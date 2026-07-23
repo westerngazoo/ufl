@@ -1,13 +1,13 @@
 # SPEC-0017 — One iterative depth contract
 
 - **Realizes:** [R-0017](../requirements/0017-depth-contract.md) AC1–AC5.
-- **Status:** **Draft — revised 2026-07-23 after the three-lens.** Nice-guy *SOLID*,
-  architect *approve-with-changes*, hater *needs-work*. The hater proved (by running
-  the code) that the original 5-walk scope leaves `Sexpr`/`Eml`'s **derived recursive
-  `Clone`/`PartialEq`** aborting `(eq?/eval (quote DEEP))` in library code — so
-  **scope expanded (Gustavo) to close the whole class**: + iterative `Clone`/
-  `PartialEq` (`Sexpr`+`Eml`) + iterative `raise`. All findings folded (§5 ledger).
-  **Re-review pending.**
+- **Status:** **Accepted** (2026-07-23) — three-lens complete. Round 1: nice-guy
+  *SOLID*, architect *approve-with-changes*, hater *needs-work* (proved the 5-walk
+  scope aborts `(eq?/eval (quote DEEP))` in library code → **scope expanded, Gustavo,
+  to close the class**: + iterative `Clone`/`PartialEq`/`raise`). Round 2: architect
+  *approve-with-changes* (all resolved; the `pred`-is-not-a-leaf + clippy-AC4 fixes
+  folded), hater corroborated the `pred` tail-call/TCO trap before an infra watchdog
+  cut it short. All findings resolved (§5). Gustavo holds final approval for the PR.
 - **Crates:** `ufl-core` (`eval`, `Eml` `Clone`/`PartialEq`, delete `depth`),
   `ufl-syntax` (`read`, `lower`, `raise`, `Sexpr` `Display`/`Clone`/`PartialEq`),
   `ufl-predicate` (`eval_pred`). No new crate; no new public API (the derives become
@@ -162,9 +162,22 @@ enum Frame<'a> {
     And(std::slice::Iter<'a, Sexpr>),   // resume: pop the last bool, short-circuit on false
     Or(std::slice::Iter<'a, Sexpr>),    // resume: pop the last bool, short-circuit on true
     Not,                                // resume: pop, push its negation
-    // =, eq?, pred, true/false are LEAVES inside Eval — compute one bool, push it.
+    // ONLY =, eq?, true, false are LEAVES inside Eval — compute one bool, push it.
 }
 ```
+
+**`(pred e)` is NOT a leaf (architect + hater — the TCO trap).** `(pred e)` =
+`eval_pred(e)` (`eval_pred.rs:94`), nestable like `not`, so computing its bool
+"locally" means a recursive `eval_pred(e)` — the exact overflow this kills. The
+`Eval` arm handles it by an eager arity check then **`push Eval(e)` with no resume
+frame** (`pred` is the identity on its operand's bool). This matters doubly: the
+hater measured a recursive `(pred)^d` *surviving 100k in `--release`* because the
+compiler TCO's its tail call — so a recursive-`pred` regression is **invisible in
+release** and only the debug-pinned arena (§2.9) catches it.
+
+**Zero-arg base cases (architect):** `(and)`→`true`, `(or)`→`false` vacuously
+(`eval_pred.rs:114-128`); the `Eval` arm pushes the identity when the operand
+iterator is empty, rather than launching a nonexistent operand 0.
 
 **The driver invariants (hater — the two ways and/or machines break):**
 1. **Net +1 boolean per sub-eval.** Every `Eval(p)` pushes exactly one boolean onto
@@ -220,10 +233,14 @@ harness's own re-exec) asserting a **clean exit status** — because a stack ove
 an `abort()`, *not* a catchable panic: a child *thread* cannot `join()` it (the prior
 draft's claim was wrong — architect + hater), and on the main thread it takes the whole
 test binary down. Pass signal: "the subprocess exits 0 at depth 10⁵"; a recursive
-regression exits non-zero (SIGABRT) → the assertion fails. Deep fixtures are **built
-iteratively** (a recursive generator would itself overflow); the codec fixture
-(`ufl-prng` arbitrary-head spine) is **distinct** from the `(eml x (eml x …))` spine
-the `lower→eval` leg needs (only `eml`-spines lower — hater).
+regression exits non-zero (SIGABRT) → the assertion fails. **The arena bin is pinned
+to the `dev` (debug) profile (architect + hater):** the hater measured a recursive
+tail-call (`pred`) *surviving 100k in `--release`* because the compiler TCO's it, so a
+release arena would **false-pass** a tail-recursive regression at any depth; debug (no
+TCO) reliably overflows. Deep fixtures are **built iteratively** (a recursive generator
+would itself overflow); the codec fixture (`ufl-prng` arbitrary-head spine) is
+**distinct** from the `(eml x (eml x …))` spine the `lower→eval` leg needs (only
+`eml`-spines lower — hater).
 
 1. **T-roundtrip-1e5** (AC1): a depth-10⁵ `Sexpr` satisfies
    `display(read(display(s))) == display(s)` — a **`String`** compare, never tree
@@ -255,10 +272,14 @@ the `lower→eval` leg needs (only `eml`-spines lower — hater).
     `MAX_DEPTH`/`RecursionDepthExceeded` token remains in `crates/*/src` **or
     `crates/*/tests`** (the stale test lives in `tests/`, invisible to a src-only
     grep — hater).
-13. **T-no-panic** (AC4): the **callsite-anchored** `grep -rnE
-    '\.unwrap\(|\.expect\(|panic!\('` over the three crates' `src` (test modules
-    excluded) is zero — the loose `unwrap|expect|panic!` pattern false-matches
-    `unexpected`/`expected` and is unsatisfiable (architect + hater).
+13. **T-no-panic** (AC4): realized as a **clippy lint, not a grep** (architect — a
+    grep cannot exclude inline `#[cfg(test)]` modules, and 5 genuine `.expect(`/
+    `panic!(` live in test modules in `src/`: `eml.rs:97`, `sexpr.rs:183,239`,
+    `ufl-predicate/src/lib.rs:99,150`). Add per-crate
+    `#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used,
+    clippy::panic))]` — exempts tests by construction, folds into the existing
+    `cargo clippy --all-targets -- -D warnings` merge gate. `unreachable!` with a
+    message stays permitted.
 
 ## 3. Non-goals
 
@@ -309,18 +330,33 @@ proved the 5-walk scope aborts on the reflection path.
 | **Nice-guy** — promote the idiom + the arena to `conventions.md` | §6 deliverable (arena **corrected** to subprocess, not thread) |
 | **Nice-guy** — spec under-claims the R-0016 payoff | §Context/AC4b: `(eval (quote DEEP))` becomes total |
 
+**Round 2 (on the revision):**
+
+| Lens · finding | Resolution |
+|---|---|
+| **Architect (MAJOR)** — `pred` misclassified as a leaf (it's `eval_pred(e)`, nestable) → a recursive-`pred` regression | §2.6: `(pred e)` is a tail-launch `push Eval(e)`, no resume frame; removed from "leaves" |
+| **Architect (MAJOR)** — AC4 grep can't exclude inline `#[cfg(test)]` (5 real `.expect`/`panic!` in `src/` test mods) | §2.9 test-13 + AC4: **clippy lint** `deny(clippy::{unwrap,expect,panic}_used)` cfg-gated `not(test)` |
+| **Hater (round-2, corroborating)** — recursive `(pred)^d` *survives 100k in release* (TCO) → release arena false-passes | §2.9: arena bin **pinned to `dev`/debug** (no TCO) |
+| **Architect (MINOR)** — `(and)`/`(or)` zero-arg base case | §2.6: empty operand-iter pushes the identity (`true`/`false`) |
+| **Architect (MINOR)** — no `decisions/` dir exists (CLAUDE.md §8 unspecified) | §6: implementer establishes/confirms the decision-log location |
+
 ## 6. Deliverables (AC5 + the promotions)
 
 - Close **PR #38 and #40** with supersession notes pointing to R-0017.
-- Decision-log entry: the one-policy/no-constant decision + the scope expansion.
+- Decision-log entry: the one-policy/no-constant decision + the scope expansion
+  (establish/confirm the `decisions/` location — none exists yet; CLAUDE.md §8 is
+  silent on it, so the implementer picks and records it).
 - `docs/conventions.md`: **Explicit-Stack Tree Walk** (per-site, no shared helper;
   push-order comment + differential order-tripwire mandatory) and **Bounded-Stack
   Regression Arena** (the **subprocess** technique — corrected from the thread claim).
 
 ## 7. Changelog
 
-- 2026-07-23 — revised after the three-lens: scope **expanded** to close the class
-  (+ iterative `Clone`/`PartialEq`/`raise`); subprocess test arena; real `eval_pred`
-  heads; `read` `TrailingTokens`; the `EvalError` variant + `pub mod` line; grep
-  patterns; delete the stale `r_0003` cap test; §5 ledger. Re-review pending.
+- 2026-07-23 (round 2) — **Accepted**: `pred` tail-launch (not a leaf; the TCO
+  trap); AC4 as a clippy lint (not a grep); arena pinned to debug; `(and)`/`(or)`
+  base cases; decision-log location note.
+- 2026-07-23 (round 1) — revised after the three-lens: scope **expanded** to close the
+  class (+ iterative `Clone`/`PartialEq`/`raise`); subprocess test arena; real
+  `eval_pred` heads; `read` `TrailingTokens`; the `EvalError` variant + `pub mod` line;
+  callsite-anchored patterns; delete the stale `r_0003` cap test; §5 ledger.
 - 2026-07-16 — created (Draft).

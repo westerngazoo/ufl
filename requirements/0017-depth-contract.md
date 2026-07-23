@@ -101,10 +101,11 @@ what `Display` emits), and no deep code↔data operation aborts in library code.
 - **AC3 (bounded Drop — regression guard).** A **10⁵-deep** `Eml` **and** a 10⁵-deep
   `Sexpr` each drop without stack overflow. (Both `Drop`s are already iterative on
   `main`; this pins them so a future refactor cannot silently re-recurse.)
-- **AC4 (no panics in lib code).** The **callsite-anchored** grep
-  `grep -rnE '\.unwrap\(|\.expect\(|panic!\(' crates/{ufl-core,ufl-syntax,ufl-predicate}/src`
-  (test modules excluded) shows **zero** hits — anchored so it does not false-match
-  `unexpected`/`expected` (R-0017's original loose pattern was unsatisfiable). Every
+- **AC4 (no panics in lib code).** Enforced by a **clippy lint**, not a grep (a grep
+  cannot exclude inline `#[cfg(test)]` modules): each crate carries
+  `#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used,
+  clippy::panic))]`, so `cargo clippy --all-targets -- -D warnings` (the existing
+  merge gate) fails on any `.unwrap()`/`.expect()`/`panic!` in non-test code. Every
   remaining `unreachable!` carries a justifying message per §6. **AC4b:**
   `(eq? (quote DEEP))` and `(eval (quote DEEP))` at depth 10⁵ complete without a
   library-code abort (the reflection-path guarantee the scope expansion delivers).
