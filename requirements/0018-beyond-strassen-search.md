@@ -66,6 +66,34 @@ papers use.
   claimed reduction is discharged through `RankDecomposition`; the budget, seeds,
   and strategy are pre-registered before the run (the pre-run discipline).
 
+## 3b. De-risk findings (2026-07-24, measured before spec — the discipline)
+
+A throwaway rectangular pilot measured the gate *before* speccing an engine:
+
+- **⟨2,2,3⟩ naive-start random-flip (eager-reduce), 300k flips, 12 seeds → 0/12.**
+  Best rank stays **12** (= naive); zero reduction. Same as ⟨3,3,3⟩ (rank 27, 0
+  progress at 1M).
+- **⟨2,2,3⟩ greedy steepest-descent-on-rank, 4000 steps, 20 seeds → 0/20**, and —
+  the diagnostic — **no single flip from naive ever lowers the rank**. The 12→11
+  reduction is therefore **behind a plateau**: it needs a long *rank-preserving*
+  flip walk before a reduction flip appears. Greedy can't climb a plateau; random
+  doesn't wander far enough.
+- **Diagnosis / what the real build needs.** This matches the Kauers–Moosbauer
+  method exactly: they cross these plateaus with **10⁸–10⁹ flips** and a
+  **fixed-rank walk** (accept rank-equal flips; do *not* eager-reduce; a reduction
+  is a rare event along the plateau). Our pilot used ~10⁵ flips with eager reduce —
+  **~1000× too few and the wrong walk structure.** So AC3 rung (a) [naive random /
+  greedy] is **measured-refuted**; the real attempt is the fixed-rank plateau walk
+  at a ≥10⁸-flip budget (which is laptop-feasible at ~µs/flip ≈ minutes for one
+  target — the open question is whether the *plateau is crossable at all* at that
+  scale, not whether the compute exists).
+
+**Consequence for the spec:** SPEC-0018's search is the **fixed-rank plateau walk**
+(the record papers' actual method), not the eager-reduce random/greedy the pilot
+refuted. The gate (⟨2,2,3⟩ 12→11 certified) is unchanged; the escalation ladder
+becomes: fixed-rank walk at 10⁸ → 10⁹ flips; then start-from-known; then the
+documented negative.
+
 ## 4. Non-goals
 
 - **Beating the ⟨3,3,3⟩ record** — measured out of laptop reach; not attempted.
