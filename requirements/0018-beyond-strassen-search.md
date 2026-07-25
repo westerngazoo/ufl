@@ -1,7 +1,7 @@
 # R-0018 — Smarter search for a certified beyond-⟨2,2,2⟩ matmul reduction
 
-- **Status:** **Draft** — discuss phase (acceptance criteria proposed below, to be
-  decided together per CLAUDE.md §1.2/§4.1).
+- **Status:** **Accepted** (ACs confirmed by Gustavo 2026-07-24; de-risk banked
+  §3b). Realized by SPEC-0018.
 - **Milestone:** M5 object-level discovery — the honest, laptop-scale "redo
   AlphaTensor from our perspective."
 - **Depends on:** R-0013 / SPEC-0013 (the flip-graph — proven to certify Strassen
