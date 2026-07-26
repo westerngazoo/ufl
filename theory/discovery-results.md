@@ -6,6 +6,36 @@ verifier-certified and load-bearing for R-0013 (matmul Gate-0) and R-0011
 (geometric Gate-1). See [two-language-substrate](two-language-substrate.md) for
 how they fit the architecture.
 
+## Matmul — a certified rank-11 ⟨2,2,3⟩ scheme (BEYOND Strassen, 2026-07-24)
+
+**The first certified matmul reduction beyond the ⟨2,2,2⟩ special case** (R-0018 /
+SPEC-0018). The *same* flip-graph engine — **unmodified** `reduce_matmul_with`,
+eager-reduce — run over a **square-embedded** ⟨2,2,3⟩ naive (slots padded to `d=6`,
+so it reuses the existing square `Triple`/verifier with no `ufl-tensor` change)
+reaches a **rank-11 ternary scheme** (naive 12) at **10⁶ flips, seed 3**, certified
+by the exact verifier: `RankDecomposition::for_target(target_embedded, 11)
+.discharge == Ok(true)` (rank-12 check `Ok(false)`), plus **50,000 random 2×2·2×3
+bilinear re-derivations** of `C=A·B`. Reproduced independently before banking.
+
+**Honest scope (as with Strassen):** rank-11 is **Hopcroft–Kerr optimal** for
+⟨2,2,3⟩, so the *object* is re-derived, not novel — the win is **method reach**: the
+correctness-first engine cracked a *rectangular*, beyond-textbook target it had never
+touched, and the result arrives as a **theorem (verifier-certified), not a candidate
+needing a check** — the differentiator vs FunSearch/AlphaEvolve.
+
+**Mechanism measured (the hater's diagnosis, which corrected a borrowed assumption):**
+the 12→11 crossing is a **two-level plateau** — (1) *reach* rank 11 (~6–12% of seeds
+at 10⁶), then (2) *land on a ternary state* (the rank-11 plateau is **~99.999%
+non-ternary, ≈1:135,000**); the loop's `is_ternary()` early-stop is the load-bearing
+**terminal filter**. A fixed-rank walk (the plan borrowed from KM's ⟨3,3,3⟩ record
+scale) measured **worse (0/32)** — the "10⁸-flip fixed-rank" hypothesis was withdrawn:
+eager-reduce at 10⁶ is the method. *(Lesson banked: a borrowed constant is not a
+measurement, even when a correct diagnosis backs it.)* Ternary existence is settled —
+a Strassen-7 ⊕ matvec-4 block scheme certifies. **What this earns (Gustavo):** the
+"if matmul succeeds we can generalize" step — the plateau walk lifts to a general
+`run_walk<Workspace, Move>` (SPEC-0018 §5), next target boolean-circuit minimization
+via the R-0014 exact truth-table verifier.
+
 ## Matmul — an exact rank-7 decomposition of T₂ (Strassen-grade)
 
 Beats the naive rank 8. Found by a **Kauers–Moosbauer flip-graph over exact

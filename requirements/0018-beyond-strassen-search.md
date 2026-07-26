@@ -88,11 +88,38 @@ A throwaway rectangular pilot measured the gate *before* speccing an engine:
   target — the open question is whether the *plateau is crossable at all* at that
   scale, not whether the compute exists).
 
-**Consequence for the spec:** SPEC-0018's search is the **fixed-rank plateau walk**
-(the record papers' actual method), not the eager-reduce random/greedy the pilot
-refuted. The gate (⟨2,2,3⟩ 12→11 certified) is unchanged; the escalation ladder
-becomes: fixed-rank walk at 10⁸ → 10⁹ flips; then start-from-known; then the
-documented negative.
+**Consequence for the spec:** ~~SPEC-0018's search is the fixed-rank plateau walk~~
+— **SUPERSEDED by §3c.**
+
+## 3c. Correction + the WON gate (2026-07-24, measured — §3b's conclusion was wrong)
+
+§3b's *diagnosis* (the 12→11 reduction is behind a plateau) was right; its
+*conclusion* was **borrowed, not measured** — the "10⁸–10⁹ flips, fixed-rank walk"
+figure is Kauers–Moosbauer's **⟨3,3,3⟩-record** scale, imported to ⟨2,2,3⟩ without
+justification. That is the exact anti-pattern this project exists to prevent, and
+the hater caught it. **Measured (hater + reproduced independently, seed 3):**
+
+- The **existing, unmodified eager-reduce `reduce_matmul_with` loop** crosses ⟨2,2,3⟩
+  12→11 and returns a **certified rank-11 ternary scheme** (`for_target(…,11)
+  .discharge = Ok(true)`; 50k random bilinear re-derivations pass) — at **10⁶ flips**,
+  ~100× *below* the borrowed claim.
+- A **fixed-rank walk got 0/32** — measured *worse*, not better. AC3's rung (a) is
+  **vindicated**, not refuted; §3b's "the real method is fixed-rank" is withdrawn.
+- The plateau is **two-level**: (1) *reach* rank 11 (~6–12% of seeds at 10⁶; hard
+  seeds cross by 10⁸), then (2) *land on a ternary state* — the rank-11 plateau is
+  **~99.999% non-ternary (≈1:135,000)**, so the loop's `is_ternary()` early-stop is
+  the load-bearing **terminal filter** that catches a rare ternary moment. Budget
+  matters because more rank-11 samples = more ternary draws, not because of a deeper
+  plateau.
+- A **ternary rank-11 ⟨2,2,3⟩ demonstrably exists** (a Strassen-7 ⊕ matvec-4 block
+  scheme certifies), so the gate is well-posed — the only question was reachability,
+  now answered **yes**.
+
+**AC2 is MET.** The corrected method is the eager-reduce loop over `naive_embedded`
+with the `is_ternary` terminal filter; the gate is a **pinned seed** (seed 3 @ 10⁶,
+~5 s — the `r_0013` pattern), with a seed-block robustness run at 10⁸ optional. The
+lesson (banked): *even a diagnosis-backed conclusion is a hypothesis until the target
+itself is measured — a borrowed constant is not a measurement.*
 
 ## 4. Non-goals
 
