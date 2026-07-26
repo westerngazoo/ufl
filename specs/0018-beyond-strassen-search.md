@@ -4,7 +4,11 @@
   2026-07-24) — a certified matmul reduction beyond the ⟨2,2,2⟩ special case, via
   rectangular support + a record-scale plateau walk. The falsifiable gate is
   **⟨2,2,3⟩ 12→11 certified**.
-- **Status:** **Draft** — three-lens pending.
+- **Status:** **Draft — round 1 three-lens: nice-guy STRONG WORK; architect + hater
+  died on infra errors but both surfaced the `Triple`-equal-length feasibility wall,
+  now RESOLVED via the verified square-embedding (§1.1, §1.3).** Revised 2026-07-24
+  (square-embedding, measured budget cost, boolean-minimization second domain).
+  Architect + hater **re-review pending** on this revision.
 - **Crate:** `ufl-discovery` (extend `flipgraph`), `ufl-tensor` (rectangular
   `Tensor`/verifier — feasibility flagged for the lens, §1.3).
 - **Depends on:** SPEC-0013 (the flip-graph — its primitives are already
@@ -24,39 +28,52 @@ with a plateau policy tuned for long constant-rank wandering. Neither is new sci
 — both are engineering the existing, proven primitives to the regime the method
 actually needs.
 
-## 1. Rectangular support (the enabling infra)
+## 1. Rectangular support via square-embedding (the enabling infra)
 
-### 1.1 Per-slot dimensions
+### 1.1 The square-embedding — no `ufl-tensor` change, no `IntScheme` change
 
-`IntScheme` today carries one `dim`; `reconstruct_int`/`target_int` assume it. The
-flip **moves** (`shared_factor_pairs`/`flip_at`/`reduce`/`perturb`) are already
-dim-agnostic (verified: they touch only the triples' `u/v/w` vectors, and copy `dim`
-through untouched). Change: `IntScheme.dim: usize` → `dims: (usize, usize, usize)`
-= `(d_u, d_v, d_w)`. For ⟨m,n,p⟩: `d_u = m·n`, `d_v = n·p`, `d_w = m·p`. Square
-⟨n,n,n⟩ keeps `d_u = d_v = d_w = n²`, so **⟨2,2,2⟩ stays byte-identical** (a
-regression gate, §4 T-square-identical).
+**VERIFIED (2026-07-24, before this revision).** ⟨m,n,p⟩ has unequal slot lengths
+(`m·n`/`n·p`/`m·p`), which `ufl_tensor::Triple::new` **rejects** as `Ragged`
+(`scheme.rs:47`) — the wall the first draft flagged. The clean fix is to **pad every
+slot to `d = max(m·n, n·p, m·p)`**, embedding ⟨m,n,p⟩ into a **square `d×d×d`**
+tensor with *structural zeros* in the unused dimensions. Then:
 
-### 1.2 Rectangular naive / target / reconstruct
+- all slots are length `d` → `Triple::new` accepts them (no `Ragged`);
+- the target is a genuine `d×d×d` `Tensor` → the **existing square**
+  `reconstruct` + `RankDecomposition::for_target(target, rank).discharge` certify it
+  **with no `ufl-tensor` change** (measured: `for_target(padded⟨2,2,3⟩, 12)
+  .discharge(padded-naive) = Ok(true)`; a one-coefficient corruption → `Ok(false)`);
+- `IntScheme` keeps its single `dim = d`; `reconstruct_int`/`target_int` stay square;
+  the flip **moves** are unchanged (already dim-agnostic — they touch only the
+  triples). **So the whole rectangular generalization is ONE new constructor**
+  (`naive_embedded(m,n,p)`), not a per-slot-dims refactor. ⟨2,2,2⟩ is untouched
+  (`naive_embedded(2,2,2) == naive(2)`, `d=4`) — the T-square-identical gate.
 
-- `naive_rect(m, n, p) -> IntScheme` — one `0/1` triple per `(i,j,k)`,
-  `i<m, j<n, k<p`: `u = e_{i·n+j}` (len `m·n`), `v = e_{j·p+k}` (len `n·p`),
-  `w = e_{i·p+k}` (len `m·p`). Rank `m·n·p`. `naive(n)` becomes `naive_rect(n,n,n)`.
-- `reconstruct_int` / `target_int` take `(d_u, d_v, d_w)` and index
-  `flat[(p·d_v + q)·d_w + r]` — the rectangular row-major image. The **debug
-  invariant** `reconstruct_int(s) == target_int` holds after every move, exactly as
-  today (SPEC-0013 §2.4), now over the rectangular flat vector.
+### 1.2 The embedded naive
 
-### 1.3 The rectangular verifier — the one real feasibility question for the lens
+- `naive_embedded(m, n, p) -> IntScheme` — `d = max(m·n, n·p, m·p)`; one `0/1`
+  triple per `(i,j,k)`, `i<m, j<n, k<p`: `u = e_{i·n+j}`, `v = e_{j·p+k}`,
+  `w = e_{i·p+k}`, **each a unit vector in length `d`** (the used index < its true
+  slot length ≤ d; higher dims structurally zero). Rank `m·n·p`. The structural
+  zeros stay zero under every move (flips are linear combos of existing triples,
+  whose padded dims are zero), so the walk never leaves the embedded subspace.
+- `target_embedded(m,n,p) = reconstruct(naive_embedded).to_tensor` — one source of
+  truth; the `reconstruct_int == target` debug invariant (SPEC-0013 §2.4) holds
+  unchanged over the `d³` flat image.
 
-Certification must stay the caller's, through the **exact** verifier (AC2/VHT).
-`RankDecomposition::new(n, rank)` is square; `for_target(target: Tensor, rank)`
-already accepts an arbitrary tensor — **so the rectangular path is
-`RankDecomposition::for_target(rect_target, rank).discharge(&scheme)`**, provided
-`ufl_tensor::Tensor` can *represent* a rectangular ⟨m,n,p⟩ target (three distinct
-axis dims). **Open for the architect/hater:** does `Tensor` carry independent
-`(dp, dq, dr)` today, or is it square-only (then a small `ufl-tensor` extension is in
-scope — a rectangular `Tensor::zeros(dp,dq,dr)` + the bilinear-check helper)? The
-spec assumes the minimal extension; the lens confirms the surface.
+*(A note the nice-guy surfaced, worth keeping: because the embedded slots have
+genuinely different **used** lengths, the rectangular tests are a **stronger**
+slot-hygiene check than square ever was — any accidental slot-crossing that
+equal-length square silently tolerated surfaces here. T-rect-naive-exact
+retroactively hardens confidence in the certified square primitives.)*
+
+### 1.3 Certification (RESOLVED — the verifier needs no extension)
+
+The caller discharges through `RankDecomposition::for_target(target_embedded, rank)`
+(§1.1, measured). `Tensor` is square `(d,d,d)` and already supported; the
+`Ragged`-guard-in-`Triple::new` (the "Guard Inside the Candidate" convention) is
+sidestepped by padding, not weakened. VHT preserved: the proposer never holds the
+verifier; a tensor-breaking move can only *fail* to certify.
 
 ## 2. The plateau walk (the search)
 
@@ -68,8 +85,15 @@ budget and policy, not structure:
   loop over `naive_rect(m,n,p)`, verifying against the rectangular target,
   returning a certified ternary `Scheme` (via `to_scheme` + the caller's
   `for_target` discharge) or `NotFound { best_rank }`.
-- **Budget to the regime the method needs:** the gate run uses **`budget = 10⁸`**
-  (feasible at ~µs/flip ≈ minutes for one target; the e2e is `#[ignore]`, release).
+- **Budget to the regime the method needs — measured cost, not guessed.** Per-flip
+  cost was timed (architect): ⟨2,2,2⟩ 0.68 µs, ⟨3,3,3⟩ 8.19 µs; ⟨2,2,3⟩ (embedded
+  d=6, rank ~11–12) brackets to **~2–3 µs/flip**. So **10⁸ ≈ 4–5 min per seed**
+  (feasible); a *seed block* of 8 → ~40 min; a 10⁹ escalation → ~40 min–hours per
+  seed. The gate pre-registers `budget = 10⁸` and a **small seed block** (the e2e is
+  `#[ignore]`, release); the 10⁹ escalation is a *documented, opt-in* second run, not
+  the default — the honest wall-clock is stated so "run the gate" is actually
+  runnable. **The debug `reconstruct` invariant must be `debug_assert!`** (off in
+  release) or the per-flip cost explodes — confirmed it is (`flipgraph.rs`).
 - **A plateau-tuned `FlipConfig`:** the pilot used `pinned() = {stall_window: 400,
   perturb_flips: 6}`. §2.7 pre-registers a small sweep of `(stall_window,
   perturb_flips)` for the gate — the plateau-walk literature favours *large*
@@ -137,19 +161,31 @@ discovery engine — the `ufl-search` seam's shape (workspace + correctness-pres
 moves + cost + unreachable exact verifier), which already hosts the GA and memetic
 lanes. **Per CLAUDE.md §2 (no premature abstraction), the plateau walk stays
 matmul-specific in `ufl-discovery` until the gate is met.** *If* AC2 succeeds, a
-follow-up requirement lifts the walk into `ufl-search` as `run_walk<Workspace, Move>`
-and points it at a second domain (geometric-algebra rewrites, boolean minimization).
-Building the abstraction now, before the instance works, is the anti-pattern this
+follow-up requirement lifts the walk into `ufl-search` as `run_walk<Workspace, Move>`.
+**The named nearest second domain is boolean-circuit minimization via the
+R-0014-AC3 eml-NAND verifier (nice-guy)** — a recombination of two in-repo artifacts:
+R-0014 AC3's **exact, finite truth-table** oracle + this plateau walk, with workspace
+= NAND trees (transiently non-canonical, exactly the flip-graph's off-the-ternary-set
+trick), moves = truth-table-preserving rewrites, cost = gate count (the rank
+analogue). It **preserves the exact-verifier differentiator** where the geometric
+lane weakens it (`ufl-geo` equivalence is only *numerical* over sampled multivectors).
+This "prove the instance, then lift" is UFL's *demonstrated* method (SPEC-0014
+hardened the `run_generic` traits in `ufl-discovery` before the physical `ufl-search`
+crate; SPEC-0011M placed `Refiner` in `ufl-search` only after the geometric instance
+worked) — building the abstraction before the instance works is the anti-pattern this
 project rejects.
 
 ### Open questions for the three-lens
 1. **Eager-reduce vs fixed-rank walk (§2.6):** does the existing eager-reduce loop
    cross the plateau at 10⁸, or must the search wander at fixed rank? (Measured in
    T-plateau-diagnostic; the spec should not pre-decide.)
-2. **Rectangular `Tensor` surface (§1.3):** minimal `ufl-tensor` extension, or does
-   `Tensor`/`for_target` already carry rectangular dims?
-3. **Budget honesty:** is 10⁸ the right pre-registered ceiling (minutes), or should
-   the gate escalate 10⁷→10⁸→10⁹ and report the first crossing?
+2. **RESOLVED (2026-07-24):** no `ufl-tensor` change — the **square-embedding**
+   (§1.1) passes `Triple::new` and certifies via the existing `for_target` (measured
+   `Ok(true)`; corruption `Ok(false)`).
+3. **Budget honesty:** 10⁸ ≈ 4–5 min/seed (measured ~2–3 µs/flip); the gate
+   pre-registers 10⁸ + a small seed block, with 10⁹ as a documented opt-in second
+   run. Is that the right ceiling, or should it escalate 10⁷→10⁸→10⁹ and report the
+   first crossing?
 4. **The `{−1,0,1}` constraint:** the flip workspace is unrestricted `i64`; only the
    *final* state must be ternary. Is a known rank-11 ⟨2,2,3⟩ scheme ternary, and is
    the ternary end-state reachable, or does the plateau live off the ternary set?
