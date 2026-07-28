@@ -22,9 +22,17 @@ use crate::prng::SplitMix64;
 use ufl_tensor::{reconstruct, target, Scheme, SchemeError, Tensor, Triple};
 
 /// Workspace envelope: flips are skipped when a coefficient would leave
-/// `|c| ≤ 2¹⁶`. This exists solely to keep `i64` reconstruction arithmetic
-/// overflow-free — it does not constrain the walk (an overly tight cap starves
-/// exploration; SPEC-0013 §2.3).
+/// `|c| ≤ 2¹⁶`. Its purpose is to keep `i64` reconstruction arithmetic
+/// overflow-free (SPEC-0013 §2.3).
+///
+/// **Measured correction (2026-07-24, PR #77 review):** SPEC-0013's claim that
+/// this "does not constrain the walk" is *false* — the cap is strongly binding.
+/// On the certified ⟨2,2,3⟩ seed-3 run **66%** of frontier draws are refused by
+/// it (peak `|c| = 65_533`), and **79%** on the ⟨2,2,2⟩ seed-5 run. The walk
+/// therefore spends most of its time saturated against the envelope, which is
+/// part of why the low-rank plateau is so rarely ternary. Raising it (or making
+/// it a workspace policy) is an open question for the R-0018 §5 lift, not a
+/// change to make silently under a certified result.
 const ENVELOPE: i64 = 1 << 16;
 
 /// A search failure — never a panic (CLAUDE.md §6).
@@ -88,7 +96,9 @@ impl IntScheme {
         self.triples.len()
     }
 
-    /// The shared vector length `d = n²`.
+    /// The shared vector length: `n²` for a square ⟨n,n,n⟩ target, and
+    /// `max(m·n, n·p, m·p)` for a square-embedded rectangular one
+    /// ([`naive_embedded`], SPEC-0018 §1.1).
     pub fn dim(&self) -> usize {
         self.dim
     }

@@ -1,16 +1,27 @@
 # Discovery results — verifier-certified
 
-Concrete artifacts the discovery engine produced (de-risk pilots, 2026-06-29).
-Not yet R-loop deliverables (no qa sign-off) — recorded because they are
-verifier-certified and load-bearing for R-0013 (matmul Gate-0) and R-0011
-(geometric Gate-1). See [two-language-substrate](two-language-substrate.md) for
+Concrete artifacts the discovery engine produced. The ⟨2,2,3⟩ and geometric
+entries are **committed, regression-gated R-loop deliverables** (R-0018/SPEC-0018,
+R-0011/SPEC-0011M) — qa sign-off still outstanding on both; the rest began as
+de-risk pilots (2026-06-29) and are load-bearing for R-0013 (matmul Gate-0). See [two-language-substrate](two-language-substrate.md) for
 how they fit the architecture.
 
-## Matmul — a certified rank-11 ⟨2,2,3⟩ scheme (BEYOND Strassen, 2026-07-24)
+## Matmul — a certified rank-11 ⟨2,2,3⟩ scheme (2026-07-24)
 
-**The first certified matmul reduction beyond the ⟨2,2,2⟩ special case** (R-0018 /
-SPEC-0018). The *same* flip-graph engine — **unmodified** `reduce_matmul_with`,
-eager-reduce — run over a **square-embedded** ⟨2,2,3⟩ naive (slots padded to `d=6`,
+> **Read this first — what the object is.** The scheme the engine found is the
+> **direct sum ⟨2,2,2⟩-Strassen ⊕ ⟨2,2,1⟩-naive**: products 3/5/6/9 compute
+> column 3 trivially (`a11·b13 + a12·b23 → c13`, `a21·b13 + a22·b23 → c23`) and
+> the other 7 act only on columns 1–2 (a rank-7 ⟨2,2,2⟩ product, hence Strassen up
+> to symmetry by de Groote). **Zero products mix the two blocks** — verified by
+> partitioning the banked coefficients. So this is the *known block construction*,
+> the same one §3 of SPEC-0018 names as the ternary-existence witness — **not an
+> indecomposable rank-11 object**. What is genuinely new is that the walk **reached
+> it from a naive rank-12 start without being seeded with it**, on a rectangular
+> target the engine had never handled. Claim the search, not the object.
+
+**The first certified matmul reduction past the ⟨2,2,2⟩ case** (R-0018 /
+SPEC-0018) — with the caveat above. The *same* flip-graph engine (the shared `walk`, behaviour-identical
+to the certified square path) run over a **square-embedded** ⟨2,2,3⟩ naive (slots padded to `d=6`,
 so it reuses the existing square `Triple`/verifier with no `ufl-tensor` change)
 reaches a **rank-11 ternary scheme** (naive 12) at **10⁶ flips, seed 3**, certified
 by the exact verifier: `RankDecomposition::for_target(target_embedded, 11)
@@ -20,7 +31,7 @@ independently before banking, then **committed**: the scheme is a literal in
 [`crates/ufl-discovery/tests/r_0018_rect.rs`](../crates/ufl-discovery/tests/r_0018_rect.rs)
 whose certification, corruption-rejection and bilinear check run in the normal
 suite, and whose `#[ignore]` gate **re-derives it from naive** at the pinned seed
-(release, ~0.8 s). The 11 products, in the `d=6` embedding (`u` dims 4–5 are
+(release, **0.74 s** measured). The 11 products, in the `d=6` embedding (`u` dims 4–5 are
 structurally zero — ⟨2,2,3⟩'s `u` truly has length 4):
 
 | # | product `m_t` | contributes to |
@@ -42,11 +53,15 @@ hand-transcription was wrong, and an independent Python bilinear check over 5,00
 random pairs is what caught it. Three implementations now agree: the Rust engine,
 the Rust acceptance test, and that check.)*
 
-**Honest scope (as with Strassen):** rank-11 is **Hopcroft–Kerr optimal** for
-⟨2,2,3⟩, so the *object* is re-derived, not novel — the win is **method reach**: the
-correctness-first engine cracked a *rectangular*, beyond-textbook target it had never
-touched, and the result arrives as a **theorem (verifier-certified), not a candidate
-needing a check** — the differentiator vs FunSearch/AlphaEvolve.
+**Honest scope (weaker than the first draft of this entry claimed).** Rank-11 is
+**Hopcroft–Kerr optimal** for ⟨2,2,3⟩, so the object is re-derived, not novel — and
+per the banner it is specifically the *decomposable* block form, the one a person
+would write down by hand. So the claim is **not** "found a non-obvious algorithm".
+What the run does support, precisely: the engine **searched a rectangular target it
+had never handled and reached a certified optimal-rank scheme from a naive start**,
+and the result arrives as a **theorem (verifier-certified), not a candidate needing
+a check** — the differentiator vs FunSearch/AlphaEvolve. Whether the walk can find
+an *indecomposable* reduction is untested and is the honest next question.
 
 **Mechanism measured (the hater's diagnosis, which corrected a borrowed assumption):**
 the 12→11 crossing is a **two-level plateau** — (1) *reach* rank 11 (~6–12% of seeds

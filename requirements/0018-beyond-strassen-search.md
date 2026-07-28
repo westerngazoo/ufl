@@ -117,9 +117,17 @@ the hater caught it. **Measured (hater + reproduced independently, seed 3):**
 
 **AC2 is MET.** The corrected method is the eager-reduce loop over `naive_embedded`
 with the `is_ternary` terminal filter; the gate is a **pinned seed** (seed 3 @ 10⁶,
-~5 s — the `r_0013` pattern), with a seed-block robustness run at 10⁸ optional. The
+**0.74 s measured** — the `r_0013` pattern), with a seed-block robustness run at 10⁸ optional. The
 lesson (banked): *even a diagnosis-backed conclusion is a hypothesis until the target
 itself is measured — a borrowed constant is not a measurement.*
+
+**What AC2 does NOT establish (PR #77 architect finding, verified).** The scheme the
+walk found **is** that same Strassen-7 ⊕ matvec-4 block scheme — products 3/5/6/9
+compute column 3 trivially and no product mixes the blocks. So AC2 demonstrates
+**reaching a certified optimal-rank scheme on a new rectangular target from a naive
+start**, *not* discovering a non-obvious (indecomposable) algorithm. Recorded in
+`theory/discovery-results.md`; finding an indecomposable reduction is the honest next
+question, and the natural AC for a follow-up requirement.
 
 ## 4. Non-goals
 

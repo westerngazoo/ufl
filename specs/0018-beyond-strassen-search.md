@@ -4,12 +4,22 @@
   a certified matmul reduction beyond the ⟨2,2,2⟩ special case, via a square-embedded
   rectangular flip-graph + the existing eager-reduce loop. The falsifiable gate —
   **⟨2,2,3⟩ 12→11 certified ternary** — is **MET** (§3).
-- **Status:** **Draft — three-lens complete; AC2 GATE WON (⟨2,2,3⟩ 12→11 certified
-  ternary, reproduced independently at seed 3).** Nice-guy STRONG WORK; architect
-  approve-with-changes (square-embedding verified isomorphic); hater NEEDS-WORK on
-  the *rationale* (not the gate — it *won* the gate) → the borrowed "10⁸/fixed-rank"
-  claim replaced by the measured "eager-reduce @10⁶" reality (§0, §2, §3c). Ready for
-  implementation (test-first) + acceptance once the corrected spec is re-scanned.
+- **Status:** **Accepted** (2026-07-24) — three-lens complete and all findings
+  folded: nice-guy *STRONG WORK*; architect *approve-with-changes* (verified the
+  square-embedding is **isomorphic**, not merely type-compatible); hater *NEEDS-WORK
+  on the rationale while **winning the gate*** → the borrowed "10⁸/fixed-rank" claim
+  replaced by the measured "eager-reduce @10⁶" reality (§0, §2, R-0018 §3c). AC2 is
+  **met** (⟨2,2,3⟩ 12→11 certified, independently reproduced). Implemented in PR #77;
+  Gustavo holds final approval there.
+- **Deferred (recorded, PR #77 architect finding 5):** §4 T5 (the plateau
+  level-ratio diagnostic) is **not implemented**. The §2.1 ratios (~6–12% level-1;
+  ≈1:135,000 ternary) are therefore **one-off pilot observations, not committed
+  measurements** — cited as such, never as regression-guarded facts. Landing T5 is a
+  follow-up. Related measured correction: the `ENVELOPE` cap is **strongly binding**
+  (66–79% of frontier draws refused, peak |c| ≈ 65,533), which SPEC-0013's "does not
+  constrain the walk" comment denied — corrected in `flipgraph.rs`, and flagged as an
+  open question for the §5 lift (the envelope must become a *workspace policy*, not a
+  module constant, before a non-matmul workspace reuses the walk).
 - **Crate:** `ufl-discovery` only (extend `flipgraph` with one constructor +
   `reduce_matmul_rect`). **No `ufl-tensor` change** — the square-embedding reuses the
   existing square `Tensor`/`for_target` (§1.3, verified).
@@ -82,8 +92,9 @@ verifier; a tensor-breaking move can only *fail* to certify.
 
 ## 2. The search — the measured method (R-0018 §3c)
 
-**MEASURED, gate WON (2026-07-24, reproduced independently, seed 3).** The existing,
-**unmodified** `reduce_matmul_with` eager-reduce loop, run over `naive_embedded(2,2,3)`
+**MEASURED, gate WON (2026-07-24, reproduced independently, seed 3).** The existing
+eager-reduce loop — behaviour-identical to the certified square path, now factored
+into a shared `walk()` — run over `naive_embedded(2,2,3)`
 with `FlipConfig::pinned()`, crosses ⟨2,2,3⟩ 12→11 and returns a **certified rank-11
 ternary scheme** (`for_target(target_embedded, 11).discharge = Ok(true)`) at **10⁶
 flips**. A fixed-rank walk was measured **worse** (0/32); the earlier "fixed-rank at
@@ -97,7 +108,8 @@ constructor change on the proven loop, not a new driver**:
 
 ### 2.1 The two-level plateau (why the `is_ternary` early-stop is load-bearing)
 
-The 12→11 crossing has two levels, both measured:
+The 12→11 crossing has two levels (**pilot-observed, not regression-guarded** —
+T5 is deferred, see the Status block):
 - **Level 1 — reach rank 11.** ~6–12% of seeds do so at 10⁶; hard seeds cross by 10⁸.
   (This is why *budget helps* — more attempts at the level-1 crossing.)
 - **Level 2 — land on a *ternary* rank-11 state.** The rank-11 plateau is
@@ -107,7 +119,8 @@ The 12→11 crossing has two levels, both measured:
   steps on the rank-11 plateau ⇒ more ternary draws. **This early-stop is
   load-bearing and must be preserved** — a "detect-drop-only" fixed-rank walk (the
   withdrawn plan) would sit at rank 11 *forever* (rank 10 for ⟨2,2,3⟩ does not exist)
-  and never terminate. §4 T5 measures the level ratios as a regression guard.
+  and never terminate. §4 T5 *would* guard these ratios; it is **deferred** (Status block), so treat the
+  numbers as one-off observations.
 
 ### 2.2 Budget + config (measured cost, pre-registered)
 
