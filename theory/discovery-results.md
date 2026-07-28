@@ -14,8 +14,33 @@ eager-reduce — run over a **square-embedded** ⟨2,2,3⟩ naive (slots padded 
 so it reuses the existing square `Triple`/verifier with no `ufl-tensor` change)
 reaches a **rank-11 ternary scheme** (naive 12) at **10⁶ flips, seed 3**, certified
 by the exact verifier: `RankDecomposition::for_target(target_embedded, 11)
-.discharge == Ok(true)` (rank-12 check `Ok(false)`), plus **50,000 random 2×2·2×3
-bilinear re-derivations** of `C=A·B`. Reproduced independently before banking.
+.discharge == Ok(true)` (rank-12 check `Ok(false)`), plus **20,000 random 2×2·2×3
+bilinear re-derivations** of `C=A·B` against the textbook definition. Reproduced
+independently before banking, then **committed**: the scheme is a literal in
+[`crates/ufl-discovery/tests/r_0018_rect.rs`](../crates/ufl-discovery/tests/r_0018_rect.rs)
+whose certification, corruption-rejection and bilinear check run in the normal
+suite, and whose `#[ignore]` gate **re-derives it from naive** at the pinned seed
+(release, ~0.8 s). The 11 products, in the `d=6` embedding (`u` dims 4–5 are
+structurally zero — ⟨2,2,3⟩'s `u` truly has length 4):
+
+| # | product `m_t` | contributes to |
+|---|---|---|
+| 1 | (a11) · (b11 + b21) | c11 − c12 |
+| 2 | (a12 + a22) · (b11 + b12 + b21 + b22) | c12 |
+| 3 | (a11) · (b13) | c13 |
+| 4 | (−a11 + a12) · (b21) | c11 − c21 |
+| 5 | (a22) · (b23) | c23 |
+| 6 | (a12) · (b23) | c13 |
+| 7 | (a11 − a12 + a21 − a22) · (b11 + b12) | c21 |
+| 8 | (a21) · (b12) | −c21 + c22 |
+| 9 | (a21) · (b13) | c23 |
+| 10 | (−a11 + a12 + a22) · (b11 + b12 + b21) | −c12 + c21 |
+| 11 | (a22) · (b22) | −c12 + c22 |
+
+*(Rendered programmatically from the banked coefficients, not by hand — a first
+hand-transcription was wrong, and an independent Python bilinear check over 5,000
+random pairs is what caught it. Three implementations now agree: the Rust engine,
+the Rust acceptance test, and that check.)*
 
 **Honest scope (as with Strassen):** rank-11 is **Hopcroft–Kerr optimal** for
 ⟨2,2,3⟩, so the *object* is re-derived, not novel — the win is **method reach**: the
