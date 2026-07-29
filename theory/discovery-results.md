@@ -76,6 +76,65 @@ a Strassen-7 ⊕ matvec-4 block scheme certifies. **What this earns (Gustavo):**
 `run_walk<Workspace, Move>` (SPEC-0018 §5), next target boolean-circuit minimization
 via the R-0014 exact truth-table verifier.
 
+## Matmul — the measured reach of the walk (2026-07-25, a bounded negative)
+
+The ⟨2,2,3⟩ result raised the honest question it could not answer: **can the walk
+find a reduction that is _not_ a block construction?** ⟨2,3,3⟩ answers it, because it
+carries a built-in indecomposability certificate — naive **18**, best direct sum
+(⟨2,3,2⟩⊕⟨2,3,1⟩ = 11+6) = **17**, known optimal (Hopcroft–Kerr) **15**. So **any
+certified rank ≤ 16 is provably not a direct sum.** Measured, naive-start,
+`FlipConfig::pinned()`:
+
+| target | naive | block bound | best reached | budget |
+|---|---|---|---|---|
+| ⟨2,2,2⟩ | 8 | 8 (⟨2,2,1⟩⊕⟨2,2,1⟩) | **7 — certified, indecomposable** | 10⁶ |
+| ⟨2,2,3⟩ | 12 | 11 (7+4) | **11 = the block bound** | 10⁶ |
+| ⟨2,3,3⟩ | 18 | 17 (11+6) | **17 = the block bound** (1 of 4 seeds) | **10⁸** |
+| ⟨3,3,3⟩ | 27 | 27 | 27 — no reduction at all | 10⁶ |
+
+**The finding.** ⟨2,3,3⟩ **never crossed 16** — not at 10⁶, 10⁷, or **10⁸ flips
+(~8 min/seed)**. Three of four seeds never left naive-18 at all. So the walk's reach,
+naive-start at laptop scale, is precisely characterised:
+
+> Every reduction this engine has found is explicable as **Strassen on a 2×2×2
+> sub-block + a naive remainder**. It reliably finds the ⟨2,2,2⟩ 8→7 step — which
+> *is* genuinely indecomposable, and is a real result — including when that step is
+> buried inside a larger rectangular target (⟨2,2,3⟩'s 11 contains it). It has
+> **never** found a reduction past the block bound.
+
+**Why this is a useful negative, not just a failure.** It separates the two things
+that were confounded: the *verifier* and correctness-by-construction work perfectly
+at every size (nothing false ever certified); what runs out is **search power**. The
+gap to AlphaTensor/Kauers–Moosbauer is compute + strategy, not soundness — they use
+billions of flips, symmetry reduction, and **start-from-known-scheme** perturbation,
+where we tested only naive-start random flips.
+
+**The lever, pulled (2026-07-25) — start-from-known also fails.** The one untested
+strategy was the record papers' own: seed a *known good* scheme and
+perturb-and-recover, which makes 17→16 a far smaller search than 18→16 from naive.
+Measured, using only the SPEC-0013 public primitives:
+
+- **Phase 1** — walk naive→**rank-17 checkpoint** (31 s).
+- **Phase 2** — **200 independent perturb-and-recover restarts** from that
+  checkpoint (kick sizes `k ∈ {2,4,6,10,16}` × 40 seeds, 250k steps each):
+  **best rank 17 on every one. Not a single restart reached ≤ 16.**
+
+So the negative is no longer strategy-limited:
+
+> **At laptop scale (≤10⁸ flips), with *both* naive-start and start-from-known
+> perturb-and-recover, the flip-graph walk does not cross the block bound.** Its
+> measured reach is exactly: *find the ⟨2,2,2⟩ Strassen step (genuinely
+> indecomposable, including buried in a rectangular target), then stop at the best
+> direct-sum construction.*
+
+**Remaining honest caveat (what would still be needed).** This bounds *our* scale,
+not the method in principle. The record results additionally use ~10⁹⁺ flips,
+**symmetry reduction** over the ⟨m,n,p⟩ automorphism group, and a fixed-rank walk —
+none of which we have. And the `ENVELOPE` cap refuses 66–79% of frontier moves
+(`flipgraph.rs`), so a meaningful share of the search space is simply unreachable in
+this workspace. Those are the three concrete levers a future attempt would pull;
+absent them, "beyond the block bound" is out of reach here.
+
 ## Matmul — an exact rank-7 decomposition of T₂ (Strassen-grade)
 
 Beats the naive rank 8. Found by a **Kauers–Moosbauer flip-graph over exact
