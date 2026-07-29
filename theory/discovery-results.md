@@ -76,6 +76,45 @@ a Strassen-7 ⊕ matvec-4 block scheme certifies. **What this earns (Gustavo):**
 `run_walk<Workspace, Move>` (SPEC-0018 §5), next target boolean-circuit minimization
 via the R-0014 exact truth-table verifier.
 
+## Matmul — the measured reach of the walk (2026-07-25, a bounded negative)
+
+The ⟨2,2,3⟩ result raised the honest question it could not answer: **can the walk
+find a reduction that is _not_ a block construction?** ⟨2,3,3⟩ answers it, because it
+carries a built-in indecomposability certificate — naive **18**, best direct sum
+(⟨2,3,2⟩⊕⟨2,3,1⟩ = 11+6) = **17**, known optimal (Hopcroft–Kerr) **15**. So **any
+certified rank ≤ 16 is provably not a direct sum.** Measured, naive-start,
+`FlipConfig::pinned()`:
+
+| target | naive | block bound | best reached | budget |
+|---|---|---|---|---|
+| ⟨2,2,2⟩ | 8 | 8 (⟨2,2,1⟩⊕⟨2,2,1⟩) | **7 — certified, indecomposable** | 10⁶ |
+| ⟨2,2,3⟩ | 12 | 11 (7+4) | **11 = the block bound** | 10⁶ |
+| ⟨2,3,3⟩ | 18 | 17 (11+6) | **17 = the block bound** (1 of 4 seeds) | **10⁸** |
+| ⟨3,3,3⟩ | 27 | 27 | 27 — no reduction at all | 10⁶ |
+
+**The finding.** ⟨2,3,3⟩ **never crossed 16** — not at 10⁶, 10⁷, or **10⁸ flips
+(~8 min/seed)**. Three of four seeds never left naive-18 at all. So the walk's reach,
+naive-start at laptop scale, is precisely characterised:
+
+> Every reduction this engine has found is explicable as **Strassen on a 2×2×2
+> sub-block + a naive remainder**. It reliably finds the ⟨2,2,2⟩ 8→7 step — which
+> *is* genuinely indecomposable, and is a real result — including when that step is
+> buried inside a larger rectangular target (⟨2,2,3⟩'s 11 contains it). It has
+> **never** found a reduction past the block bound.
+
+**Why this is a useful negative, not just a failure.** It separates the two things
+that were confounded: the *verifier* and correctness-by-construction work perfectly
+at every size (nothing false ever certified); what runs out is **search power**. The
+gap to AlphaTensor/Kauers–Moosbauer is compute + strategy, not soundness — they use
+billions of flips, symmetry reduction, and **start-from-known-scheme** perturbation,
+where we tested only naive-start random flips.
+
+**The untested lever (the honest next experiment).** Start-from-known is *cheap* and
+we have never tried it: seeding ⟨2,3,3⟩ at the block-17 scheme and perturbing toward
+16 is a vastly smaller search than 18→16 from naive, and it is exactly the strategy
+the record papers actually use. Until that is measured, "the method cannot find
+indecomposable reductions beyond ⟨2,2,2⟩" is **only established for naive-start**.
+
 ## Matmul — an exact rank-7 decomposition of T₂ (Strassen-grade)
 
 Beats the naive rank 8. Found by a **Kauers–Moosbauer flip-graph over exact
