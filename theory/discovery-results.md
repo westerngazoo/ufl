@@ -109,11 +109,31 @@ gap to AlphaTensor/Kauers–Moosbauer is compute + strategy, not soundness — t
 billions of flips, symmetry reduction, and **start-from-known-scheme** perturbation,
 where we tested only naive-start random flips.
 
-**The untested lever (the honest next experiment).** Start-from-known is *cheap* and
-we have never tried it: seeding ⟨2,3,3⟩ at the block-17 scheme and perturbing toward
-16 is a vastly smaller search than 18→16 from naive, and it is exactly the strategy
-the record papers actually use. Until that is measured, "the method cannot find
-indecomposable reductions beyond ⟨2,2,2⟩" is **only established for naive-start**.
+**The lever, pulled (2026-07-25) — start-from-known also fails.** The one untested
+strategy was the record papers' own: seed a *known good* scheme and
+perturb-and-recover, which makes 17→16 a far smaller search than 18→16 from naive.
+Measured, using only the SPEC-0013 public primitives:
+
+- **Phase 1** — walk naive→**rank-17 checkpoint** (31 s).
+- **Phase 2** — **200 independent perturb-and-recover restarts** from that
+  checkpoint (kick sizes `k ∈ {2,4,6,10,16}` × 40 seeds, 250k steps each):
+  **best rank 17 on every one. Not a single restart reached ≤ 16.**
+
+So the negative is no longer strategy-limited:
+
+> **At laptop scale (≤10⁸ flips), with *both* naive-start and start-from-known
+> perturb-and-recover, the flip-graph walk does not cross the block bound.** Its
+> measured reach is exactly: *find the ⟨2,2,2⟩ Strassen step (genuinely
+> indecomposable, including buried in a rectangular target), then stop at the best
+> direct-sum construction.*
+
+**Remaining honest caveat (what would still be needed).** This bounds *our* scale,
+not the method in principle. The record results additionally use ~10⁹⁺ flips,
+**symmetry reduction** over the ⟨m,n,p⟩ automorphism group, and a fixed-rank walk —
+none of which we have. And the `ENVELOPE` cap refuses 66–79% of frontier moves
+(`flipgraph.rs`), so a meaningful share of the search space is simply unreachable in
+this workspace. Those are the three concrete levers a future attempt would pull;
+absent them, "beyond the block bound" is out of reach here.
 
 ## Matmul — an exact rank-7 decomposition of T₂ (Strassen-grade)
 
