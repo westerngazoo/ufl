@@ -19,12 +19,20 @@
 //! this module (SPEC-0013 §2.3).
 
 use crate::prng::SplitMix64;
-use ufl_tensor::{target, Scheme, SchemeError, Triple};
+use ufl_tensor::{reconstruct, target, Scheme, SchemeError, Tensor, Triple};
 
 /// Workspace envelope: flips are skipped when a coefficient would leave
-/// `|c| ≤ 2¹⁶`. This exists solely to keep `i64` reconstruction arithmetic
-/// overflow-free — it does not constrain the walk (an overly tight cap starves
-/// exploration; SPEC-0013 §2.3).
+/// `|c| ≤ 2¹⁶`. Its purpose is to keep `i64` reconstruction arithmetic
+/// overflow-free (SPEC-0013 §2.3).
+///
+/// **Measured correction (2026-07-24, PR #77 review):** SPEC-0013's claim that
+/// this "does not constrain the walk" is *false* — the cap is strongly binding.
+/// On the certified ⟨2,2,3⟩ seed-3 run **66%** of frontier draws are refused by
+/// it (peak `|c| = 65_533`), and **79%** on the ⟨2,2,2⟩ seed-5 run. The walk
+/// therefore spends most of its time saturated against the envelope, which is
+/// part of why the low-rank plateau is so rarely ternary. Raising it (or making
+/// it a workspace policy) is an open question for the R-0018 §5 lift, not a
+/// change to make silently under a certified result.
 const ENVELOPE: i64 = 1 << 16;
 
 /// A search failure — never a panic (CLAUDE.md §6).
@@ -88,7 +96,9 @@ impl IntScheme {
         self.triples.len()
     }
 
-    /// The shared vector length `d = n²`.
+    /// The shared vector length: `n²` for a square ⟨n,n,n⟩ target, and
+    /// `max(m·n, n·p, m·p)` for a square-embedded rectangular one
+    /// ([`naive_embedded`], SPEC-0018 §1.1).
     pub fn dim(&self) -> usize {
         self.dim
     }
@@ -140,21 +150,40 @@ pub enum Variant {
 /// The naive rank-`n³` scheme: one `0/1` triple per `(i,j,k)` with
 /// `u = e_{i·n+j}`, `v = e_{j·n+k}`, `w = e_{i·n+k}` — exactly the terms of
 /// [`ufl_tensor::target`], so it reconstructs to `T_n` by definition.
+///
+/// The square case of [`naive_embedded`] (`d = n²`), so the two cannot drift.
 pub fn naive(n: usize) -> IntScheme {
-    let d = n * n;
+    naive_embedded(n, n, n)
+}
+
+/// The naive rank-`m·n·p` scheme for the **rectangular** ⟨m,n,p⟩ product,
+/// *square-embedded* (SPEC-0018 §1.1): one `0/1` triple per `(i,j,k)` with
+/// `u = e_{i·n+j}`, `v = e_{j·p+k}`, `w = e_{i·p+k}`, each a unit vector of the
+/// shared length `d = max(m·n, n·p, m·p)`.
+///
+/// **Why padded rather than per-slot lengths:** ⟨m,n,p⟩'s three slots have
+/// genuinely different lengths, which [`ufl_tensor::Triple::new`] rejects as
+/// ragged. Padding to a common `d` embeds the problem in a square `d×d×d`
+/// tensor whose extra dimensions are *structurally zero* — and since every move
+/// is an element-wise same-slot add/sub of existing triples, a dimension that
+/// starts zero everywhere stays zero. So the walk never leaves the embedded
+/// subspace, the flip frontier is identical to a true rectangular one, and the
+/// **existing square verifier certifies the result unchanged**.
+pub fn naive_embedded(m: usize, n: usize, p: usize) -> IntScheme {
+    let d = (m * n).max(n * p).max(m * p);
     let unit = |idx: usize| {
         let mut e = vec![0i64; d];
         e[idx] = 1;
         e
     };
-    let mut triples = Vec::with_capacity(n * n * n);
-    for i in 0..n {
+    let mut triples = Vec::with_capacity(m * n * p);
+    for i in 0..m {
         for j in 0..n {
-            for k in 0..n {
+            for k in 0..p {
                 triples.push(IntTriple {
                     u: unit(i * n + j),
-                    v: unit(j * n + k),
-                    w: unit(i * n + k),
+                    v: unit(j * p + k),
+                    w: unit(i * p + k),
                 });
             }
         }
@@ -179,6 +208,26 @@ pub fn target_int(n: usize) -> Vec<i64> {
         }
     }
     flat
+}
+
+/// The **square-embedded ⟨m,n,p⟩ matmul tensor** — the target a rectangular
+/// candidate is certified against (`RankDecomposition::for_target(target_rect(..),
+/// rank)`; SPEC-0018 §1.3).
+///
+/// It is the reconstruction of [`naive_embedded`], i.e. the *definition* of the
+/// product (one term per `(i,j,k)`). Two independent anchors keep that honest:
+/// the square case must equal [`ufl_tensor::target`] (a different code path),
+/// and the R-0018 acceptance test multiplies random matrices through a certified
+/// scheme against the textbook `C[i][k] = Σ_j A[i][j]·B[j][k]`.
+///
+/// # Panics
+/// Never: [`naive_embedded`] is `0/1` by construction, so the conversion to a
+/// ternary [`Scheme`] cannot fail (the `unreachable!` documents the invariant).
+pub fn target_rect(m: usize, n: usize, p: usize) -> Tensor {
+    match naive_embedded(m, n, p).to_scheme() {
+        Ok(scheme) => reconstruct(&scheme),
+        Err(_) => unreachable!("naive_embedded is 0/1, hence always ternary"),
+    }
 }
 
 /// `Σ_t u_t[p]·v_t[q]·w_t[r]` as a flat row-major `d³` vector — the workspace
@@ -448,9 +497,60 @@ pub fn reduce_matmul_with(
     budget: usize,
     config: FlipConfig,
 ) -> Result<Scheme, FlipError> {
-    let tgt = target_int(n);
+    walk(naive(n), &target_int(n), target_rank, seed, budget, config)
+}
+
+/// Walk the flip-graph for the **rectangular** ⟨m,n,p⟩ product down to
+/// `target_rank`, under the pinned plateau policy (SPEC-0018 §2).
+///
+/// The square-embedded workspace ([`naive_embedded`]) means this is the *same*
+/// proven walk, not a second engine — `reduce_matmul(n, ..)` is the ⟨n,n,n⟩ case.
+/// The result is a *candidate*: certification belongs to the caller's verifier,
+/// `RankDecomposition::for_target(target_rect(m, n, p), rank)`.
+pub fn reduce_matmul_rect(
+    m: usize,
+    n: usize,
+    p: usize,
+    target_rank: usize,
+    seed: u64,
+    budget: usize,
+) -> Result<Scheme, FlipError> {
+    reduce_matmul_rect_with(m, n, p, target_rank, seed, budget, FlipConfig::pinned())
+}
+
+/// [`reduce_matmul_rect`] with an explicit plateau policy.
+pub fn reduce_matmul_rect_with(
+    m: usize,
+    n: usize,
+    p: usize,
+    target_rank: usize,
+    seed: u64,
+    budget: usize,
+    config: FlipConfig,
+) -> Result<Scheme, FlipError> {
+    let start = naive_embedded(m, n, p);
+    let tgt = reconstruct_int(&start);
+    walk(start, &tgt, target_rank, seed, budget, config)
+}
+
+/// The shared plateau walk: draw a frontier flip, `reduce`, keep the best-rank
+/// checkpoint, and perturb it on a stall — stopping at the first state that is
+/// both within `target_rank` and ternary (the terminal filter of SPEC-0018 §2.1;
+/// the rank-`target` plateau is overwhelmingly non-ternary, so this early-stop
+/// is what catches a convertible state).
+///
+/// Square and rectangular share this body, so the certified ⟨2,2,2⟩ trajectory
+/// is byte-identical by construction, not by inspection.
+fn walk(
+    start: IntScheme,
+    tgt: &[i64],
+    target_rank: usize,
+    seed: u64,
+    budget: usize,
+    config: FlipConfig,
+) -> Result<Scheme, FlipError> {
     let mut rng = SplitMix64::new(seed);
-    let mut s = reduce(&naive(n));
+    let mut s = reduce(&start);
     debug_assert_eq!(reconstruct_int(&s), tgt, "naive scheme must be exact");
     if s.rank() <= target_rank && s.is_ternary() {
         return s.to_scheme();

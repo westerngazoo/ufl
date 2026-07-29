@@ -30,8 +30,9 @@ mod proposer;
 
 pub use engine::{run, Config, EngineError, Outcome};
 pub use flipgraph::{
-    flip_at, naive, perturb, reconstruct_int, reduce, reduce_matmul, reduce_matmul_with,
-    shared_factor_pairs, target_int, FlipConfig, FlipError, IntScheme, IntTriple, Variant,
+    flip_at, naive, naive_embedded, perturb, reconstruct_int, reduce, reduce_matmul,
+    reduce_matmul_rect, reduce_matmul_rect_with, reduce_matmul_with, shared_factor_pairs,
+    target_int, target_rect, FlipConfig, FlipError, IntScheme, IntTriple, Variant,
 };
 pub use generic::run_matmul_generic;
 pub use genome::Genome;
