@@ -9,12 +9,16 @@
   literal `eml` tree for NAND evaluated end-to-end through `ufl-core`, **plus** the
   integer-regime probe (one matmul entry as an `eml` tree vs the exact `i64`
   verifier).
-- **Status:** **Draft — revised 2026-07-25, all three-lens findings folded (§6).**
-  Nice-guy *STRONG WORK*; architect *REQUEST CHANGES*; hater *NEEDS WORK* — and
-  three of my claims were **measurably wrong**: the branch-cut mechanism, the
-  probe's decision rule (it would have written a **false row into the honest
-  ledger**), and the 0-path story. All corrected from measurement. Ready for
-  re-review.
+- **Status:** **Accepted** (2026-07-25) — three review rounds, **every** finding
+  folded (§6 round 1, §7 round 2, §8 round 3). Both blocking reviewers closed on
+  "the substance now holds / fixes are mechanical", and the mechanical fixes are
+  applied and independently re-measured. **Implemented** in
+  `crates/ufl-core/tests/{nand/mod.rs, r_0014_ac3_eml_nand.rs}` (9 tests green);
+  the §6 ledger row is closed. Gustavo holds final approval on the PR.
+  *Six of my own claims were measurably wrong across the three rounds* — the
+  branch-cut mechanism, the probe's decision rule (it would have written a **false
+  row into the honest ledger**), the 0-path story, the `ln` cliff, the size law,
+  and "a 32-bit adder is not expressible". All corrected from measurement.
 - **Milestone:** **M5 — Route A / value-universality** and the closure of the one
   **"Owed" row** in
   [`theory/universal-computability.md` §6](../theory/universal-computability.md).
