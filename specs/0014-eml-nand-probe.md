@@ -65,12 +65,16 @@ here** (the measured column is not aspirational — §1.1):
 **Domain cliffs (measured — rows 4–7 are NOT unconditional identities).** The
 encodings route through `exp` of an intermediate, so they inherit `f64`'s range:
 
-- `a − b`, `−b`, `a + b` require **`|second operand| ≤ ln(f64::MAX) = 709.782713`**
+- `a − b`, `−b`, `a + b` require **`|second operand| ≤ ln(f64::MAX)`, measured finite to `709.782712893`**
   — at `b = 709.79` the inner `exp(b)` overflows and the result is `(±inf, NaN)`
   even though the *answer* (`710.79`) is trivially representable.
-- `ln(y)` has a hole for **`0 < y < e/f64::MAX ≈ 1.512e-308`** (the inner `e/y`
-  overflows): `ln_t(1.512e-308) = (−inf, NaN)` while the true value `−708.78` is
-  finite. Not subnormal-only — it eats normal `f64`s.
+- `ln(y)` has a hole for **`0 < y < e^e/f64::MAX ≈ 8.4298e-308`** — the AC5 tree's
+  inner intermediate is `exp(e − ln y) = e^e/y`, which overflows: measured finite for
+  `y ≥ 8.429838189618891e-308`, `(−inf, NaN)` below. **Not subnormal-only** — the
+  threshold sits *above* `f64::MIN_POSITIVE = 2.225e-308`, so it eats normal `f64`s.
+  *(An earlier draft said `e/f64::MAX ≈ 1.512e-308`: that was the **old 19-node
+  `ln`** encoding's intermediate, carried over unmeasured when row 4 changed — and
+  it is itself subnormal, which contradicted the very sentence after it. Re-measured.)*
 
 These are documented and boundary-asserted (§2.5 T-primitives), not hidden. They do
 not affect the Boolean gate (inputs are `{0,1}`), which is the AC3 deliverable.
@@ -89,26 +93,38 @@ NAND(0,0)=1  NAND(0,1)=1  NAND(1,0)=1  NAND(1,1)=0     ← the truth table, EXAC
 **The truth table came out exact, not merely within tolerance.** Scope that claim
 precisely: it is exact **on bit inputs**, because `{0,1}` are exp/ln round-trip fixed
 points — it is *not* a claim about the encoding generally (measured: `exp(ln x) == x`
-holds for only 1071/2000 reals on `[0.01, 20]`; `sub_t(1e16, 0)` is off by 34).
+holds for only **886 of 2000** uniform points on `[0.01, 20]`; `sub_t(1e16, 0)` is off by 34).
 §2.3 therefore asserts **bit-exactness** on the gate, and reserves tolerance language
 for the probe alone.
 
 ### 1.2 Why the exactness survives arbitrary circuit depth (the real result)
 
-`{0,1}` is a **closed exact orbit** of the gate: `ln 1 = 0`, `exp 0 = 1`,
-`ln 0 = −∞`, `exp(−∞) = 0` are each exact in IEEE-754, so every gate's output is
-again *exactly* `0.0` or `1.0` — a gate's inputs are therefore always exact and
-error has nowhere to accumulate. Measured (nice-guy, independently reproduced):
-`NOT^k = NAND(prev,prev)` is **bit-exact at every k up to 9** (depth 93, 56,211
+`{0,1}` is a **closed exact orbit** of the gate. The airtight form of the argument is
+*measured base case + compositional evaluator*, not a list of identities (the four
+usually cited — `ln 1 = 0`, `exp 0 = 1`, `ln 0 = −∞`, `exp(−∞) = 0` — are necessary
+but not what the literal tree computes; it also needs `e − e = 0` exactly via
+`zero_t`, `exp(ln 1) = 1`, and §2.2's 14-infinity cancellation):
+
+> **Base:** `nand_t` is bit-exact on all four `{0,1}` rows (measured, §1.1).
+> **Step:** `ufl_core::eval` is a compositional post-order fold with no
+> depth-dependent state, so a gate whose inputs are *exactly* `0.0`/`1.0` returns
+> exactly `0.0`/`1.0` — the same four rows.
+> ∴ exact at **any** composition depth; error has nowhere to accumulate. Measured (nice-guy, independently reproduced):
+`NOT^k = NAND(prev,prev)` is **bit-exact at every k up to 9** (depth 93, 25,551
 nodes), and a 3-layer **XOR** from 4 NANDs is bit-exact on all 4 rows.
 
-Stronger still, `{0,1}` are **superattracting** fixed points of the induced map
-`x ↦ 1 − x²`, so the encoding is **self-correcting**: perturbed to `true = 0.99`,
-six NOTs restore `0.9999999999984`. The basin boundary is exactly the **golden
-ratio φ = 1.618…** (the repelling fixed point of `1 − x²`): `x₀ = 1.618` converges,
-`1.6180339888` diverges at step 23. So `theory/universal-computability.md` §6's
-"noise margins shrink in deep circuits" is **wrong in the favourable direction** for
-the digital case — inside the basin, margins *grow*. One caveat: near the `0` rail
+Stronger still, `{0,1}` is a **superattracting 2-cycle** of the induced NOT map
+`x ↦ 1 − x²` (NOT swaps the rails; they are *fixed points of double-NOT*, not of
+NOT — the earlier "superattracting fixed points" wording was loose). So the encoding
+is **self-correcting**: perturbed to `true = 0.99`, six NOTs give
+`0.9999999999984273` and eight return **bit-exact `1.0`**. The basin boundary is the
+**golden ratio φ = 1.618…** — precisely, `−φ` is the repelling fixed point of
+`1 − x²` and `+φ` is its positive preimage, hence the edge: `x₀ = 1.618` converges to
+the cycle, `1.6180339888` diverges at step 23 (both measured). This **quantifies** `theory/universal-computability.md` §6 rather than correcting it:
+§6 already scopes "noise margins shrink" to the **analog** substrate (~8–10 bits per
+node) and already asserts digital exactness. §1.2 is the *digital* half — an IEEE-754
+witness at depth 93 plus a named φ margin. (An earlier draft claimed it *corrected*
+§6; that misread the scoping.) One caveat: near the `0` rail
 there is no *relative* accuracy (`NAND(1−1e-12, 1−1e-12)` returns `2.0001778e-12`
 vs the ideal `2.0e-12`) — catastrophic cancellation in `1 − a²`, first gate.
 
@@ -188,8 +204,14 @@ the correction is the finding:**
   the closed-form residue, not a pass/fail.
 - **Leak** — a NaN, an `±inf`, or an unbounded/structural error.
 
-**Measured, so the spec states it rather than predicting it:** real error ≤ **2 ulp**
-(81/81); the imaginary residue is **`Im ∈ sin(τ/2)·ℤ` with `|k| ≤ 4`** — a *winding
+**Measured, so the spec states it rather than predicting it** — and the rule is
+**two-part, because a bare ulp bound is undefined where the expected value is 0**
+(33 of the 81 cases; `ulp(0) = 5e-324`, so a 2.2e-16 residue there is 4.5e307 ulps —
+the *same* "metric doesn't cover its grid" defect as the ε rule it replaced):
+- **nonzero expectation (48 cases):** worst error **1 ulp**; 38/48 bit-exact in `Re`.
+- **exact-zero expectation (33 cases):** absolute residue ≤ **2.221e-16**.
+
+Overall **36/81 bit-exact** (`Re` *and* `Im`). The imaginary residue is **`Im ∈ sin(τ/2)·ℤ` with `|k| ≤ 4`** — a *winding
 number*, not drift, whose quantum **is the R-0001 AC6 tripwire constant**
 (`log.rs`); and `round()` recovers the exact `i64` in **81/81**. So the honest
 characterisation is **"ulp-accurate and reversible, never exact"**.
@@ -200,11 +222,11 @@ characterisation is **"ulp-accurate and reversible, never exact"**.
   bit-exact**, worst `|ΔRe| = 8.9e-16` — roughly double the error, same verdict.
   It costs one loop; use it.
 - **Probe beyond `{−1,0,1}`, and name the silently-wrong case.** `mul_t(n,1)` is
-  **not bit-exact for 49 of the first 64 integers** — `mul_t(3,1) =
+  **not bit-exact for 51 of the integers 0..=63** — `mul_t(3,1) =
   2.99999999999999956`, so `as i64` **truncates to 2**. That is the worst failure
   mode (finite and wrong, not obviously broken) and it must be a named test case, not
   a lucky miss. Also named: `mul_t(−1,0) = −0.0` while `mul_t(0,−1) = +0.0` (**not
-  bit-commutative**), and `ln(−0.0) = (−inf, +π)` vs `ln(+0.0) = (−inf, 0)` — a
+  bit-commutative**), and — *through the encoding*, measured — `ln_t(−0.0) = (−inf, 3τ/8)` vs `ln_t(+0.0) = (−inf, 0)` — a
   `−0.0` intermediate can inject a spurious `iπ`.
 
 **What each outcome changes in the theory doc** (so "no silent middle" is a decision
@@ -234,8 +256,10 @@ decision to keep per-lane atoms. It does **not** touch the `{0,1}` Boolean claim
    guarded the empty set while missing the only real failure mode.
 4. **T-depth-exact** (§1.2 — the strongest result) — `NOT^k` for `k = 1..=8` is
    **bit-exact at every level**, and a 3-layer **XOR** from 4 NANDs is bit-exact on
-   all 4 rows. Plus the self-correction witness: from `true = 0.99`, six NOTs land
-   within `2e-13` of `1.0`. (Release-only above `k = 6`: node count is `220·2^k − 109`.)
+   all 4 rows. Plus the self-correction witness: from `true = 0.99`,
+   **NOT⁸ returns bit-exact `1.0`** (measured; a stronger and more stable assertion
+   than a tolerance — NOT⁶ is `0.9999999999984273`, i.e. `1.57e-12` out, so the
+   earlier "within 2e-13" would have failed). (No release-only gate needed: measured 1.25 ms at `k = 9` in a debug build.)
 5. **T-integer-probe** (§2.4) — the **verifier-shaped** 7-term sum vs exact `i64`
    over `{−1,0,1}`; asserts the pre-registered three-way verdict and **prints the
    bit-exact count + the ulp bound unconditionally**, so the number lands in the PR
@@ -256,20 +280,36 @@ claim: control universality (branching/recursion/state — "standard theory, but
 unbuilt", theory §6), self-hosting, or that `eml` is a programming language in the
 control sense.
 
-**And it does NOT claim poly-size circuit ⇒ poly-size `eml` tree — that is false**
-(the hater's blocking finding, measured). `Eml` has **no sharing** (no DAG, no
-let-binding), and `NOT a = NAND(a,a)` duplicates its argument, so chained-NOT tree
-size is **`220·2^g − 109`** nodes at gate-depth `g` — verified against real trees to
-`g = 12` (450,451 nodes); `g = 32` would need **4.7 × 10¹¹**. What `eml` gets is
-**Boolean formulas, not Boolean circuits**, and formula size is super-polynomially
-larger than circuit size for fan-out ≥ 2. **A 32-bit adder is not expressible as an
-`eml` tree** in this repo, in this universe. The universality is *functional*, not
-*efficient* — the ledger row must say so.
+**And it does NOT claim that a circuit's `eml` tree is the size of the circuit.**
+`Eml` has **no sharing** (no DAG, no let-binding), so a gate whose output feeds `k`
+places is *substituted* `k` times. Measured under the AC5 encoding: a `G`-gate
+fan-in-2 NAND formula is **`50·G + 1` nodes** (NAND 51, AND 151, OR 151), and
+because `NOT a = NAND(a,a)` duplicates its argument, **chained** NOT is
+**`50·2^g − 49`** at gate-depth `g` — exact at every `g = 1..12` (25,551 at `g=9`;
+204,751 at `g=12`). So a circuit with heavy fan-out *re-expands* into a formula, and
+that expansion is the honest limit: `eml` gets **Boolean formulas, not shared
+circuits**.
 
-*(Forward-looking: this fan-out blow-up is the first concrete, exactly-verifiable
-benchmark for R-0012's equality saturation — sharing collapses 56,211 nodes to ~940
-with bit-exact ground truth. A good open question this spec creates rather than
-answers.)* The honest closed class stays **"elementary functions — total,
+**Two claims an earlier draft made here were WRONG and are withdrawn** (architect,
+verified):
+- *"`220·2^g − 109`"* — that constant fits **neither** encoding; it was a mangled
+  carry-over from the old 19-node `ln` (whose law was `110·2^g − 109`). Re-measured
+  above. This is the same defect as N1: **numbers derived from the pre-row-4
+  encoding were not re-verified when row 4 changed.**
+- *"A 32-bit adder is not expressible as an `eml` tree in this universe"* — **false.**
+  Integer addition is in AC⁰ ⊆ NC¹, so it *has* poly-size fan-in-2 formulas; an
+  unrolled 32-bit carry-lookahead is ~24k gates ≈ 73k NANDs ≈ **3.6 × 10⁶ nodes**,
+  well inside what this spec already evaluates in milliseconds. Likewise
+  *"formula size is super-polynomially larger than circuit size"* asserts as fact
+  the **open NC¹ vs P/poly question**. The non-goal stands on the *measured*
+  substitution blow-up, not on an unproven separation.
+
+The universality claimed is **functional, for combinational logic** — not a
+statement about efficient representation. The ledger row must say exactly that.
+
+*(Forward-looking: the substitution blow-up is a concrete, exactly-verifiable
+benchmark for R-0012's equality saturation — full hash-consing collapses NOT⁹'s
+25,551 nodes to **125** distinct subtrees, with bit-exact ground truth.)* The honest closed class stays **"elementary functions — total,
 terminating, no recursion, no branching, no state"** until R-0005/T13. No new
 public API; no change to any merged lane.
 
@@ -301,14 +341,18 @@ a bare "match"/"leak".
    coincidence.
 3. **RESOLVED:** **bit-exact** on the gate (§2.3); tolerance language confined to the
    probe, and expressed in **ulps**, not absolute ε (§2.4).
-4. **Sequencing (new, for the implementer):** the derived-gate trees exceed
+5. **Sequencing (for the implementer):** the derived-gate trees exceed
    `ufl_core::DEFAULT_MAX_DEPTH = 128` at gate-depth **13** (eml-depth = `10g + 3`),
    and `Sexpr`'s `Display` cap turns that into a **panic** via `to_string()` today.
-   **SPEC-0017 (Accepted) removes the cap but is not yet implemented**, so either
-   bound §2.5 T-depth-exact below 13 gates or land after R-0017. Recorded, not
-   discovered later.
-4. Does T-nand-is-universal-shape (§2.5.5) overreach toward the §3 composition claim
-   the non-goals disclaim, or is it the right bounded evidence?
+   **SPEC-0017 (Accepted) removes the cap but is not yet implemented.** Measured
+   caveat on my own note: it **binds nothing here** — `ufl_core::eval` never consults
+   `get_max_depth()`, and this design never builds an `Sexpr`, so the `Display` cap is
+   unreachable from this test path. Keep the note for whoever *does* render these
+   trees; drop it as a constraint on T-depth-exact.
+4. **RESOLVED:** T-functional-completeness (§2.5 item 6, renamed from
+   "universal-shape") is the right bounded evidence — R-0014 AC3 explicitly requires
+   "verifying functional completeness", so it is not optional; `OR` was added so the
+   test matches the chain the theory doc cites.
 
 
 ## 6. Three-lens resolutions (2026-07-25)
@@ -338,3 +382,31 @@ things I asserted turned out to be false.
 but never bit-exact on integers**, which says an `eml`-lowered matmul lane could never
 satisfy `error == 0` without a rounding step. Both are citeable engineering facts;
 neither was in the first draft.
+
+
+## 7. Round-2 architect findings (2026-07-25) — one defect, four faces
+
+Re-review verdict: **REQUEST CHANGES**, and the diagnosis is worth stating plainly
+because it is a *process* failure, not four unrelated slips.
+
+**The defect:** §1 row 4 changed encoding (19-node 0-anchored `ln` → R-0001 AC5's
+7-node one) and **four families of derived numbers were carried over unmeasured** —
+the very thing §1's preamble ("every line was verified against the real
+`ufl_core::eval`") promises never happens. The lesson this repo already banked as
+*Measured Before Specified* has a corollary it did not have: **a measured block is
+invalidated by any change to what it measured.** Re-measure on revision, not just on
+first draft.
+
+| Finding | Was | Now (re-measured) |
+|---|---|---|
+| **N1 (blocking)** `ln_t` cliff | `e/MAX ≈ 1.512e-308` (old encoding; itself subnormal, contradicting the next sentence) | **`e^e/MAX ≈ 8.4298e-308`** — above `MIN_POSITIVE`, so "eats normal f64s" is now true |
+| **N2 (blocking)** size law | `220·2^g − 109` — fits **neither** encoding | **`50·G + 1`** per gate; **`50·2^g − 49`** chained-NOT (exact g=1..12) |
+| **N2 (blocking)** "32-bit adder not expressible **in this universe**" | asserted | **FALSE, withdrawn** — addition is AC⁰ ⊆ NC¹; ~3.6e6 nodes. Also withdrew "formula ≫ circuit size", which is the **open NC¹ vs P/poly** question |
+| **N4 (major)** the ulp rule | one bound over the whole grid | **two-part** — 1 ulp on the 48 nonzero-expectation cases, ≤2.221e-16 absolute on the 33 exact-zero ones (a bare ulp bound is undefined at 0: the *same* defect as the ε rule it replaced) |
+| **N7/N8 (minor)** dynamics + framing | "superattracting fixed points"; "*corrects* §6" | **2-cycle** (fixed points of *double*-NOT); `−φ` repelling, `+φ` its preimage; **"quantifies"** §6, whose margin clause is scoped to *analog* |
+| **N3/N5/N6/N9–N12** | tolerance 2e-13; raw-`Complex` `ln(−0.0)`; 709.782713; loose induction; needless release-gate; §5 dup numbering; 1071/2000; 49 integers | NOT⁸ bit-exact `1.0`; **`ln_t(−0.0) = (−inf, 3τ/8)`**; 709.782712893; base-case+fold form; debug-fine (1.25 ms @ k=9); renumbered; **886/2000**; **51** integers |
+
+Corroborated unchanged (independently reproduced by the architect): the 14-infinite /
+**0-NaN** subtree census, the 7-term **21/200**, `mul_t(3,1) as i64 == 2`, the `±0.0`
+non-commutativity, the `(0,1)` branch residues, the φ divergence step, and
+**rewrite-invariance across seven semantics-preserving variants**.
