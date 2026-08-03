@@ -45,6 +45,15 @@ field. The build order across requirements and specs is in
 | [SPEC-0008](0008-discovery-engine.md) | Discovery Engine (loop validation + blind-proposer falsification) | R-0008 | Implemented (merged) |
 | [SPEC-0009](0009-pga-kernel-binding.md) | `Cl(3,0,1)` PGA Kernel Binding (`ufl-ga`) | R-0009 | Implemented (merged) |
 | [SPEC-0010](0010-geometric-forms-grade-types.md) | Geometric Forms + the Grade-Type System (`ufl-geo`) | R-0010 | Accepted |
+| [SPEC-0011](0011-geometric-neuroevolution.md) | Geometric Neuroevolution (the tree-GA harness) | R-0011 | Accepted |
+| [SPEC-0011M](0011-memetic-engine.md) | The Memetic Engine — `Refiner` seam + the geometric lane | R-0011 Gate-1 | **Implemented** (PRs #72, #73) |
+| [SPEC-0013](0013-matmul-moonshot.md) | Flip-graph matmul reduction (Gate-0) | R-0013 | **Implemented** (PR #55) |
+| [SPEC-0014](0014-discovery-framework.md) | The Discovery Framework (`ufl-search` seam) | R-0014 AC1/AC2/AC4 | Accepted |
+| [SPEC-0014N](0014-eml-nand-probe.md) | The literal `eml`-NAND tree + the integer-regime probe | R-0014 **AC3** | **Implemented** (PR #76) |
+| [SPEC-0015](0015-evolve-operator-semantics.md) | The Rung-4 probe (MoveForm DSL + the three-set gate) | R-0015 | **Closed — §11 case-1** (no headroom window; Rung-5 deferred, PR #74) |
+| [SPEC-0016](0016-reflection-quote-eval-raise.md) | Reflection — `quote` / `eval` / `eq?` / `raise` | R-0016 | Accepted |
+| [SPEC-0017](0017-depth-contract.md) | One iterative depth contract (no cap, no recursion) | R-0017 | **Accepted — awaiting implementation** ([#63](https://github.com/westerngazoo/ufl/issues/63)) |
+| [SPEC-0018](0018-beyond-strassen-search.md) | Rectangular flip-graph + the plateau walk | R-0018 | **Implemented** (PR #77) |
 
 SPEC-0002 (G(3,0,0) GA core, garust-based) is written by the separate GA agent
 flow against [R-0002](../requirements/0002-geometric-algebra-core.md).

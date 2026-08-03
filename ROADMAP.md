@@ -107,10 +107,12 @@ and reframed:
 | [R-0010](requirements/0010-geometric-forms-grade-types.md) | **Geometric forms + the grade-type system** (`ufl-geo`) — GA ops as forms (the `GeoExpr` genotype R-0011 evolves) lowering onto `ufl-ga`; decidable grade inference (the dimensional type, per Haynes), keystone = the sandwich preserves grade. | **Done** (merged, PR #23; `ufl-geo`, 18 tests — 14 AC + 4 soundness; SPEC-0010 Accepted; architect APPROVE + qa SIGN-OFF; a 4-lens adversarial soundness audit found & fixed two hand-rule defects). |
 | [R-0011](requirements/0011-geometric-neuroevolution.md) | **Geometric neuroevolution** (the headline) — evolve the R-0010 `GeoExpr` genotype on R-0008's seam (generalized to a totally-ordered, NaN-safe real-valued fitness = accuracy − parsimony); grade = a pruning filter + a seeding bias. **Two gates:** rediscover the rotor sandwich `R x R̃` (de-risk 6/6) **and** the **equivariant-OOD-generalization** headline — an evolved, exact, equivariant `GeoExpr` (4 `Param`s, machine-exact in-dist + OOD) vs the smallest fair MLP that collapses OOD (≤145×). *Reframed from "IK-beats-MLP" by the SPEC-0011 §2.6 de-risk: literal IK is inexpressible + the MLP baseline was a strawman.* Agentic proposer, Strassen, and the `Normalize`/`Log` literal-IK extension all **deferred**. | **In progress** — SPEC-0011 Accepted (three-lens closed; §2.6 + §2.8 de-risks positive). Merged: the `GeoExpr` printer (PR #31), the `ufl-prng` deterministic RNG (PR #29), the fair-MLP Gate-2 anti-strawman baseline in `ufl-evolve` (PR #33). **Pending: Gate 1** (rotor-sandwich rediscovery) **and Gate 2** (the equivariant-OOD headline run). |
 | [R-0012](requirements/0012-f2-boolean-deduction.md) | **Boolean deduction over 𝔽₂** (the discrete-logic lane) — logic-as-polynomial-ring (XOR=+, AND=·, idemp x²=x); entailment = ideal membership; **equality saturation (egg) ≡ Buchberger/Gröbner**. A falsifiable spike with a **SAT baseline** (AC2/AC4). Orthogonal to the EML + geometric lanes; **new engine, not a reuse**. | Draft (does not block R-0011; spike after/parallel at owner discretion) |
-| R-0013 | **The matmul-decomposition moonshot** (the relocated Strassen prize) — a stronger-than-blind-GA search over exact integer schemes on the R-0006/0007/0008 verifier stack; **Gate 0** (go/no-go) = rediscover rank-7 Strassen for `T_2`. | **In progress** — Gate-0 flip-graph search in flight on branch `R-0013-flipgraph` (requirement + SPEC-0013 + red test live there; not yet on `main`). The earlier basin-hopping draft (PR #43) is closed as superseded; its decision log is preserved in the PR record and ported to the flipgraph requirement. |
-| [R-0014](requirements/0014-discovery-framework.md) | **The shared discovery framework** — generalize the proposer-agnostic seam into one genome-generic, deterministic search/rewrite loop + the grade/closure harness; the three lanes (R-0011/12/13) become **verifier instances** that KEEP their own atoms. Unifies with R-0012's equality saturation (search = rewrite-under-cost). **First build:** re-host the green matmul GA on the generic loop byte-identically, then add the geometric fitness. | **Merged as Draft** (PR #50) — the generic seam (`ufl-discovery::generic`) + the theory ledger (`theory/two-language-substrate.md`, `theory/discovery-results.md`) are on `main`; **SPEC-0014 is owed** (task 07) before the requirement advances. Design-panel scope stands: the one-`{eml,+}`-substrate-generates-everything claim refuted — unify the harness, not the atoms; metacircularity + temperature bridge deferred. |
-| R-0015 | **Evolve operator *semantics*** (reframed per the 2026-06-29 discovery verdict — not hyperparameter knobs) — staircase requirement. | Planned — in drafting (task 04) |
-| R-0016 | **Reflection rung 1** — `quote` / `eval` / structural `=` / `raise` (code-as-data) — staircase requirement. | Planned — in drafting (task 04) |
+| [R-0013](requirements/0013-matmul-moonshot.md) | **The matmul-decomposition moonshot** — a stronger-than-blind-GA search over exact integer schemes; **Gate 0** = rediscover rank-7 Strassen for `T_2`. | **Done** (PR #55) — Gate-0 met: a **certified rank-7 `T_2`** scheme via the Kauers–Moosbauer flip-graph, regression-gated (blind GA failed at 25×10⁹ evals; *the proposer is the result*). Extended rectangular by **R-0018**. |
+| [R-0014](requirements/0014-discovery-framework.md) | **The shared discovery framework** — one genome-generic, deterministic search loop; the lanes become **verifier instances** keeping their own atoms. | **Done.** AC1/AC2/AC4 → SPEC-0014 (the pure `ufl-search` seam: `Proposer`/`Fitness`/`Screen`/`Refiner`, PRs #58/#72). **AC3 → SPEC-0014N** (PR #76): the literal `eml`-NAND tree is **bit-exact** through `ufl-core` and the universality ledger's one *Owed* row is **closed** — with its caveats attached (formula-not-circuit; integers are **ulp-accurate, never exact**). |
+| [R-0015](requirements/0015-evolve-operator-semantics.md) | **Evolve operator *semantics*** — the staircase's **Rung-4 decision node**. | **CLOSED — documented negative** (PR #74, SPEC-0015 §11 case-1). The probe architecture was three-lens-validated, but the mandatory pre-run found **no headroom window on any substrate**: matmul is structurally dead (rank-7 `T_2` is an isolated fixpoint), and the geometric lane has B0 **at the ceiling** (N=64). The probe was never armed ⇒ **Rung-5 deferred, not killed** — no Lisp self-modification layer without earned efficacy evidence. |
+| [R-0016](requirements/0016-reflection-quote-eval-raise.md) | **Reflection rung 1** — `quote` / `eval` / `eq?` / `raise` (code-as-data). | **Done** — SPEC-0016 Accepted and shipped. |
+| [R-0017](requirements/0017-depth-contract.md) | **One iterative depth contract** — every tree-walk on the code↔data surface uses an explicit heap stack: no cap, no constant, no library-code abort at any depth. | **Accepted, implementation outstanding** ([#63](https://github.com/westerngazoo/ufl/issues/63)). Two-round three-lens; scope **expanded** after the hater proved the 5-walk scope still aborts `(eq?/eval (quote DEEP))` — now also iterative `Clone`/`PartialEq`/`raise`. |
+| [R-0018](requirements/0018-beyond-strassen-search.md) | **Beyond-⟨2,2,2⟩ matmul** — rectangular (square-embedded) flip-graph + the plateau walk. | **Done** (PR #77) — a **certified rank-11 ⟨2,2,3⟩** reduction found from a naive start (Hopcroft–Kerr optimal; the object is the known block form — the result is the *search* reaching it unseeded on an unfamiliar target). **And its measured boundary** (PR #78): every reduction the engine finds is Strassen-on-a-2×2×2-sub-block + naive remainder; ⟨2,3,3⟩ never crossed the block bound at 10⁸ flips, nor under 200 start-from-known restarts. |
 
 ### M4 / language-build — *paused for the discovery pivot*
 
@@ -135,9 +137,22 @@ exploration is shelved on branch `R-0005-value-conditional` (recoverable).
 
 ## Current focus
 
-**R-0013 + R-0014 are the active front; the execution plan is
-[`docs/tasks/README.md`](docs/tasks/README.md)** (the enumerated task set from
-the 2026-06-30 five-lens review — it sequences the whole backlog below).
+**The discovery arc is complete and bounded; the spine is where the work is now.**
+
+Object level (**works, and we know how far**): certified Strassen (R-0013), a
+certified rank-11 ⟨2,2,3⟩ (R-0018), the geometric rotor rediscovery 6/16 vs 2/16
+ablation (R-0011 Gate-1) — and the *measured ceiling*: the walk never crosses the
+block bound, under either naive-start or the record papers' own start-from-known
+strategy. Meta level (**closed negative**): R-0015's Rung-4 probe found no headroom
+window on any substrate, so Rung-5 stays unbuilt — deferred, not killed.
+
+Universality: R-0014 AC3 closed the ledger's one *Owed* row — `eml` builds NAND
+bit-exactly, is **self-correcting** with a golden-ratio noise margin at any circuit
+depth, and is **ulp-accurate but never exact** on integers.
+
+**Live work:** R-0017's implementation ([#63](https://github.com/westerngazoo/ufl/issues/63)),
+then the rung-2/3 spine (T10/T12/T13). The `run_walk` generalization is *earned* but
+deliberately unbuilt — prove the instance, then lift.
 
 - **R-0013** — the matmul moonshot's **Gate 0** (rediscover rank-7 Strassen) is
   in flight on branch `R-0013-flipgraph` with a flip-graph proposer.
