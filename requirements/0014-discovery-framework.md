@@ -1,6 +1,6 @@
 # R-0014 — The Shared Discovery Framework (one search/rewrite substrate, three verifier instances)
 
-- **Status:** Draft (2026-06-28 — design-panel pressure-tested; scoped honestly)
+- **Status:** **Accepted / realized** — AC1+AC2+AC4 by SPEC-0014 (`ufl-search`, PRs #58/#72); **AC3 by SPEC-0014N** (PR #76, the eml-NAND tree + the integer probe; the universality ledger row is closed).
 - **Milestone:** M5 — Discovery (the **unifying** requirement)
 - **Owner:** Gustavo Delgadillo (Goose)
 - **Created:** 2026-06-28

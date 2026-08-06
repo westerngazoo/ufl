@@ -1,6 +1,6 @@
 # R-0013 — Matmul discovery moonshot (flip-graph)
 
-- **Status:** Draft (this branch realizes **Gate-0**, AC1/AC2)
+- **Status:** **Done** (2026-07-02, PR #55) — Gate-0 met: a certified rank-7 `T_2` scheme, regression-gated. Extended by R-0018 (rectangular).
 - **Milestone:** discovery / object-level scaling
 - **Depends on:** R-0006 (integer tensor core), R-0007 (tensor predicate), R-0008
   (discovery engine). *Independent of R-0014* — the flip-graph is a distinct search
