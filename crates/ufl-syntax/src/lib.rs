@@ -16,6 +16,10 @@
 //! square on the reader's canonical image (SPEC-0016 §2.5).
 
 #![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
 
 mod lower;
 mod read;

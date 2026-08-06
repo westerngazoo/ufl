@@ -4,7 +4,7 @@
 /// representation (R-0003 AC1). It is *general data*: it can hold any finite
 /// number and any symbol. The restriction to R-0001's grammar is the lowering
 /// pass's job (`crate::lower`), not this type's.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Sexpr {
     /// A numeric literal. The reader only ever produces *finite* values
     /// (SPEC-0003 §2.3); complex values are *derived*, never literal.
@@ -48,25 +48,101 @@ impl Drop for Sexpr {
 }
 
 impl Sexpr {
-    fn fmt_internal(&self, f: &mut std::fmt::Formatter<'_>, depth: usize) -> std::fmt::Result {
-        if depth > ufl_core::get_max_depth() {
-            return Err(std::fmt::Error);
+    /// **Iterative** rendering (R-0017): an explicit frame stack, so a tree of
+    /// any depth prints without recursion and **without a depth cap**. The old
+    /// cap returned `fmt::Error`, which the `ToString` contract turns into a
+    /// *panic* — that latent panic is gone with it. Output is byte-identical.
+    fn fmt_internal(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        enum Frame<'a> {
+            Node(&'a Sexpr),
+            Close,
+            Space,
         }
-
-        match self {
-            Sexpr::Num(n) => write!(f, "{n}"),
-            Sexpr::Sym(s) => write!(f, "{s}"),
-            Sexpr::List(items) => {
-                write!(f, "(")?;
-                for (i, item) in items.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, " ")?;
+        let mut stack = vec![Frame::Node(self)];
+        while let Some(frame) = stack.pop() {
+            match frame {
+                Frame::Close => write!(f, ")")?,
+                Frame::Space => write!(f, " ")?,
+                Frame::Node(node) => match node {
+                    Sexpr::Num(n) => write!(f, "{n}")?,
+                    Sexpr::Sym(sym) => write!(f, "{sym}")?,
+                    Sexpr::List(items) => {
+                        write!(f, "(")?;
+                        stack.push(Frame::Close);
+                        // Push in reverse so items emit in order, with exactly
+                        // n−1 separators (a trailing space would break the
+                        // byte-identical round-trip).
+                        for (i, item) in items.iter().enumerate().rev() {
+                            stack.push(Frame::Node(item));
+                            if i > 0 {
+                                stack.push(Frame::Space);
+                            }
+                        }
                     }
-                    item.fmt_internal(f, depth + 1)?;
-                }
-                write!(f, ")")
+                },
             }
         }
+        Ok(())
+    }
+}
+
+/// **Iterative** deep clone (R-0017) — see `Eml`'s for the rationale: the
+/// reflection path clones quoted subtrees, which are machine-generated and deep.
+impl Clone for Sexpr {
+    fn clone(&self) -> Self {
+        enum Task<'a> {
+            Visit(&'a Sexpr),
+            Rebuild(usize),
+        }
+        let mut tasks = vec![Task::Visit(self)];
+        let mut out: Vec<Sexpr> = Vec::new();
+        while let Some(t) = tasks.pop() {
+            match t {
+                Task::Visit(e) => match e {
+                    Sexpr::Num(n) => out.push(Sexpr::Num(*n)),
+                    Sexpr::Sym(sym) => out.push(Sexpr::Sym(sym.clone())),
+                    Sexpr::List(items) => {
+                        tasks.push(Task::Rebuild(items.len()));
+                        for item in items.iter().rev() {
+                            tasks.push(Task::Visit(item));
+                        }
+                    }
+                },
+                Task::Rebuild(n) => {
+                    // Each Visit nets exactly one value, so `n` are present.
+                    if out.len() < n {
+                        unreachable!("clone stack underflow: Rebuild(n) follows n Visits")
+                    }
+                    let items = out.split_off(out.len() - n);
+                    out.push(Sexpr::List(items));
+                }
+            }
+        }
+        let Some(root) = out.pop() else {
+            unreachable!("clone produced no value: the root Visit always pushes one")
+        };
+        root
+    }
+}
+
+/// **Iterative** structural equality (R-0017): a lockstep pair-stack walk that
+/// short-circuits on the first difference. `eq?` compares quoted `Sexpr`s.
+impl PartialEq for Sexpr {
+    fn eq(&self, other: &Self) -> bool {
+        let mut pairs = vec![(self, other)];
+        while let Some((a, b)) = pairs.pop() {
+            match (a, b) {
+                (Sexpr::Num(x), Sexpr::Num(y)) if x == y => {}
+                (Sexpr::Sym(x), Sexpr::Sym(y)) if x == y => {}
+                (Sexpr::List(xs), Sexpr::List(ys)) if xs.len() == ys.len() => {
+                    for (x, y) in xs.iter().zip(ys) {
+                        pairs.push((x, y));
+                    }
+                }
+                _ => return false,
+            }
+        }
+        true
     }
 }
 
@@ -75,7 +151,7 @@ impl std::fmt::Display for Sexpr {
     /// `read(s.to_string()) == Ok(s)` (the round-trip invariant, scoped to the
     /// reader's image — SPEC-0003 §2.2).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.fmt_internal(f, 0)
+        self.fmt_internal(f)
     }
 }
 

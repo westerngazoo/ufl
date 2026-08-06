@@ -72,65 +72,152 @@ fn describe(s: &Sexpr) -> String {
 }
 
 /// Evaluate a predicate `Sexpr` to a boolean under `env` (SPEC-0004 §3).
+///
+/// **Iterative** (R-0017): a continuation machine over an explicit frame stack,
+/// so the boolean spine nests to any depth without recursion. Semantics are
+/// unchanged — in particular `and`/`or` keep their **lazy short-circuit**, so an
+/// unreached operand's error is still never surfaced.
+///
+/// Only `and`/`or`/`not`/`pred` deepen the spine. `=` and `eq?` delegate to
+/// `eval_num`/`eval_syntax`, which do **not** re-enter here, so they are leaves
+/// that compute one boolean and push it.
 pub fn eval_pred(s: &Sexpr, env: &Env) -> Result<bool, PredError> {
-    match s {
-        Sexpr::Sym(t) if t == "true" => Ok(true),
-        Sexpr::Sym(t) if t == "false" => Ok(false),
-        Sexpr::List(items) => eval_form(items, env),
-        _ => Err(PredError::ExpectedBool { found: describe(s) }),
+    enum Frame<'a> {
+        /// Launch a fresh predicate evaluation.
+        Eval(&'a Sexpr),
+        /// Resume: pop the operand's result; short-circuit on `false`, else continue.
+        And(std::slice::Iter<'a, Sexpr>),
+        /// Resume: pop the operand's result; short-circuit on `true`, else continue.
+        Or(std::slice::Iter<'a, Sexpr>),
+        /// Resume: pop and negate.
+        Not,
     }
-}
 
-/// Dispatch a list form in boolean position on its head symbol. This `match` is
-/// the documented seam where the deferred control forms (`;`, choice, fixpoint)
-/// plug in — one arm at a time (SPEC-0004 §2.3).
-fn eval_form(items: &[Sexpr], env: &Env) -> Result<bool, PredError> {
-    let Some((Sexpr::Sym(head), args)) = items.split_first() else {
-        return Err(PredError::ExpectedBool {
-            found: "non-form list".to_string(),
-        });
-    };
-    match head.as_str() {
-        "pred" => match args {
-            [e] => eval_pred(e, env),
-            _ => Err(arity("pred", 1, args.len())),
-        },
-        "not" => match args {
-            [p] => Ok(!eval_pred(p, env)?),
-            _ => Err(arity("not", 1, args.len())),
-        },
-        "=" => match args {
-            [a, b] => Ok(eval_num(a, env)? == eval_num(b, env)?),
-            _ => Err(arity("=", 2, args.len())),
-        },
-        // Structural equality on *syntax* (SPEC-0016 §2.4): compares the denoted
-        // `Sexpr`s (the `quote` children) by the exact, decidable
-        // `Sexpr::PartialEq`. Distinct from numeric `=` — no mixed-mode case.
-        "eq?" => match args {
-            [a, b] => Ok(eval_syntax(a, env)? == eval_syntax(b, env)?),
-            _ => Err(arity("eq?", 2, args.len())),
-        },
-        // Lazy short-circuit: an unreached operand's error is not surfaced.
-        "and" => {
-            for p in args {
-                if !eval_pred(p, env)? {
-                    return Ok(false);
+    let mut frames = vec![Frame::Eval(s)];
+    let mut vals: Vec<bool> = Vec::new();
+
+    while let Some(frame) = frames.pop() {
+        match frame {
+            Frame::Not => {
+                let Some(v) = vals.pop() else {
+                    unreachable!("not: its operand's Eval always pushes exactly one bool")
+                };
+                vals.push(!v);
+            }
+            Frame::And(mut rest) => {
+                // Resume *by popping* the operand just evaluated (never peeking
+                // — a peek would read a stale value).
+                let Some(v) = vals.pop() else {
+                    unreachable!("and: the launched operand always pushes exactly one bool")
+                };
+                if !v {
+                    vals.push(false); // short-circuit: the remaining operands are never Eval'd
+                } else {
+                    match rest.next() {
+                        Some(next) => {
+                            frames.push(Frame::And(rest));
+                            frames.push(Frame::Eval(next));
+                        }
+                        None => vals.push(true),
+                    }
                 }
             }
-            Ok(true)
-        }
-        "or" => {
-            for p in args {
-                if eval_pred(p, env)? {
-                    return Ok(true);
+            Frame::Or(mut rest) => {
+                let Some(v) = vals.pop() else {
+                    unreachable!("or: the launched operand always pushes exactly one bool")
+                };
+                if v {
+                    vals.push(true); // short-circuit
+                } else {
+                    match rest.next() {
+                        Some(next) => {
+                            frames.push(Frame::Or(rest));
+                            frames.push(Frame::Eval(next));
+                        }
+                        None => vals.push(false),
+                    }
                 }
             }
-            Ok(false)
+            Frame::Eval(node) => match node {
+                Sexpr::Sym(t) if t == "true" => vals.push(true),
+                Sexpr::Sym(t) if t == "false" => vals.push(false),
+                Sexpr::List(items) => {
+                    let Some((Sexpr::Sym(head), args)) = items.split_first() else {
+                        return Err(PredError::ExpectedBool {
+                            found: "non-form list".to_string(),
+                        });
+                    };
+                    match head.as_str() {
+                        // `pred` is the identity on its operand's bool, so it is
+                        // a **tail launch** — no resume frame. (Treating it as a
+                        // leaf would mean calling `eval_pred` recursively, which
+                        // is exactly the overflow this rewrite removes; and a
+                        // recursive `pred` is invisible in release builds, where
+                        // the compiler TCOs its tail call.)
+                        "pred" => match args {
+                            [e] => frames.push(Frame::Eval(e)),
+                            _ => return Err(arity("pred", 1, args.len())),
+                        },
+                        "not" => match args {
+                            [p] => {
+                                frames.push(Frame::Not);
+                                frames.push(Frame::Eval(p));
+                            }
+                            _ => return Err(arity("not", 1, args.len())),
+                        },
+                        // Leaves: neither re-enters the boolean spine.
+                        "=" => match args {
+                            [a, b] => vals.push(eval_num(a, env)? == eval_num(b, env)?),
+                            _ => return Err(arity("=", 2, args.len())),
+                        },
+                        // Structural equality on *syntax* (SPEC-0016 §2.4).
+                        "eq?" => match args {
+                            [a, b] => vals.push(eval_syntax(a, env)? == eval_syntax(b, env)?),
+                            _ => return Err(arity("eq?", 2, args.len())),
+                        },
+                        "and" => {
+                            let mut it = args.iter();
+                            match it.next() {
+                                Some(first) => {
+                                    // First entry launches operand 0 *without*
+                                    // inspecting any value — there is no "last
+                                    // boolean" yet.
+                                    frames.push(Frame::And(it));
+                                    frames.push(Frame::Eval(first));
+                                }
+                                None => vals.push(true), // `(and)` is vacuously true
+                            }
+                        }
+                        "or" => {
+                            let mut it = args.iter();
+                            match it.next() {
+                                Some(first) => {
+                                    frames.push(Frame::Or(it));
+                                    frames.push(Frame::Eval(first));
+                                }
+                                None => vals.push(false), // `(or)` is vacuously false
+                            }
+                        }
+                        other => {
+                            return Err(PredError::ExpectedBool {
+                                found: format!("form `{other}`"),
+                            })
+                        }
+                    }
+                }
+                _ => {
+                    return Err(PredError::ExpectedBool {
+                        found: describe(node),
+                    })
+                }
+            },
         }
-        other => Err(PredError::ExpectedBool {
-            found: format!("form `{other}`"),
-        }),
     }
+
+    let Some(result) = vals.pop() else {
+        unreachable!("eval_pred produced no value: the root Eval always pushes exactly one")
+    };
+    Ok(result)
 }
 
 fn arity(form: &str, expected: usize, got: usize) -> PredError {

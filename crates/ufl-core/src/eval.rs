@@ -46,32 +46,67 @@ impl Env {
 pub enum EvalError {
     #[error("unbound variable: {0}")]
     UnboundVariable(String),
-    #[error("recursion depth exceeded while evaluating")]
-    RecursionDepthExceeded,
 }
 
 /// Evaluate an EML expression under the given environment.
 ///
-/// Recursive post-order walk per SPEC-0001 §2.5:
+/// **Iterative** post-order walk over an explicit heap work-stack (R-0017): a
+/// tree of any depth the machine can allocate evaluates without a stack
+/// overflow. Semantics are unchanged from SPEC-0001 §2.5:
 ///
 /// - `One` → the complex value `1 + 0i`.
 /// - `Var(name)` → the binding from `env`, or `Err(UnboundVariable)`.
-/// - `Node { exp_arg, log_arg }` → `eval` both children, then return
+/// - `Node { exp_arg, log_arg }` → evaluate both children, then return
 ///   `exp(x) − ln_eml(y)`.
 ///
 /// Infallible on numeric edge cases (`inf` / `nan` propagate as ordinary
 /// `Value`s); the only failure mode is an unbound variable.
 pub fn eval(expr: &Eml, env: &Env) -> Result<Value, EvalError> {
-    // Evaluation post-order walk, per SPEC-0001 §2.5.
-    match expr {
-        Eml::One => Ok(Value::new(1.0, 0.0)),
-        Eml::Var(name) => env
-            .get(name)
-            .ok_or_else(|| EvalError::UnboundVariable(name.clone())),
-        Eml::Node { exp_arg, log_arg } => {
-            let exp_val = eval(exp_arg, env)?;
-            let log_val = eval(log_arg, env)?;
-            Ok(exp_val.exp() - crate::log::ln_eml(log_val))
+    // The two-stack post-order machine. `Task::Combine` marks the point where a
+    // node's two child values are ready to fold.
+    enum Task<'a> {
+        Eval(&'a Eml),
+        Combine,
+    }
+
+    let mut tasks = vec![Task::Eval(expr)];
+    let mut vals: Vec<Value> = Vec::new();
+
+    while let Some(task) = tasks.pop() {
+        match task {
+            Task::Eval(e) => match e {
+                Eml::One => vals.push(Value::new(1.0, 0.0)),
+                Eml::Var(name) => {
+                    let v = env
+                        .get(name)
+                        .ok_or_else(|| EvalError::UnboundVariable(name.clone()))?;
+                    vals.push(v);
+                }
+                Eml::Node { exp_arg, log_arg } => {
+                    // LIFO: push Combine, then log, then exp — so `exp` is
+                    // evaluated first and `log` second, preserving SPEC-0001
+                    // §2.4's convention *and* the order in which an unbound
+                    // variable surfaces.
+                    tasks.push(Task::Combine);
+                    tasks.push(Task::Eval(log_arg));
+                    tasks.push(Task::Eval(exp_arg));
+                }
+            },
+            Task::Combine => {
+                // Each `Eml` subtree nets exactly one value (leaf: +1; Node:
+                // two Evals then a Combine that pops 2 and pushes 1), and LIFO
+                // guarantees both children completed before their Combine — so
+                // two values are always present here.
+                let (Some(log_val), Some(exp_val)) = (vals.pop(), vals.pop()) else {
+                    unreachable!("eval value-stack underflow: each Combine follows two Eval pushes")
+                };
+                vals.push(exp_val.exp() - crate::log::ln_eml(log_val));
+            }
         }
     }
+
+    let Some(result) = vals.pop() else {
+        unreachable!("eval produced no value: the root task always pushes exactly one")
+    };
+    Ok(result)
 }
