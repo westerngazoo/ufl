@@ -16,8 +16,7 @@ use crate::expr::GeoExpr;
 /// length; product chains are parenthesised to stay unambiguous.
 pub fn render(e: &GeoExpr) -> String {
     let mut ctx = Ctx::default();
-    let mut body = String::new();
-    node(e, &mut ctx, &mut body);
+    let body = node(e, &mut ctx);
     let mut out = String::new();
     for (name, def) in &ctx.lets {
         out.push_str("let ");
@@ -60,117 +59,77 @@ fn is_atom(e: &GeoExpr) -> bool {
 
 /// Render `e` as a *factor* in a product / reverse context: parenthesise it
 /// unless it is an atom or a self-delimiting functional form (`exp`, `⟨⟩`, `𝒢`).
-fn factor(e: &GeoExpr, ctx: &mut Ctx, out: &mut String) {
+fn factor(e: &GeoExpr, ctx: &mut Ctx) -> String {
+    let s = node(e, ctx);
     let self_delimiting = matches!(
         e,
         GeoExpr::Exp(_) | GeoExpr::GradeProject(..) | GeoExpr::GradeLift(..)
     );
     if is_atom(e) || self_delimiting {
-        node(e, ctx, out);
+        s
     } else {
-        out.push('(');
-        node(e, ctx, out);
-        out.push(')');
+        format!("({s})")
     }
 }
 
-fn node(e: &GeoExpr, ctx: &mut Ctx, out: &mut String) {
+fn node(e: &GeoExpr, ctx: &mut Ctx) -> String {
     match e {
-        GeoExpr::Param(x) => fmt_param(*x, out),
-        GeoExpr::Var(name) => out.push_str(name),
-        GeoExpr::Basis(i) => blade_name(*i, out),
-        GeoExpr::GeoProduct(a, b) => {
-            factor(a, ctx, out);
-            out.push(' ');
-            factor(b, ctx, out);
-        }
-        GeoExpr::Wedge(a, b) => {
-            factor(a, ctx, out);
-            out.push('∧');
-            factor(b, ctx, out);
-        }
-        GeoExpr::Inner(a, b) => {
-            factor(a, ctx, out);
-            out.push('·');
-            factor(b, ctx, out);
-        }
-        GeoExpr::Reverse(a) => {
-            out.push('~');
-            factor(a, ctx, out);
-        }
-        GeoExpr::Exp(a) => {
-            out.push_str("exp(");
-            node(a, ctx, out);
-            out.push(')');
-        }
-        GeoExpr::GradeProject(k, a) => {
-            out.push('⟨');
-            node(a, ctx, out);
-            use std::fmt::Write;
-            write!(out, "⟩_{k}").unwrap();
-        }
-        GeoExpr::GradeLift(k, a) => {
-            use std::fmt::Write;
-            write!(out, "𝒢_{k}(").unwrap();
-            node(a, ctx, out);
-            out.push(')');
-        }
+        GeoExpr::Param(x) => fmt_param(*x),
+        GeoExpr::Var(name) => name.clone(),
+        GeoExpr::Basis(i) => blade_name(*i),
+        GeoExpr::GeoProduct(a, b) => format!("{} {}", factor(a, ctx), factor(b, ctx)),
+        GeoExpr::Wedge(a, b) => format!("{}∧{}", factor(a, ctx), factor(b, ctx)),
+        GeoExpr::Inner(a, b) => format!("{}·{}", factor(a, ctx), factor(b, ctx)),
+        GeoExpr::Reverse(a) => format!("~{}", factor(a, ctx)),
+        GeoExpr::Exp(a) => format!("exp({})", node(a, ctx)),
+        GeoExpr::GradeProject(k, a) => format!("⟨{}⟩_{k}", node(a, ctx)),
+        GeoExpr::GradeLift(k, a) => format!("𝒢_{k}({})", node(a, ctx)),
         GeoExpr::Sandwich(rotor, x) => {
             // Bind a non-atom rotor to a name so nesting stays bounded
             // (rendering it once into a `let`, not twice inline).
             let rotor_str = if is_atom(rotor) {
-                let mut temp = String::new();
-                node(rotor, ctx, &mut temp);
-                temp
+                node(rotor, ctx)
             } else {
-                let mut def = String::new();
-                node(rotor, ctx, &mut def);
+                let def = node(rotor, ctx);
                 let name = ctx.fresh();
                 ctx.lets.push((name.clone(), def));
                 name
             };
-            out.push_str(&rotor_str);
-            out.push(' ');
-            factor(x, ctx, out);
-            out.push_str(" ~");
-            out.push_str(&rotor_str);
+            format!("{rotor_str} {} ~{rotor_str}", factor(x, ctx))
         }
     }
 }
 
 /// The blade's name (garust `Cl(3,0,1)` convention: `e₀` is the null generator,
 /// bit 3). Subscripts ascend `0 < 1 < 2 < 3`, so e.g. blade 9 (`e₀ ∧ e₁`) is `e₀₁`.
-fn blade_name(i: u8, out: &mut String) {
+fn blade_name(i: u8) -> String {
     if i == 0 {
-        out.push('1');
-        return;
+        return "1".to_string();
     }
     if i >= 16 {
-        use std::fmt::Write;
-        write!(out, "e?{i}").unwrap();
-        return;
+        return format!("e?{i}");
     }
     const GENERATORS: [(u8, char); 4] = [(8, '₀'), (1, '₁'), (2, '₂'), (4, '₃')];
-    out.push('e');
+    let mut name = String::from("e");
     for (bit, sub) in GENERATORS {
         if i & bit != 0 {
-            out.push(sub);
+            name.push(sub);
         }
     }
+    name
 }
 
 /// A parameter to 3 significant figures (trailing zeros trimmed).
-fn fmt_param(x: f64, out: &mut String) {
+fn fmt_param(x: f64) -> String {
     if x == 0.0 {
-        out.push('0');
-        return;
+        return "0".to_string();
     }
     let magnitude = x.abs().log10().floor() as i32;
     let decimals = (2 - magnitude).clamp(0, 12) as usize;
     let s = format!("{x:.decimals$}");
     if s.contains('.') {
-        out.push_str(s.trim_end_matches('0').trim_end_matches('.'));
+        s.trim_end_matches('0').trim_end_matches('.').to_string()
     } else {
-        out.push_str(&s);
+        s
     }
 }
