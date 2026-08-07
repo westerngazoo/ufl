@@ -147,6 +147,9 @@ pub fn eval_pred(s: &Sexpr, env: &Env) -> Result<bool, PredError> {
                             found: "non-form list".to_string(),
                         });
                     };
+                    // This `match` is the documented seam where the deferred
+                    // control forms (`;`, choice, fixpoint) plug in — one arm at
+                    // a time (SPEC-0004 §2.3).
                     match head.as_str() {
                         // `pred` is the identity on its operand's bool, so it is
                         // a **tail launch** — no resume frame. (Treating it as a

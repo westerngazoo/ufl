@@ -56,6 +56,9 @@ pub fn lower(s: &Sexpr) -> Result<Eml, LowerError> {
                     let Some((Sexpr::Sym(head), args)) = items.split_first() else {
                         return Err(LowerError::NotAForm);
                     };
+                    // This `match` is the documented seam where future forms
+                    // (and the orchestrator/macro layer) plug in; the form-table
+                    // registry is deferred until form count warrants it.
                     match head.as_str() {
                         "eml" => match args {
                             [a, b] => {

@@ -46,6 +46,13 @@ a **clippy lint**, not a grep, because a grep cannot exclude inline
   pre-1.0 research crates, zero external consumers (verified by grep).
 - The R-0003 acceptance test asserting the *inverse* of AC2 (129-deep must fail)
   is deleted; `r_0017_depth_contract.rs` supersedes it.
+- **Adversarial-input posture changes shape, not severity.** Removing the cap
+  moves `read`'s worst case from *stack overflow* (an `abort()`) to *heap
+  proportional to input*: `"("×n` allocates n empty `Vec`s and then returns
+  `UnclosedList`. Bounded and linear in the input we already hold in memory, and
+  it fails as a typed `Err` rather than killing the process — but it is the
+  substantive consequence of deleting PR #40's mitigation, recorded here so it
+  need not be re-derived.
 - **Superseded PRs:** #38 (heap-bounded `eval`, never merged — its correct-in-
   spirit shape is reimplemented here without the bare `unwrap`s) and #40 (the
   128-cap; its iterative `Drop`s are kept and regression-guarded).

@@ -93,6 +93,41 @@ Instances: `Eml`/`Sexpr` iterative `Drop` (PR #40); R-0017's `eval`, `read`,
 
 **Decided:** 2026-07-26.
 
+### Bounded-Stack Regression Arena
+
+A test for "this deep input does not overflow the stack" cannot be an ordinary
+`#[test]`: a stack overflow is an `abort()`, **not** a catchable panic. A child
+*thread* cannot `join()` it, and on the main thread it takes the whole test
+binary down — so the regression reports as a runtime abort with its sibling tests
+deleted, rather than as one named failing test.
+
+Run the deep case in a **subprocess** — a re-exec of the test binary itself,
+selected by an env var and a `--exact` filter — and assert the child's **exit
+status**. Two companions are mandatory:
+
+1. **Pin the arena to the `dev` (debug) profile.** `--release` TCOs a
+   tail-recursive walk, so it false-passes at *any* depth. Measured on UFL's
+   pre-R-0017 recursive `eval_pred`, a `(pred …)` spine overflows at 10⁵ in debug
+   and returns `Ok` at 3·10⁶ in release. A release run must **decline** and say
+   so, never report a green it cannot justify.
+2. **Assert the child actually ran a test** (`stdout` contains `1 passed`).
+   `libtest` exits 0 when its filter matches nothing, so exit status alone
+   false-passes the moment the test name and the case string drift apart.
+
+Deep fixtures are built **iteratively** — a recursive generator overflows before
+the code under test runs. And deep values are compared with `assert!(a == b, …)`,
+never `assert_eq!`: `Debug` is typically still a recursive derive, so formatting
+the failure message would itself abort, reporting the exact symptom the test
+exists to distinguish.
+
+Prove the arena can fail before trusting it: reintroduce the recursion and watch
+it fail *by name*.
+
+Instances: R-0017's `r_0017_depth_contract.rs` in `ufl-syntax` and
+`ufl-predicate` (11 cases at depth 10⁵).
+
+**Decided:** 2026-07-26.
+
 ### Assert the Protocol, Not the Outcome
 
 When a committed test *runs an experiment* whose scientific result is the
