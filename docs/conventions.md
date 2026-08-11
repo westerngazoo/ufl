@@ -128,22 +128,6 @@ Instances: R-0017's `r_0017_depth_contract.rs` in `ufl-syntax` and
 
 **Decided:** 2026-07-26.
 
-### Assert the Protocol, Not the Outcome
-
-When a committed test *runs an experiment* whose scientific result is the
-deliverable, the assertion checks that the experiment **ran as pre-registered**
-(fixed budget, fixed seeds, verdict recorded) — never that it produced the hoped
-result. A documented negative is then a first-class **green** outcome, and CI
-cannot create pressure to tune until the answer is the pleasant one. Pair it with
-a reachability pre-check so a negative is *clean* (the thing was findable) rather
-than *confounded* (it never existed).
-
-Instances: SPEC-0018 §4 (the gate asserts it ran at the pinned budget/seeds);
-SPEC-0014N §2.5 (the integer probe prints its bit-exact count unconditionally and
-asserts **both** bounds, so drift toward either extreme fails loudly).
-
-**Decided:** 2026-07-26.
-
 ### Structural Frugality over Wall-Clock
 
 Performance acceptance criteria assert the **mechanism** (a cached field, a
