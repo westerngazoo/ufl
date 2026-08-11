@@ -128,6 +128,30 @@ Instances: R-0017's `r_0017_depth_contract.rs` in `ufl-syntax` and
 
 **Decided:** 2026-07-26.
 
+### Assert the Protocol, Not the Outcome
+
+When a committed test *runs an experiment* whose scientific result is the
+deliverable, the assertion checks that the experiment **ran as pre-registered**
+(fixed budget, fixed seeds, verdict recorded) — never that it produced the hoped
+result. A documented negative is then a first-class **green** outcome, and CI
+cannot create pressure to keep tuning until the answer is the pleasant one.
+
+Two companions make the negative *worth* something:
+
+1. **Print the measurement unconditionally**, so the number lands in the PR
+   whichever way it fell. A verdict nobody can read is not a result.
+2. **Pair it with a reachability pre-check**, so a negative is *clean* (the thing
+   was findable and we failed to find it) rather than *confounded* (it was never
+   there). Without this, "not found" is unattributable.
+
+Instances: SPEC-0018 §4 — the ⟨2,2,3⟩ gate asserts it ran at the pre-registered
+budget and seeds, explicitly **not** that rank 11 was found, with §4's
+`T-ternary-exists` as the reachability pre-check. SPEC-0014N §2.5 — the integer
+probe asserts the pre-registered three-way verdict and prints the bit-exact count
+and ulp bound unconditionally.
+
+**Decided:** 2026-07-26.
+
 ### Structural Frugality over Wall-Clock
 
 Performance acceptance criteria assert the **mechanism** (a cached field, a
