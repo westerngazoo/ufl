@@ -48,6 +48,9 @@ fn arena(case: &str) -> bool {
     if std::env::var("UFL_DEPTH_ARENA").as_deref() == Ok(case) {
         return true; // child mode: this process **is** the arena
     }
+    // Normally unreachable: the `cfg_attr(ignore)` on each arena test means a
+    // release run reports them as **ignored, with the reason**, rather than a
+    // green that hides a skip. This still guards `--release -- --ignored`.
     if !cfg!(debug_assertions) {
         eprintln!("arena[{case}]: declined — only a debug build can detect a recursive regression");
         return false;
@@ -157,6 +160,10 @@ fn and_or_short_circuit_including_the_nested_case() {
 /// (`eval_syntax`) and compares the two with `==`; both were derived, hence
 /// recursive, so this form aborted **in library code**.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_eq_on_quoted_trees() {
     if !arena("deep_eq_on_quoted_trees") {
         return;
@@ -175,6 +182,10 @@ fn arena_deep_eq_on_quoted_trees() {
 /// one pipeline: clone (`eval_syntax`) → `lower` → `ufl_core::eval`. Three
 /// formerly-recursive walks in a single form.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_eval_of_a_quoted_spine() {
     if !arena("deep_eval_of_a_quoted_spine") {
         return;
@@ -201,6 +212,10 @@ fn arena_deep_eval_of_a_quoted_spine() {
 /// tail **launch** here — push the operand, no resume frame — so the frame stack
 /// does not grow at all.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_pred_spine() {
     if !arena("deep_pred_spine") {
         return;
@@ -211,6 +226,10 @@ fn arena_deep_pred_spine() {
 
 /// `not` at depth — an even count returns the leaf unchanged.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_not_spine() {
     if !arena("deep_not_spine") {
         return;
@@ -221,6 +240,10 @@ fn arena_deep_not_spine() {
 
 /// A left-nested `and` spine at depth: 10⁵ `And` frames outstanding at once.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_and_spine() {
     if !arena("deep_and_spine") {
         return;
@@ -231,6 +254,10 @@ fn arena_deep_and_spine() {
 
 /// The `or` counterpart — a distinct frame kind with its own resume arm.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_or_spine() {
     if !arena("deep_or_spine") {
         return;

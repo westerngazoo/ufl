@@ -33,6 +33,9 @@ fn arena(case: &str) -> bool {
     if std::env::var("UFL_DEPTH_ARENA").as_deref() == Ok(case) {
         return true;
     }
+    // Normally unreachable: the `cfg_attr(ignore)` on each arena test means a
+    // release run reports them as **ignored, with the reason**, rather than a
+    // green that hides a skip. This still guards `--release -- --ignored`.
     if !cfg!(debug_assertions) {
         eprintln!("arena[{case}]: declined — only a debug build can detect a recursive regression");
         return false;
@@ -103,6 +106,10 @@ fn the_codec_is_symmetric_across_and_past_the_old_cap() {
 /// **AC1 — the round trip at 10⁵**, compared as `String`: tree `==` is itself
 /// one of the walks under test, so the codec check must not lean on it.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_round_trip_read_display() {
     if !arena("deep_round_trip_read_display") {
         return;
@@ -118,6 +125,10 @@ fn arena_deep_round_trip_read_display() {
 /// **AC1 — `raise → read → lower → eval` on a deep `(eml …)` spine** returns a
 /// value with no overflow and no panic.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_eml_spine_lowers_and_evaluates() {
     if !arena("deep_eml_spine_lowers_and_evaluates") {
         return;
@@ -138,6 +149,10 @@ fn arena_deep_eml_spine_lowers_and_evaluates() {
 /// failure message would itself overflow — reporting the exact abort the test
 /// exists to distinguish.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_clone_and_structural_eq_do_not_abort() {
     if !arena("deep_clone_and_structural_eq_do_not_abort") {
         return;
@@ -161,6 +176,10 @@ fn arena_deep_clone_and_structural_eq_do_not_abort() {
 /// **`raise` is on the same codec** — the `Eml → Sexpr` leg. A deep
 /// `Eml → raise → Display → read → lower` cycle used to overflow *at `raise`*.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_raise_closes_the_code_data_square() {
     if !arena("deep_raise_closes_the_code_data_square") {
         return;
@@ -174,6 +193,10 @@ fn arena_deep_raise_closes_the_code_data_square() {
 /// **AC3 (regression guard)** — the `Drop`s were already iterative (PR #40);
 /// this pins them so a future refactor cannot silently re-recurse.
 #[test]
+#[cfg_attr(
+    not(debug_assertions),
+    ignore = "the depth arena is sound only in a debug build: --release TCOs tail recursion and would false-pass"
+)]
 fn arena_deep_trees_drop_without_overflow() {
     if !arena("deep_trees_drop_without_overflow") {
         return;
