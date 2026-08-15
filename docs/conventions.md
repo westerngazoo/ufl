@@ -59,6 +59,99 @@ in `State::new`, so the trait path cannot bypass them).
 
 **Decided:** 2026-06-08.
 
+### Explicit-Stack Tree Walk (no recursion on machine-shaped depth)
+
+Any walk over a heap-recursive AST that a *generator* — not just a human — can
+build deep (evaluate, lower, print, read, clone, compare, raise, drop) uses an
+explicit heap work-stack, never call-stack recursion: depth is then bounded by
+the heap, not the thread stack, and there is no cap to pick, tune, or breach.
+
+Applied **per site, not via a shared helper**. The walks differ materially —
+n-ary vs binary, eager-`?`-error vs lazy short-circuit, byte-identical emission —
+and one signature over all of them is the wrong abstraction ("three similar lines
+beat the wrong abstraction", CLAUDE.md §2).
+
+Two companions are mandatory:
+1. a comment stating the **child push order** wherever a reversal would silently
+   transpose operands (LIFO means you push the *last* child first);
+2. a **differential test** as the order tripwire — an underflow `unreachable!`
+   guards *arity*, not *order*, so only comparing against a known-good result
+   catches a swap.
+
+Two traps this convention exists to remember, both found by review, both
+invisible without it:
+- **A tail call can hide a recursion in release builds.** `eval_pred`'s
+  `(pred e)` looked like a leaf; implemented recursively it survived 100k nesting
+  under `--release` because the compiler TCO'd it, and only overflowed in debug.
+  Prefer a tail *launch* (push the operand, no resume frame).
+- **A derived trait is a recursive walk.** `#[derive(Clone, PartialEq)]` on a
+  boxed-recursive enum generates recursion that no grep for `fn` will find —
+  `(eq? (quote DEEP))` aborted in library code for exactly this reason.
+
+Instances: `Eml`/`Sexpr` iterative `Drop` (PR #40); R-0017's `eval`, `read`,
+`Display`, `lower`, `raise`, `eval_pred`, and the hand-written `Clone`/`PartialEq`.
+
+**Decided:** 2026-07-26.
+
+### Bounded-Stack Regression Arena
+
+A test for "this deep input does not overflow the stack" cannot be an ordinary
+`#[test]`: a stack overflow is an `abort()`, **not** a catchable panic. A child
+*thread* cannot `join()` it, and on the main thread it takes the whole test
+binary down — so the regression reports as a runtime abort with its sibling tests
+deleted, rather than as one named failing test.
+
+Run the deep case in a **subprocess** — a re-exec of the test binary itself,
+selected by an env var and a `--exact` filter — and assert the child's **exit
+status**. Two companions are mandatory:
+
+1. **Pin the arena to the `dev` (debug) profile.** `--release` TCOs a
+   tail-recursive walk, so it false-passes at *any* depth. Measured on UFL's
+   pre-R-0017 recursive `eval_pred`, a `(pred …)` spine overflows at 10⁵ in debug
+   and returns `Ok` at 3·10⁶ in release. A release run must **decline** and say
+   so, never report a green it cannot justify.
+2. **Assert the child actually ran a test** (`stdout` contains `1 passed`).
+   `libtest` exits 0 when its filter matches nothing, so exit status alone
+   false-passes the moment the test name and the case string drift apart.
+
+Deep fixtures are built **iteratively** — a recursive generator overflows before
+the code under test runs. And deep values are compared with `assert!(a == b, …)`,
+never `assert_eq!`: `Debug` is typically still a recursive derive, so formatting
+the failure message would itself abort, reporting the exact symptom the test
+exists to distinguish.
+
+Prove the arena can fail before trusting it: reintroduce the recursion and watch
+it fail *by name*.
+
+Instances: R-0017's `r_0017_depth_contract.rs` in `ufl-syntax` and
+`ufl-predicate` (11 cases at depth 10⁵).
+
+**Decided:** 2026-07-26.
+
+### Assert the Protocol, Not the Outcome
+
+When a committed test *runs an experiment* whose scientific result is the
+deliverable, the assertion checks that the experiment **ran as pre-registered**
+(fixed budget, fixed seeds, verdict recorded) — never that it produced the hoped
+result. A documented negative is then a first-class **green** outcome, and CI
+cannot create pressure to keep tuning until the answer is the pleasant one.
+
+Two companions make the negative *worth* something:
+
+1. **Print the measurement unconditionally**, so the number lands in the PR
+   whichever way it fell. A verdict nobody can read is not a result.
+2. **Pair it with a reachability pre-check**, so a negative is *clean* (the thing
+   was findable and we failed to find it) rather than *confounded* (it was never
+   there). Without this, "not found" is unattributable.
+
+Instances: SPEC-0018 §4 — the ⟨2,2,3⟩ gate asserts it ran at the pre-registered
+budget and seeds, explicitly **not** that rank 11 was found, with §4's
+`T-ternary-exists` as the reachability pre-check. SPEC-0014N §2.5 — the integer
+probe asserts the pre-registered three-way verdict and prints the bit-exact count
+and ulp bound unconditionally.
+
+**Decided:** 2026-07-26.
+
 ### Structural Frugality over Wall-Clock
 
 Performance acceptance criteria assert the **mechanism** (a cached field, a

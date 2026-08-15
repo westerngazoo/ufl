@@ -21,8 +21,6 @@ pub enum ReadError {
     EmptyInput,
     #[error("unexpected trailing tokens after the first s-expression")]
     TrailingTokens,
-    #[error("recursion depth exceeded while parsing")]
-    RecursionDepthExceeded,
 }
 
 /// A lexical token. Comments and whitespace are consumed during tokenization
@@ -105,50 +103,50 @@ pub fn is_reader_canonical_sym(token: &str) -> bool {
         && matches!(classify(token), Sexpr::Sym(_))
 }
 
-/// Parse one s-expression starting at `tokens[*pos]`, advancing `*pos` past it.
-/// Running off the end can only happen inside an unclosed list.
-fn parse_expr(tokens: &[Token], pos: &mut usize, depth: usize) -> Result<Sexpr, ReadError> {
-    if depth > ufl_core::get_max_depth() {
-        return Err(ReadError::RecursionDepthExceeded);
-    }
-
-    let Some(token) = tokens.get(*pos) else {
-        return Err(ReadError::UnclosedList);
-    };
-    match token {
-        Token::Close => Err(ReadError::UnexpectedClose),
-        Token::Atom(atom) => {
-            let expr = classify(atom);
-            *pos += 1;
-            Ok(expr)
-        }
-        Token::Open => {
-            *pos += 1; // consume '('
-            let mut items = Vec::new();
-            loop {
-                match tokens.get(*pos) {
-                    None => return Err(ReadError::UnclosedList),
-                    Some(Token::Close) => {
-                        *pos += 1; // consume ')'
-                        return Ok(Sexpr::List(items));
-                    }
-                    Some(_) => items.push(parse_expr(tokens, pos, depth + 1)?),
-                }
-            }
-        }
-    }
-}
-
 /// Read exactly one top-level s-expression from `src`.
+///
+/// **Iterative** (R-0017): an explicit stack of partial lists, so input of any
+/// nesting depth parses without recursion and **without a depth cap**. The error
+/// behaviour is unchanged — in particular the single-top-level-datum rule: once
+/// a top-level datum completes, *any* further token is `TrailingTokens`.
 pub fn read(src: &str) -> Result<Sexpr, ReadError> {
     let tokens = tokenize(src);
     if tokens.is_empty() {
         return Err(ReadError::EmptyInput);
     }
-    let mut pos = 0;
-    let expr = parse_expr(&tokens, &mut pos, 0)?;
-    if pos != tokens.len() {
-        return Err(ReadError::TrailingTokens);
+
+    let mut stack: Vec<Vec<Sexpr>> = Vec::new();
+    let mut result: Option<Sexpr> = None;
+
+    for token in &tokens {
+        // Once the single top-level datum is complete, nothing may follow it.
+        if result.is_some() && stack.is_empty() {
+            return Err(ReadError::TrailingTokens);
+        }
+        match token {
+            Token::Open => stack.push(Vec::new()),
+            Token::Atom(atom) => {
+                let expr = classify(atom);
+                match stack.last_mut() {
+                    Some(top) => top.push(expr),
+                    None => result = Some(expr),
+                }
+            }
+            Token::Close => {
+                let Some(items) = stack.pop() else {
+                    return Err(ReadError::UnexpectedClose);
+                };
+                let list = Sexpr::List(items);
+                match stack.last_mut() {
+                    Some(top) => top.push(list),
+                    None => result = Some(list),
+                }
+            }
+        }
     }
-    Ok(expr)
+
+    if !stack.is_empty() {
+        return Err(ReadError::UnclosedList);
+    }
+    result.ok_or(ReadError::UnclosedList)
 }

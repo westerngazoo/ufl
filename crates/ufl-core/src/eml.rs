@@ -6,7 +6,7 @@
 /// `S → 1 | <var> | eml(S, S)`.
 ///
 /// The enum admits exactly the grammar — R-0001 AC1 holds structurally.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Eml {
     /// The literal `1` — the sole numeric constant terminal.
     One,
@@ -36,6 +36,77 @@ impl Eml {
             exp_arg: Box::new(exp_arg),
             log_arg: Box::new(log_arg),
         }
+    }
+}
+
+/// **Iterative** deep clone (R-0017): a two-stack post-order rebuild, so a tree
+/// of any depth clones without recursing. `Eml` is heap-recursive, and `eq?` /
+/// `eval_syntax` clone quoted subtrees, so a derived (recursive) `Clone` would
+/// abort on the deep machine-generated ASTs the reflection loop makes normal.
+impl Clone for Eml {
+    fn clone(&self) -> Self {
+        enum Task<'a> {
+            Visit(&'a Eml),
+            Rebuild,
+        }
+        let mut tasks = vec![Task::Visit(self)];
+        let mut out: Vec<Eml> = Vec::new();
+        while let Some(t) = tasks.pop() {
+            match t {
+                Task::Visit(e) => match e {
+                    Eml::One => out.push(Eml::One),
+                    Eml::Var(n) => out.push(Eml::Var(n.clone())),
+                    Eml::Node { exp_arg, log_arg } => {
+                        tasks.push(Task::Rebuild);
+                        tasks.push(Task::Visit(log_arg));
+                        tasks.push(Task::Visit(exp_arg));
+                    }
+                },
+                Task::Rebuild => {
+                    // Same net-one-value argument as `eval`: a Rebuild always
+                    // follows its two children's Visits.
+                    let (Some(log_arg), Some(exp_arg)) = (out.pop(), out.pop()) else {
+                        unreachable!("clone stack underflow: each Rebuild follows two Visits")
+                    };
+                    out.push(Eml::node(exp_arg, log_arg));
+                }
+            }
+        }
+        let Some(root) = out.pop() else {
+            unreachable!("clone produced no value: the root Visit always pushes one")
+        };
+        root
+    }
+}
+
+/// **Iterative** structural equality (R-0017): a lockstep walk over an explicit
+/// pair-stack, short-circuiting on the first difference. Same verdict as the
+/// derived `PartialEq`, without the recursion (`eq?` compares `Sexpr`/`Eml`
+/// with `==` on quoted — hence potentially deep — trees).
+impl PartialEq for Eml {
+    fn eq(&self, other: &Self) -> bool {
+        let mut pairs = vec![(self, other)];
+        while let Some((a, b)) = pairs.pop() {
+            match (a, b) {
+                (Eml::One, Eml::One) => {}
+                (Eml::Var(x), Eml::Var(y)) if x == y => {}
+                (
+                    Eml::Node {
+                        exp_arg: ae,
+                        log_arg: al,
+                    },
+                    Eml::Node {
+                        exp_arg: be,
+                        log_arg: bl,
+                    },
+                ) => {
+                    pairs.push((al, bl));
+                    pairs.push((ae, be));
+                }
+                _ => return false,
+            }
+        }
+        true
     }
 }
 

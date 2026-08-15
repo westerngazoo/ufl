@@ -431,6 +431,9 @@ a bare "match"/"leak".
    `get_max_depth()`, and this design never builds an `Sexpr`, so the `Display` cap is
    unreachable from this test path. Keep the note for whoever *does* render these
    trees; drop it as a constraint on T-depth-exact.
+   **Resolved 2026-07-26 (R-0017, PR #80):** the cap is gone entirely — `Display`
+   no longer panics at any depth, so the note above is history, not a live
+   constraint on anyone rendering these trees.
 
 ## 6. Three-lens resolutions (2026-07-25)
 
