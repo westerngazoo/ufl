@@ -1,266 +1,381 @@
 # SPEC-0019 — The depth contract on the geometric surface
 
 - **Realizes:** [R-0019](../requirements/0019-geo-depth-contract.md).
-- **Status:** **Draft** — awaiting the three-lens (CLAUDE.md §4 step 2).
+- **Status:** **Draft (rev 2)** — three-lens round 1 complete; the three blocking
+  findings are folded below. Awaiting re-review.
 - **Crates touched:** `ufl-geo`, `ufl-evolve`. No new crate, no new public type.
-- **Precedent:** [SPEC-0017](0017-depth-contract.md) discharged this exact class on
-  `Sexpr`/`Eml`. This spec applies the two conventions that work produced
-  (*Explicit-Stack Tree Walk*, *Bounded-Stack Regression Arena*) and does **not**
-  re-derive them.
+- **Precedent:** [SPEC-0017](0017-depth-contract.md). This spec applies that
+  work's two conventions rather than re-deriving them.
 
-## 1. The policy, restated
+## 1. The policy
 
-Identical to R-0017: **iterative everywhere, no cap, no constant.** Depth is
-bounded by the heap. Nothing here introduces a `MAX_DEPTH`, and `max_nodes`
-keeps its current value of 60 (R-0019 §3 — decoupling, not tuning).
+Identical to R-0017: **iterative everywhere, no cap, no constant.** `max_nodes`
+keeps its value of 60 (R-0019 §3 — decoupling, not tuning).
 
-**Thirteen** recursive walks are in scope, all measured (R-0019 §1, plus §2.2
-below for `is_versor`). Ordered by how soon they die:
+**Fourteen** recursive walks are in scope (R-0019 §1.1). Two things that table
+does **not** say, and this spec is built around:
 
-| # | walk | crate | aborts at |
-|---|------|-------|-----------|
-| 1 | `eval` | `ufl-geo` | **215** |
-| 2 | `render` (`node`/`factor`) | `ufl-geo` | 2,480 |
-| 3 | `typecheck` | `ufl-geo` | 2,799 |
-| 4 | `replace_nth` | `ufl-evolve` | 3,656 |
-| 5 | `collect` (`params`/`params_mut`) | `ufl-geo` | 4,113 |
-| 6 | `Clone` (derived) | `ufl-geo` | 4,113 |
-| 7 | `grade` | `ufl-geo` | 4,700 |
-| 8 | `is_versor` | `ufl-geo` | 4,701 † |
-| 9 | `PartialEq` (derived) | `ufl-geo` | 4,701 |
-| 10 | `Debug` (derived) | `ufl-geo` | 5,060 |
-| 11 | `node_count` | `ufl-evolve` | 16,458 |
-| 12 | `Drop` (glue) | `ufl-geo` | 18,801 |
-| 13 | `nth_subtree` | `ufl-evolve` | 26,332 |
-
-† `is_versor` is mutually recursive with `grade` (it calls `grade` on a rotor's
-bivector). Measured on a `Sandwich` spine it does **not** worsen the bound —
-4,701 vs `grade`'s 4,700 — because its recursion is bounded by the *rotor*
-subtree, not by the spine. It is in scope because it is a recursive walk on a
-tree, not because it is currently the binding constraint.
+- **The depths are properties of a 2 MiB thread, not of the code.** `eval` aborts
+  at 215 under libtest and survives 800 on an 8 MB main thread. The portable
+  invariant is **bytes per frame** — `eval` ≈ 9,754 B/frame debug, ≈ 1,560 B/frame
+  release.
+- **`grade` is exponential** (R-0019 §1.2), and *an iterative rewrite does not fix
+  that*. A stack machine that re-walks is still 2^depth. §2.2b addresses it
+  separately, as AC8.
 
 ## 2. Design
 
-Every rewrite is the same idiom — a task stack plus a result stack, post-order —
-applied **per site**, never through a shared helper (the walks return different
-types and have different error disciplines; *Explicit-Stack Tree Walk* forbids
-the shared-helper shortcut for exactly this reason). Each site carries a
-**push-order comment** wherever a reversal would transpose operands, and each is
-covered by a **differential order tripwire** (§4).
+The same idiom throughout — task stack plus result stack, post-order — applied
+**per site**, never through a shared helper (*Explicit-Stack Tree Walk*). Each
+site carries a **push-order comment** and a **differential order tripwire** (§4).
 
-### 2.1 `eval` (`ufl-geo/src/eval.rs`) — the one that matters
+### 2.1 `eval` (`ufl-geo/src/eval.rs`)
 
 ```rust
 enum Task<'a> { Visit(&'a GeoExpr), Apply(&'a GeoExpr) }
 ```
 
-A `Visit` on a leaf pushes an `Mv`; on an internal node it pushes
-`Apply(node)` then its children **in reverse** so the left child evaluates first.
-`Apply` pops the operands and applies the node's operator. Binary nodes pop
-`(b, a)` in that order — the comment must say so, since `Wedge`/`Inner` are not
+`Visit` on a leaf pushes an `Mv`; on an internal node it pushes `Apply(node)`
+then the children **in reverse**, so the left child evaluates first. `Apply` pops
+`(b, a)` in that order — stated in a comment, because `Wedge`/`Inner` are not
 commutative and a transposition is silent.
 
-Error discipline is unchanged: `BadBlade`/`BadGrade`/`Unbound` surface at the
-same node and in the same left-to-right order, because a `Visit` of the left
-subtree fully drains before the right subtree's tasks are reached.
+Error order is unchanged: the left subtree fully drains before the right
+subtree's tasks are reached.
 
-**Why this walk is the point of the requirement:** its 215-deep ceiling comes
-from frame *size* — each frame holds an `Mv` (16 × `f64`) and binary nodes hold
-two at once. Moving those to a heap `Vec<Mv>` is what lifts the ceiling by orders
-of magnitude, and it is also the throughput risk (§5 Q2).
+**Correction to rev 1.** It claimed the 215 ceiling comes from binary nodes
+holding two `Mv`s. Measured false — a `Reverse` spine with zero binary nodes
+aborts at exactly 215 too. The cause is ~9.7 KB of opt-level-0 frame across the
+11-arm match; `Mv` is ~1.3% of it. Consequences:
 
-### 2.2 `grade` + `is_versor` (`ufl-geo/src/grade.rs`) — two results, one machine
+- **§5 Q2's throughput comparison must run in release**, where the recursive
+  frame is ~6× cheaper than debug suggests and the iterative form's `Vec<Mv>`
+  allocation is proportionally more visible.
+- Size or reuse that `Vec` — `GeoFitness::score` calls `eval` **six times per
+  candidate per generation** (`memetic.rs:96-108`).
 
-`grade` returns a `GradeSet`; `is_versor` returns a `bool`; `grade`'s `Sandwich`
-arm consults `is_versor` and branches on it. Three options, and the spec picks
-the third:
+### 2.2 `grade` + `is_versor` — **option 1**, not option 3
 
-1. two independent machines — `is_versor` re-walks subtrees `grade` has already
-   walked (today's behaviour, preserved but wasteful);
-2. one machine, one `enum Out { Grade(GradeSet), Versor(bool) }` result stack —
-   type-unsafe in the sense that a mis-sequenced pop yields the wrong variant and
-   an `unreachable!`;
-3. **one machine with two typed result stacks** (`Vec<GradeSet>` and
-   `Vec<bool>`) and a task enum spanning both — a mis-sequence is then a stack
-   underflow at a named site, not a variant confusion.
+Rev 1 proposed one machine with two typed result stacks. **Changed to two
+independent machines** on the architect's reasoning:
 
-Option 3 keeps the same **conservative** versor predicate: `is_versor` may still
-answer `false` for a genuine versor, and the grade rule still falls back to the
-sound product bound. This spec changes **no** grade semantics; AC4's differential
-fuzz is what proves it.
+- An iterative `grade` calling an iterative `is_versor` adds exactly one call
+  frame, not a spine. The depth contract is **fully discharged** by option 1;
+  there is no safety argument for merging.
+- *Explicit-Stack Tree Walk* says "per site, not via a shared helper". Merging is
+  that shortcut, and §3 declares this spec "not a tuning change".
+- Rev 1's safety claim was **overstated**: two typed stacks remove *variant*
+  confusion, not *value* confusion. Two non-empty stacks holding the wrong
+  entries yield a silent wrong `GradeSet` and no underflow.
 
-### 2.3 `typecheck` (`ufl-geo/src/grade.rs`) — eager error, unchanged order
+Merging does **not** endanger the conservative predicate — both functions are
+total and pure, so eager evaluation is observationally identical — but that was
+never the reason to merge.
 
-Same machine shape, `Result`-valued. The existing implementation validates a node
-**before** descending, so `BadBlade`/`BadGrade` precede any child's
-`Incoherent`. The iterative form must preserve that by validating in the `Visit`
-arm, before pushing children — the same discipline SPEC-0017 §2.3 used for
-`lower`.
+### 2.2b Single-visit `grade` (AC8) — the constraint that actually binds
 
-### 2.4 `render` (`ufl-geo/src/render.rs`) — the hard one
+R-0019 §1.2: `grade`'s `Sandwich` arm computes `grade(b)` inside `is_versor(r)`
+and again inside `grade(r)` on the non-versor branch ⇒ 2^depth. Measured 71 ms
+`typecheck` on a **55-node** genome, inside today's cap, against 62 µs for `eval`.
 
-`render` is the only walk with a **non-linear output discipline**. Its `Sandwich`
-arm renders the rotor into a *separate* buffer, appends `(name, def)` to
-`ctx.lets`, and emits only the name. So the machine cannot append to one output
-string: it needs a **stack of sinks**.
+This is **not** solved by §2.2. It is a separate, explicitly measured change:
+
+- Compute `grade(r)` **once** per `Sandwich` node and have both the versor test
+  and the product-bound rule read that one result. Since `is_versor(Exp(b))` is
+  `subset_of(grade(b), &[2])` (`grade.rs:68`), the versor test is a *predicate on
+  a `GradeSet` the machine already has* — it does not need its own walk of `b`.
+- **Assert the mechanism, not the clock** (*Structural Frugality over
+  Wall-Clock*): a **node-visit counter** asserting `grade` visits each node at
+  most *c* times. This fails loudly on any future rule that re-walks a child and
+  is stable on shared CI. A timing bound is neither.
+- §2.3's `typecheck` gets the same treatment: it calls `grade(e)` at every node
+  (`grade.rs:176`), making it **O(n²)** over an already-exponential `grade`. The
+  iterative machine already holds the children's `GradeSet`s on its result stack;
+  threading them up makes it O(n) with identical values, since `grade` is pure.
+
+**AC6 depends on this.** At `max_nodes = 5,000` a rotor-nested genome does not
+terminate in `grade`, whatever `eval` does.
+
+### 2.3 `typecheck` — the full error precedence
+
+Rev 1 stated leaf validation precedes descent. That is necessary but
+**incomplete**. The order the iterative form must reproduce:
+
+1. own `BadBlade`/`BadGrade` — in `Visit`, before pushing children;
+2. children, left to right;
+3. own `Incoherent` — in `Apply`, **post-order** (`grade.rs:176-178`, after both
+   children fully typecheck).
+
+A machine that checks emptiness in `Visit` reports a parent's `Incoherent` before
+a child's `BadBlade` — a silent reordering of a public error.
+
+### 2.4 `render` — rev 1's frame machine was wrong
+
+Three defects, all confirmed against `render.rs`:
+
+**(a) The rotor name is emitted twice.** `render.rs:132` and `:136`, straddling
+`factor(x)` at `:134`. The name is only known when `BindRotor` *executes*, but
+the frame that emits it the second time is already on the stack. `Lit(&'static
+str)` cannot carry it. A **third stack** is required — `Vec<String>` of pending
+rotor names, pushed by `BindRotor`, popped by a new `EmitBoundName` frame. The
+push/pop discipline is properly balanced under both nesting shapes, so LIFO is
+correct.
+
+**(b) `GradeProject` closes with a runtime `k`.** `⟩_{k}` is emitted *after* the
+child (`render.rs:110`), so it needs `CloseProject(u8)` (or an `Owned(String)`
+frame). `𝒢_{k}(` at `:114` is pre-order and can be written at visit time.
+
+**(c) The atom-rotor branch needs no sink at all.** `render.rs:121-125` also
+needs its text twice but does **not** bind. Since `is_atom` ⟺ leaf
+(`render.rs:57-59`), compute the leaf text inline and push two `Owned(String)`
+frames. This confines `OpenSink`/`BindRotor` to the non-atom case and simplifies
+the machine materially.
 
 ```rust
 enum Frame<'a> {
-    Node(&'a GeoExpr),          // render into the current sink
-    Factor(&'a GeoExpr),        // as Node, but parenthesised unless atom/self-delimiting
-    Lit(&'static str),          // a literal separator, emitted in order
-    OpenSink,                   // push a fresh String — the rotor's `def`
-    BindRotor,                  // pop the sink, ctx.fresh(), push to ctx.lets, emit the name
+    Node(&'a GeoExpr),
+    Factor(&'a GeoExpr),       // parenthesised unless atom or self-delimiting
+    Lit(&'static str),
+    Owned(String),             // (b), (c)
+    CloseProject(u8),          // (b)
+    OpenSink,                  // non-atom rotor only (c)
+    BindRotor,                 // pop sink, ctx.fresh(), push to ctx.lets and to the name stack
+    EmitBoundName,             // (a) — pops the name stack
 }
 ```
 
-Three observable properties must survive **byte-identically**, and each is a
-tripwire in §4:
+**The ordering invariant in rev 1 was backwards.** Measured against the current
+renderer:
 
-1. **the output bytes** — separators, parens, `⟨⟩_k`, `𝒢_k(…)`;
-2. **the `ctx.next` allocation order** — which rotor gets `R` vs `S`. This is
-   determined by the order `BindRotor` frames *execute*, which is not the order
-   they are *pushed*; a nested sandwich must still bind inner-before-outer
-   exactly as the recursive version does;
-3. **the `ctx.lets` order** — emitted as a `let` prelude in dependency order.
+```
+Sandwich(r1, Sandwich(r2, v))  →  let R = exp(1 e₁₂) / let S = exp(2 e₁₂) / R (S v ~S) ~R
+Sandwich(Sandwich(r2, v), v)   →  let R = exp(2 e₁₂) / let S = R v ~R     / S v ~S
+```
 
-Because (2) and (3) are order-sensitive in a way the other twelve walks are not,
-`render` gets the strictest test: byte-equality against the pre-change function
-on a large random corpus **including nested `Sandwich`es**.
+Body-nesting binds **outer first**. Rev 1's "inner-before-outer" holds only for
+rotor-nesting and is false for the commoner shape. The true invariant:
 
-`render` also holds the crate's only library-code `.unwrap()`s (three
-`write!(…).unwrap()` at `render.rs:110,114,150`). Writing to a `String` is
-infallible, so these become `push_str` with a pre-formatted number — no
-suppression, no `let _ =`. This is what makes AC7 cheap here.
+> `ctx.fresh()` fires in the order sandwich nodes finish rendering their **rotor**
+> subtree — rotor-subtree-first, left to right — which a LIFO frame stack
+> preserves by construction.
 
-### 2.5 `collect` (`ufl-geo/src/slots.rs`) — the `&mut` walk
+An implementer coding to rev 1's stated rule gets `R (S v ~S) ~R` wrong, and the
+output would still be well-formed GA notation — so only T-render-nested-sandwich
+catches it.
 
-`params_mut` returns `Vec<&'a mut f64>` — simultaneous mutable borrows of
-disjoint leaves. The iterative form keeps that soundness argument intact: a
-`Vec<&'a mut GeoExpr>` work-stack, where matching on `&mut` **moves** the borrow
-into disjoint child borrows, so no two stack entries alias. No `unsafe`.
+**Byte-identity is achievable.** `render` is total, infallible, and has no
+re-entrancy or early return; its only order-dependence is call order, which the
+frame stack reproduces exactly. `ctx.lets` must stay a **single flat vector
+outside the sink stack** — the `let S = R v ~R` case shows a definition
+referencing an earlier name, which only works with one shared `Ctx`.
 
-Pre-order must be preserved exactly — `params` and `params_mut` are documented to
-agree index-for-index, and R-0011's refiner indexes into the result.
+`render` also holds the crate's only library `.unwrap()`s (`render.rs:110,114,150`).
+Writing to a `String` is infallible, so these become `push_str` with a
+pre-formatted number — no suppression, no `let _ =`.
 
-### 2.6 `GeoExpr`'s trait impls — the class closure
+### 2.5 `collect` (`ufl-geo/src/slots.rs`) — verified sound
 
-Hand-written iterative `Clone`, `PartialEq`, and `Debug`, plus an iterative
-`Drop` (there is none today; the type relies on drop glue). `Debug` is in scope
-here although SPEC-0017 deferred it, because §2.7's error embeds a tree — see
-R-0019 §5 Q1.
+A `Vec<&'a mut GeoExpr>` work-stack **compiles in safe Rust** (architect built
+it): the scrutinee is moved into the `match`, so bindings are reborrows at `'a`
+of disjoint fields. No `unsafe`, no reformulation.
 
-- **`Clone`** — two-stack post-order rebuild, mirroring §2.1.
-- **`PartialEq`** — a lockstep `(&a, &b)` pair-stack; differing variants ⇒
-  `false`; leaves compare primitives; equal-arity children push pairs.
-  `f64` comparison keeps derive semantics exactly (`NaN != NaN`, `-0.0 == 0.0`).
-- **`Debug`** — output **byte-identical to the derive**, because it appears in
-  error payloads and in existing test assertions. This is the only impl here
-  whose contract is "reproduce what the compiler generated", so it is pinned by a
-  frozen-corpus differential test rather than by inspection.
-- **`Drop`** — the `Sexpr`/`Eml` idiom: take the children into an explicit stack
-  and drop them iteratively.
+Two additions rev 1 missed:
 
-### 2.7 `GradeError` — **the open design trade (R-0019 §5 Q4)**
+- **Push right, then left**, so left pops first and pre-order survives.
+  `lane.rs:84`'s `params_mut(..).nth(i)` depends on this ordering.
+- `params` (`slots.rs:29-32`) is **two** walks — `e.clone()` then `collect` — so
+  it is only depth-safe once §2.6's `Clone` lands. Whether `params` keeps the
+  clone (agreement by construction) or gets its own `&GeoExpr` loop (no clone,
+  but T-slots-agreement then actually tests something) is a decision to record,
+  not inherit.
 
-`GradeError::Incoherent(GeoExpr)` embeds a tree and is built by cloning it
-(`grade.rs:178`), so producing the error is itself a recursive walk on a `pub`
-fn's failure path, and `GradeError`'s derived `Clone`/`PartialEq`/`Debug` are
-recursive walks over caller data.
+### 2.6 `GeoExpr`'s trait impls
 
-**This spec deliberately does not choose.** Both options are viable and the
-trade is about the crate's diagnostic contract, not about depth:
+- **`Clone`** — two-stack post-order rebuild.
+- **`PartialEq`** — lockstep pair-stack; `f64` keeps derive semantics
+  (`NaN != NaN`, `-0.0 == 0.0`).
+- **`Debug`** — see below.
+- **`Drop`** — see below.
 
-- **(a) Keep the payload.** `GeoExpr`'s iterative impls (§2.6) make the derives
-  on `GradeError` safe automatically — no further work. Callers keep structured
-  access to the offending subtree. Cost: a `pub` error stays as expensive to
-  clone as the tree it holds, and every future field of this kind repeats the
-  question.
-- **(b) Replace it with `Incoherent(String)`** holding `render(e)`. Cheap,
-  already human-readable, and the error becomes `O(text)` instead of `O(tree)`.
-  Cost: a **breaking change** to a `pub` enum, and callers lose structured
-  access — `r_0010_acceptance.rs:416` matches `Incoherent(_)` and would still
-  compile, but any future caller wanting the subtree could not have it.
+**`Debug`: byte-identity is a *choice*, and rev 1 over-justified it.** Rev 1 said
+it "appears in error payloads and in existing test assertions". The assertion
+claim is false: the only `Debug` assertion on a `GeoExpr` is
+`r_0010_acceptance.rs:88`, which asserts merely `!format!("{form:?}").is_empty()`;
+`r_0010_soundness.rs:71,142` use `{e:?}` only in failure messages. `{:#?}`
+appears **zero** times repo-wide.
 
-The three-lens is asked to argue this (§5 Q1). Whichever is chosen, **AC2b is
-satisfied**: under (a) by §2.6, under (b) by construction.
+So the contract must be stated deliberately:
 
-### 2.8 `ufl-evolve` — the search-side walks
+- **`{:?}` — in contract, byte-identical.** `Box<GeoExpr>` is transparent (no
+  `Box(...)` wrapper); `, ` separators; no trailing comma.
+- **`{:#?}` — out of contract.** Reproducing it means reimplementing
+  `core::fmt::builders::PadAdapter`'s indentation by hand, because
+  `f.debug_tuple(..).field(&child)` nests by *calling* `Debug::fmt` on the child —
+  the very recursion being removed, so the builders are unusable. Given zero
+  repo-wide uses, alternate mode falls back to a documented non-identical form
+  rather than paying that cost. **This is a deliberate, recorded limitation.**
+- **Leaves must delegate** to the primitives' `Debug`, never hand-format: `f64`
+  prints `1e300`, `-0.0`, `NaN`, `inf`; `String` escapes `\n` but not emoji.
 
-`node_count`, `nth_subtree`, and `replace_nth` become iterative by the same
-idiom. `replace_nth` is the only one that *rebuilds*, so it takes the §2.6
-`Clone` shape with a substitution at the counted index; its pre-order index must
-match `nth_subtree`'s exactly, since crossover pairs them.
+**`Drop`: two consequences rev 1 didn't record.**
 
-This is what stops the anti-bloat guard from sharing the failure mode of the
-thing it guards (R-0019 §2).
+- **`impl Drop for GeoExpr` makes the type permanently non-destructurable by
+  value** (E0509). Nothing does that today in either crate, but it is an
+  irreversible constraint on a `pub` enum that R-0015's operator work will build
+  on. Accepted, and recorded as a cost.
+- **The `Eml` idiom does not transplant.** `eml.rs:120-140` is allocation-free on
+  re-entry only because its sentinel `Eml::One` is a *different variant* from its
+  one internal variant. `GeoExpr` has **eight** internal variants: a shell
+  `Sandwich(Basis(0), Basis(0))` still matches its arm on re-entry and pushes two
+  sentinels — **one `Vec` allocation per internal node**, O(n) allocations to drop
+  an n-node tree, on the path `vary` takes for the whole population every
+  generation. Guard the take:
+
+  ```rust
+  if !matches!(**slot, GeoExpr::Basis(0)) {
+      stack.push(mem::replace(&mut **slot, GeoExpr::Basis(0)));
+  }
+  ```
+
+  so the shell pushes nothing and `Vec::new()` never allocates.
+
+Once these four land, that block is ~200 lines of machinery on a 24-line enum; it
+belongs in its own module (`expr/traits.rs`), keeping the data declaration
+legible.
+
+### 2.7 `GradeError` — **decision: keep the payload (option a)**
+
+Rev 1 deferred this to the lens. Both lenses answered, and they disagreed; the
+architect's cost model is decisive because rev 1's was wrong.
+
+**Rev 1's claim that (b) makes the error "O(text) instead of O(tree)" is false.**
+Construction is still O(tree), and `render` is strictly *more* expensive than
+`Clone` — same nodes, plus a `log10`, a `format!`, and two `trim_end_matches` per
+`Param` (`render.rs:163-176`), plus `ctx.lets` maintenance. **Option (b) makes the
+hot path worse.**
+
+The options as they finally stood:
+
+- **(a) keep `Incoherent(GeoExpr)`** — §2.6 makes the derives safe for free; zero
+  new surface; no breaking change.
+- **(b) `Incoherent(String)`** — negative-measured benefit, breaking change.
+- **(c) `Incoherent { at: usize, rendered: String }`** (nice-guy) — genuinely
+  better than (b): the pre-order index composes with `replace_nth` for a future
+  `GradeRepair` refiner. But it inherits (b)'s construction cost and its breaking
+  change.
+
+**Chosen: (a).** CLAUDE.md §6 wants typed, non-lossy errors; `grade.rs:43` calls
+`GradeError` "the decidable pruning signal R-0011 uses", and a signal carrying the
+subtree composes with the repair operator (c) is really arguing for — you can
+always derive `render(&e)` from the tree, never the tree from the string. **(c)'s
+insight is recorded as a follow-up**: if a repair refiner is built, add the
+pre-order index *alongside* the tree rather than instead of it.
+
+**But name the hot path.** `GradeScreen::admissible` (`lane.rs:47`) runs
+`typecheck(..).is_ok()` on every candidate, and every rejected one clones a
+subtree and drops it. Mitigating: `typecheck` recurses into children *before* its
+own emptiness check, so it clones the **innermost** incoherent subtree, not the
+root — small at 60 nodes, not small at 5,000. §4's throughput test must therefore
+cover the **screen** path at `max_nodes = 5,000`, not just `eval`.
+
+**The chain, named for auditability (AC2b):** `GeoExpr` → `GradeError`
+(`grade.rs:49`) → `GeoLaneError` (`lane.rs:23`, `#[from]`) → `RunError<E>`
+(`ufl-search/src/lib.rs:56`). All derive `Debug`/`Clone`/`PartialEq`; all are
+transitively covered by §2.6 under option (a).
+
+### 2.8 `ufl-evolve`
+
+`node_count`, `nth_subtree`, `replace_nth` iterative by the same idiom.
+`replace_nth` rebuilds, so it takes §2.6's `Clone` shape with a substitution at
+the counted index; its pre-order index must match `nth_subtree`'s exactly, since
+crossover pairs them.
+
+`random_expr` (`memetic.rs:182`) is a recursive **generator** bounded by the `pub`
+`max_depth` field. AC6 raises `max_nodes` to 5,000 while leaving this recursive at
+`max_depth: 4` — safe, but stated explicitly rather than left implicit, since the
+convention's own note warns that recursive generators overflow before the code
+under test runs.
 
 ### 2.9 The lint (AC7)
 
-`ufl-geo` and `ufl-evolve` adopt
-`#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used, clippy::panic))]`.
-Measured cost: **three** `write!(…).unwrap()` in `ufl-geo` (§2.4) and **zero** in
-`ufl-evolve`. Two of [#82](https://github.com/westerngazoo/ufl/issues/82)'s seven
-crates close here.
+Both crates adopt `#![cfg_attr(not(test), deny(clippy::unwrap_used,
+clippy::expect_used, clippy::panic))]`. Measured: three `write!(…).unwrap()` in
+`ufl-geo` (§2.4), zero in `ufl-evolve` — the three `.expect(` there are inside
+`#[cfg(test)] mod tests` and therefore exempt.
 
 ## 3. Non-goals
 
-- **No tuning.** `max_nodes` stays 60. Whether raising it helps Gate-1 is a
-  separate R-0011 experiment this merely makes runnable.
-- **No grade-semantics change.** The versor predicate stays conservative.
-- **No new geometric form**, no signature changes, no `unsafe`.
+- **No tuning.** `max_nodes` stays 60.
+- **No grade-semantics change.** The versor predicate stays conservative;
+  §2.2b changes only how many times a subtree is visited, never the answer.
+- **No new geometric form**, no `unsafe`, no `{:#?}` fidelity (§2.6).
 
 ## 4. Tests (TDD — written first, red)
 
-1. **T-differential (AC4)** — for each of the thirteen walks, a fuzz over
-   randomly generated `GeoExpr`s (bounded depth, all variants, including
-   out-of-range `Basis`/grade indices and unbound `Var`s) comparing the iterative
-   result against a **verbatim transcription of the pre-change function**:
-   identical values **and identical error precedence**. `render` and `Debug`
-   compare **byte-identically**.
-2. **T-order-tripwire** — the differential corpus must include non-commutative
-   shapes (`Wedge`, `Inner`, `Sandwich`, `replace_nth` at index > 0). A stack
-   underflow guards arity; only a differential catches a transposition.
-3. **T-render-nested-sandwich** — nested `Sandwich`es specifically, asserting
-   `ctx.lets` order and rotor-name assignment are unchanged (§2.4's properties 2
-   and 3, which a flat corpus would not exercise).
-4. **T-arena (AC5)** — every walk at depth **10⁵** in a subprocess arena pinned
-   to the `dev` profile, per *Bounded-Stack Regression Arena*. The arena asserts
-   the child's exit status **and** that it reports `1 passed` — R-0019 §6 records
-   a false-pass caused by omitting exactly that check.
-5. **T-arena-can-fail** — the arena is shown to fail by name when a recursion is
-   reintroduced, before it is trusted. Not a committed test; a recorded step in
-   the PR, per the convention.
-6. **T-decoupling (AC6)** — the lane runs to completion with `max_nodes` set to
-   5,000 (a value that aborts `eval` today at 215). Asserts *completion*, not a
-   fitness improvement — the protocol, not the outcome.
-7. **T-throughput (AC4, §5 Q2)** — `eval` on the shapes the search actually
-   produces (≤ 60 nodes, depth ≤ 4–6), iterative vs recursive, reported
-   **unconditionally** in the PR. See §5 Q2 for what the number gates.
-8. **T-slots-agreement** — `params` and `params_mut` still agree index-for-index
-   and in pre-order (§2.5).
-9. **T-lint (AC7)** — probe each crate with a `panic!`/`.unwrap()` and confirm
-   `cargo clippy --workspace --all-targets -- -D warnings` fails; revert.
+1. **T-differential (AC4)** — each walk fuzzed against a verbatim transcription of
+   the pre-change function: identical values **and** error precedence. `render`
+   and `Debug` (`{:?}` only) byte-identical.
+2. **T-is-versor-direct** — `is_versor` is `pub(crate)`, so an integration test
+   can observe it only through `grade(Sandwich(r, x))`, where the versor branch
+   and the product-bound branch coincide whenever `grade(r) = {0}` — masking a
+   wrong answer. Its fuzz must live in an in-`src` `#[cfg(test)]` module.
+3. **T-order-tripwire** — the corpus must include non-commutative shapes
+   (`Wedge`, `Inner`, `Sandwich`, `replace_nth` at index > 0). Underflow guards
+   arity; only a differential catches a transposition. For `collect`, the seeded
+   Gate-1 e2e is the real oracle — `params`/`params_mut` agree by construction
+   (`slots.rs:31`) whatever the order, but a transposition changes which slot
+   `lane.rs:84` perturbs and therefore the reported N/16.
+4. **T-render-nested-sandwich** — both nesting shapes from §2.4, asserting
+   `ctx.lets` order and rotor-name assignment. A flat corpus does not exercise
+   these.
+5. **T-arena (AC5)** — every walk at depth 10⁵ in a subprocess arena, pinned to
+   the `dev` profile **and to an explicit stack size** (§1). Asserts the child's
+   exit status **and** `1 passed`.
+6. **T-arena-can-fail** — the arena shown to fail by name before it is trusted.
+   A recorded PR step, not a committed test.
+7. **T-grade-visit-count (AC8)** — a node-visit counter proving `grade` visits
+   each node at most *c* times. The mechanism, not a clock.
+8. **T-decoupling (AC6)** — the lane completes at `max_nodes = 5,000`. Asserts
+   completion, not fitness. **Requires AC8.**
+9. **T-throughput** — `eval` **in release** on production shapes (≤ 60 nodes,
+   depth ≤ 32 measured), *and* the `GradeScreen` path at `max_nodes = 5,000`.
+   Reported unconditionally.
+10. **T-lint (AC7)** — probe each crate, confirm clippy fails, revert.
 
-## 5. Open questions for the three-lens
+**Ordering constraint:** §2.6's iterative `Drop` must land **before or with** the
+arena. A depth-10⁵ fixture still has to be torn down, and drop glue aborts at
+~18,801 — every arena case aborts at teardown until `Drop` exists.
 
-1. **`GradeError`'s payload (§2.7) — (a) keep or (b) `String`?** The spec is
-   deliberately undecided. Architect: which is the better public contract?
-   Hater: what breaks in the wild under each? Nice-guy: does either unlock
-   something later — e.g. does a structured payload help the R-0015 operator work?
-2. **What does T-throughput gate?** `eval` is called for every candidate every
-   generation, so a regression on ≤ 60-node trees is a real cost paid for a
-   ceiling nothing currently touches. *Proposal: if iterative `eval` is more than
-   10% slower on production-shaped trees, keep the iterative form (correctness)
-   but record the number and open a follow-up — do not silently accept it, and do
-   not tune the shape until it is measured.* Is 10% the right line, and is
-   "record and continue" the right response?
-3. **Is `is_versor` worth including now?** It is a recursive walk, but it is not
-   the binding constraint on any measured path (§1 †). Including it is cheap and
-   closes the class; excluding it keeps the diff smaller. *Recommendation:
-   include — a partial closure of a class is how R-0017's first scope was wrong.*
-4. **Thirteen walks in one PR — is that too big to review?** SPEC-0017's seven
-   were already at the limit of a reviewable diff. *Proposal: split into two PRs
-   along the crate boundary — `ufl-geo` (§2.1–§2.7) then `ufl-evolve` (§2.8) —
-   with the arena landing in the first. Is that the right seam, or should
-   `render` (§2.4, by far the most intricate) be its own?*
+## 5. PR seam
+
+Rev 1 proposed the crate boundary. **Wrong seam** — it puts 10 walks, both hard
+ones, the arena, the lint, and the `GradeError` decision on one side and 3
+mechanical ones on the other. Four PRs, ordered by the dependencies above:
+
+1. **PR1 — foundation:** `Clone`/`PartialEq`/`Debug`/`Drop` + the arena + the
+   lint. First: `Drop` unblocks every arena case, `Clone` unblocks `params`, and
+   the E0509 fallout is isolated here.
+2. **PR2 — value walks:** `eval`, `grade` (+ `is_versor`), **AC8's single-visit
+   rule**, `typecheck`, `collect`, T-throughput.
+3. **PR3 — `render` alone.** The only non-linear-output walk, with its own sink
+   stack, name stack, and byte-identity corpus (§2.4).
+4. **PR4 — `ufl-evolve`** + AC6's decoupling test, green only once both crates
+   are iterative.
+
+If four is too many, fold PR4 into PR2. **Do not fold PR3.**
+
+## 6. Open questions for three-lens round 2
+
+1. **Is AC8 (§2.2b) in this requirement or its own?** It is a *complexity* fix,
+   not a depth fix, and R-0019 §1.2 shows it is the binding constraint. Argument
+   for keeping it: AC6 is unreachable without it. Argument for splitting: it has
+   nothing to do with the depth contract and drags a performance change into a
+   safety requirement.
+2. **Does `params` keep its clone** (§2.5)? Agreement-by-construction versus a
+   test that actually tests something.
+3. **Is `{:#?}` out of contract acceptable** (§2.6)? Zero repo-wide uses today,
+   but it is a permanent, documented divergence from a derive on a `pub` type.
+4. **Is R-0019 worth building at all**, given R-0019 §1.3 measured that nothing
+   aborts and nothing blows up in the real search? The honest case is conditional
+   on raising `max_nodes` — and if that experiment is not planned, this is latent
+   safety and nothing more.

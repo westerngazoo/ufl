@@ -1,169 +1,239 @@
 # R-0019 — Extend the depth contract to the geometric surface
 
-- **Status:** **Draft** — acceptance criteria await Gustavo's sign-off (CLAUDE.md §4 step 1).
+- **Status:** **Draft** — ACs revised after the three-lens; §4 needs Gustavo's
+  re-confirmation because §2's justification changed materially.
 - **Milestone:** M5 (geometric neuroevolution).
 - **Tracks:** [#83](https://github.com/westerngazoo/ufl/issues/83).
 - **Precedent:** [R-0017](0017-depth-contract.md) / [SPEC-0017](../specs/0017-depth-contract.md)
-  — the same class, already discharged on the `Sexpr`/`Eml` code↔data surface.
+  — the same class, already discharged on the `Sexpr`/`Eml` surface.
 - **Convention it applies:** `docs/conventions.md` — *Explicit-Stack Tree Walk*,
   *Bounded-Stack Regression Arena*.
 
-## 1. Context — measured, not inferred
+## 1. Context — measured, and re-measured
 
-`GeoExpr` is a `Box`-recursive enum walked by **twelve** recursive functions
+`GeoExpr` is a `Box`-recursive enum walked by **fourteen** recursive functions
 across two crates. R-0017 fixed seven such walks on `Sexpr`/`Eml`; none of that
 work reached here, and unlike those two types `GeoExpr` has **no iterative
-`Drop` at all** — it relies on compiler-generated drop glue.
+`Drop` at all` — it relies on compiler-generated drop glue.
 
-Measured abort depths — **every** walk, none inferred. A `Reverse(Reverse(…))`
-spine, debug build, default 8 MB main-thread stack, binary-searched to the exact
-node:
+### 1.1 Abort depths — and the methodology correction
 
-| walk | crate | survives | aborts at |
-|------|-------|----------|-----------|
-| **`eval`** | `ufl-geo` | 214 | **215** |
-| `render` (`node`/`factor`) | `ufl-geo` | 2,479 | 2,480 |
-| `typecheck` | `ufl-geo` | 2,798 | 2,799 |
-| `replace_nth` | `ufl-evolve` | 3,655 | 3,656 |
-| `params` / `params_mut` (`collect`) | `ufl-geo` | 4,112 | 4,113 |
-| `Clone` (derived) | `ufl-geo` | 4,112 | 4,113 |
-| `grade` | `ufl-geo` | 4,699 | 4,700 |
-| `PartialEq` (derived) | `ufl-geo` | 4,700 | 4,701 |
-| `Debug` (derived) | `ufl-geo` | 5,059 | 5,060 |
-| `node_count` | `ufl-evolve` | 16,457 | 16,458 |
-| `Drop` (glue) | `ufl-geo` | 18,800 | 18,801 |
-| `nth_subtree` | `ufl-evolve` | 26,331 | 26,332 |
+The first draft of this table labelled its numbers "default 8 MB main-thread
+stack". **That was wrong.** They were measured through `cargo test`, and libtest
+runs each `#[test]` on a *spawned* thread whose default stack is **2 MiB**. The
+architect caught it; I verified it directly with a standalone binary:
 
-`eval` is an order of magnitude worse than every other walk because each frame
-carries an `Mv` (16 × `f64`) and the binary nodes hold **two** evaluated children
-simultaneously.
+| `eval`, debug | aborts at |
+|---|---|
+| libtest spawned thread (2 MiB) | **215** |
+| `fn main()` (8 MB) | survives 800, aborts by 860 |
 
-### 1.1 `GradeError` carries a tree — the case R-0017 never met
+A **4× difference driven by the caller, not the code.** Two consequences:
 
-`GradeError::Incoherent(GeoExpr)` (`grade.rs:49`) embeds a whole `GeoExpr`, and
-`grade.rs:178` constructs it as `Err(GradeError::Incoherent(e.clone()))`. Three
-consequences that have no analogue on the `Sexpr`/`Eml` surface, where **no**
-error type held a tree:
+- The table below is valid **only** for a 2 MiB thread. It is a property of the
+  calling context, not a property of `GeoExpr`.
+- **The portable invariant is bytes-per-frame, not depth.** `eval` costs
+  ≈ 9,754 B/frame in debug and ≈ 1,560 B/frame in release (architect, measured).
+  A depth survives no change of machine, profile, or thread size; a frame cost
+  does. Future measurements here should report both.
 
-- **Producing the error is itself a recursive walk** — the derived `Clone`, on
-  the failure path of a `pub fn`. Measured: an incoherent deep tree aborts
-  `typecheck` at **2,799**, i.e. `typecheck`'s own recursion binds first and the
-  clone is not the limiting factor *today* — but it is a second abort site on the
-  same path.
-- `GradeError` **derives `Clone`, `PartialEq`, and `Debug`**, so all three are
-  recursive walks over caller-held data, on a `pub` type.
-- `GradeScreen` (`lane.rs`) calls `typecheck(g, &ctx).is_ok()` on **every
-  candidate**, so this path is the search's hot loop, not a corner.
+| walk | crate | aborts at (2 MiB) |
+|------|-------|-------------------|
+| **`eval`** | `ufl-geo` | **215** |
+| `render` (`node`/`factor`) | `ufl-geo` | 2,480 |
+| `typecheck` | `ufl-geo` | 2,799 |
+| `replace_nth` | `ufl-evolve` | 3,656 |
+| `collect` (`params`/`params_mut`) | `ufl-geo` | 4,113 |
+| `Clone` (derived) | `ufl-geo` | 4,113 |
+| `grade` | `ufl-geo` | 4,700 |
+| `is_versor` | `ufl-geo` | 4,701 † |
+| `PartialEq` (derived) | `ufl-geo` | 4,701 |
+| `Debug` (derived) | `ufl-geo` | 5,060 |
+| `node_count` | `ufl-evolve` | 16,458 |
+| `Drop` (glue) | `ufl-geo` | 18,801 |
+| `nth_subtree` | `ufl-evolve` | 26,332 |
+| `random_expr` (generator) | `ufl-evolve` | not measured ‡ |
 
-Its `#[error(…)]` string is a constant with no `{0}`, so `Display` does **not**
-walk the tree. Only `Debug` does.
+† `is_versor` is mutually recursive with `grade`. It does **not** worsen the
+bound — its recursion is bounded by the *rotor* subtree, not the spine.
 
-## 2. The real problem: one knob serving two purposes
+‡ `random_expr` (`memetic.rs:182`) is a recursive **generator** bounded by the
+`pub` field `max_depth`, and it is the fallback the anti-bloat cap invokes
+(`memetic.rs:341`). Safe at `max_depth: 4`; in scope because AC6 raises the other
+knob while leaving this one recursive (architect finding 9).
 
-There is **no abort in production today** — `GeoProposer::pinned` caps genomes at
-`max_nodes: 60`, and since `depth ≤ node count`, depth never exceeds 60 against
-`eval`'s limit of 215. The hazard is latent, with 3.5× headroom.
+**A mechanism claim in the first draft was also wrong.** It said `eval`'s 215
+comes from binary nodes holding two `Mv`s at once. The architect measured a
+`Reverse` spine — *zero* binary nodes — aborting at exactly 215 too. The real
+cause is ~9.7 KB of opt-level-0 frame across the 11-arm match; the `Mv` payload
+(`size_of::<Mv>() = 128`) is ~1.3% of it.
+
+### 1.2 `grade` is exponential — a complexity bug, not a depth bug
+
+`grade`'s `Sandwich` arm (`grade.rs:120-131`) calls `is_versor(r)`, which for
+`Exp(b)` computes `grade(b)`; on the non-versor branch it then computes
+`grade(r) = grade(Exp(b))`, recomputing `grade(b)`. **Two walks of the same
+subtree per level ⇒ 2^depth.** Measured in **release** on
+`bₖ₊₁ = Sandwich(Exp(bₖ), Basis(1))`:
+
+| depth | nodes | `grade` | `typecheck` | `eval` |
+|---|---|---|---|---|
+| 14 | 43 | 816 µs | 2.44 ms | 39 µs |
+| 18 | **55** | 13.0 ms | **71.2 ms** | 62 µs |
+| 20 | 61 | 67.6 ms | 179.5 ms | 75 µs |
+
+At 55 nodes — **inside today's `max_nodes: 60`** — `GradeScreen::admissible`
+costs 71 ms while `eval` on the same tree costs 62 µs. A screen whose purpose is
+to be cheaper than evaluation is ~1,150× more expensive than what it replaces.
+
+`typecheck` compounds it: it calls `grade(e)` at *every* node (`grade.rs:176`),
+so it is **O(n²)** over an already-exponential `grade` (architect finding 11).
+
+**This is not a depth problem and an iterative rewrite does not fix it.** An
+explicit-stack machine that still re-walks is still 2^depth. It is recorded here
+because it is the constraint that actually binds, and because AC6 would activate
+it (§2).
+
+### 1.3 What the real search actually produces
+
+The decisive question — is any of this live? Measured with the **actual pinned
+Gate-1 proposer**, 60 generations × population 400, release:
+
+| | measured |
+|---|---|
+| max depth reached | **32** |
+| max nodes | 60 (the cap) |
+| worst `typecheck` over 24,000 genomes | **22.9 µs** |
+
+Two findings, pulling in opposite directions:
+
+- **Crossover really does deepen trees far past the generation cap** — depth 32
+  against `max_depth: 4`, an 8× overrun. §2's structural claim is confirmed.
+- **Neither hazard is live.** Real depth 32 sits ~7× below `eval`'s 2 MiB
+  ceiling (215) and ~27× below its main-thread ceiling. The exponential regime
+  needs a specifically rotor-nested `Sandwich` shape that the GA does not
+  produce: the worst real genome costs 23 µs, not 71 ms.
+
+The first draft's "3.5× headroom" figure was wrong — it assumed depth = nodes =
+60. Real headroom is ~7× (test thread) or ~27× (main thread).
+
+## 2. The case for building this — stated honestly
+
+**Nothing is broken today.** §1.3 measured it. This requirement is not a bug fix,
+and framing it as one would be motivated reasoning.
+
+What is true is narrower and conditional:
 
 `max_depth: 4` bounds **generation and mutation** only. Crossover splices a
-subtree from one parent into another and can deepen the result past 4, so
-**post-crossover depth is bounded only indirectly, by `max_nodes`**. That makes a
-single knob serve two unrelated purposes:
+subtree from one parent into another and deepens the result — measured to 32,
+8× the cap. So **post-crossover depth is bounded only indirectly, by
+`max_nodes`**, and one knob serves two unrelated purposes:
 
-1. **anti-bloat / eval cost** — its intended job, and its doc comment says so;
-2. **depth safety** — an accident of `depth ≤ nodes`, holding only because
-   `60 < 215`.
+1. **anti-bloat / eval cost** — its intended job;
+2. **depth safety** — an accident of `depth ≤ nodes`.
 
-The consequences are the reason to act:
+The value is therefore **conditional on wanting to raise `max_nodes`**. If we
+never raise it, this requirement buys latent safety and nothing else. If we do
+raise it — and AC6's 5,000 is the value the R-0011 experiment wants — then at the
+measured depth/nodes ratio of 0.53 a 5,000-node genome implies depth **≈ 2,666**,
+which:
 
-- **`max_nodes` cannot be raised past ~215** without `eval` aborting, whatever
-  the search wants. A stack limit is silently capping the hypothesis space.
-- The bound is **loose in the wrong direction**: a 60-node *bushy* tree has depth
-  ~6, so the cap restricts breadth far more than depth safety requires.
-- The cap is itself **enforced by a recursive walk** (`node_count`), so the
-  guard shares the failure mode of the thing it guards.
+- exceeds `eval`'s ceiling on **both** thread sizes (215 / 860), and
+- lands squarely in §1.2's exponential regime, where `grade` alone would not
+  terminate.
+
+So the honest statement is: **the depth contract is a prerequisite for the
+`max_nodes` experiment, and it is not sufficient — §1.2 must be fixed too.** Both
+are latent today.
 
 ## 3. What this requirement is *not*
 
-- **Not a tuning change.** `max_nodes` stays at 60 here. Decoupling first keeps
-  the diff reviewable and keeps any later re-tune a clean experiment.
-- **Not a claim about Gate-1.** Whether a larger `max_nodes` improves the
-  current 6/16 is a **separate experiment** in the R-0011 lane. This requirement
-  makes that experiment *possible*; it predicts nothing about its outcome.
-  (I implied otherwise in #83 and have corrected it there.)
-- **Not a new geometric form**, and no public API change beyond what iterative
-  rewrites require (the trait signatures are unchanged).
+- **Not a bug fix.** §1.3 shows no live abort and no live blowup.
+- **Not a tuning change.** `max_nodes` stays 60. Decoupling first keeps the diff
+  reviewable and any later re-tune a clean experiment.
+- **Not a claim about Gate-1.** Whether a larger `max_nodes` improves the current
+  6/16 is a separate R-0011 experiment. This makes it *possible*; it predicts
+  nothing. (I implied otherwise in #83 and corrected it there.)
+- **Not a fix for §1.2 by itself** — see AC8.
 
-## 4. Proposed acceptance criteria — **for Gustavo's sign-off**
+## 4. Acceptance criteria — **need re-confirmation after the §2 rewrite**
 
-- **AC1 (the geometric walks are iterative).** `eval`, `grade`, `typecheck`,
-  `params`/`params_mut`, and `render` use explicit heap work-stacks. No depth
-  cap and no magic constant is introduced.
-- **AC2 (the class closure).** `GeoExpr`'s derived `Clone`, `PartialEq`, **and
-  `Debug`** are replaced by hand-written iterative impls, and `GeoExpr` gains an
-  **iterative `Drop`** (it has none today). Same observable behaviour, no
-  signature change, and `Debug` output stays **byte-identical to the derive**
-  (it appears in error payloads). `Debug` is in scope here — unlike R-0017 —
-  because §1.1's `GradeError` embeds a tree (see §5 Q1).
-- **AC2b (`GradeError` is depth-safe).** `GradeError`'s derived `Clone`,
-  `PartialEq`, and `Debug` no longer recurse over an embedded `GeoExpr`,
-  whichever resolution §5 Q4 takes.
-- **AC3 (the search-side walks).** `ufl-evolve`'s `node_count`, `nth_subtree`,
-  and `replace_nth` are iterative — the anti-bloat guard must not share the
-  failure mode of what it guards.
-- **AC4 (semantic equivalence, proven).** Every rewritten walk is differentially
-  fuzzed against a transcription of the pre-change implementation over randomly
-  generated `GeoExpr`s: identical results **and identical error precedence**.
-  `render` compares **byte-identically**.
-- **AC5 (depth, in a bounded-stack arena).** Every walk in AC1–AC3 completes at
-  depth **10⁵** inside a subprocess arena pinned to the `dev` profile, per
-  `docs/conventions.md`. The arena must be shown to **fail** when a recursion is
-  reintroduced.
-- **AC6 (the decoupling is real).** A test asserts `max_nodes` can be set to a
-  value that would previously have aborted `eval` (e.g. 5,000) and the lane still
-  runs to completion — the property that makes the R-0011 experiment possible.
-- **AC7 (no library-code abort).** `ufl-geo` and `ufl-evolve` adopt
-  `#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used,
-  clippy::panic))]`, closing two of the seven crates in
-  [#82](https://github.com/westerngazoo/ufl/issues/82).
+- **AC1 (the geometric walks are iterative).** `eval`, `grade`, `is_versor`,
+  `typecheck`, `params`/`params_mut`, and `render` use explicit heap work-stacks.
+  No depth cap and no magic constant.
+- **AC2 (the class closure).** `GeoExpr`'s derived `Clone`, `PartialEq`, and
+  `Debug` become hand-written iterative impls, and `GeoExpr` gains an **iterative
+  `Drop`**. `Debug` is in scope — unlike R-0017 — because §5's containment chain
+  puts it on a reachable path.
+- **AC2b (`GradeError` and its containment chain are depth-safe).** The chain is
+  `GeoExpr → GradeError → GeoLaneError → RunError<E>`, four types across three
+  crates, all deriving `Debug`/`Clone`/`PartialEq`.
+- **AC3 (the search-side walks).** `node_count`, `nth_subtree`, `replace_nth`
+  iterative; `random_expr`'s recursion explicitly addressed or explicitly
+  deferred with a stated bound.
+- **AC4 (semantic equivalence, proven).** Every rewritten walk differentially
+  fuzzed against a verbatim transcription of the pre-change implementation:
+  identical values **and** identical error precedence. `render` and `Debug`
+  compare byte-identically. `is_versor` is `pub(crate)`, so its fuzz lives in an
+  in-`src` `#[cfg(test)]` module — an integration test cannot observe it.
+- **AC5 (depth, in a bounded-stack arena).** Every walk completes at depth 10⁵ in
+  a subprocess arena pinned to the `dev` profile **and to an explicit stack
+  size** — without pinning, sensitivity varies 4× with the calling thread (§1.1).
+  The arena must be shown to fail when a recursion is reintroduced.
+- **AC6 (the decoupling is real).** The lane runs to completion with
+  `max_nodes = 5,000`. Asserts *completion*, not a fitness change. **Depends on
+  AC8** — §1.2 makes this non-terminating otherwise.
+- **AC7 (no library-code abort).** `ufl-geo` and `ufl-evolve` adopt the
+  `not(test)` deny of `unwrap`/`expect`/`panic`. Measured cost: three
+  `write!(…).unwrap()` in `ufl-geo`, zero in `ufl-evolve`.
+- **AC8 (new — single-visit `grade`).** `grade` visits each node a bounded number
+  of times, asserted by a **node-visit counter**, not a timing bound
+  (`docs/conventions.md` — *Structural Frugality over Wall-Clock*). This closes
+  §1.2 and is what makes AC6 reachable.
 
-## 5. Open questions
+## 5. The containment chain — why `Debug` is in scope
 
-**Q3 is answered:** every walk is now measured (§1) — `render` and the three
-`ufl-evolve` walks included. The remaining questions are for Gustavo, then the
-three-lens.
+R-0017 deferred `Debug` ([#81](https://github.com/westerngazoo/ufl/issues/81))
+because it is never invoked from library code. `{:?}` is likewise absent from
+`ufl-geo`/`ufl-evolve` library code — **but that is not the whole audit surface.**
 
-1. **Is `Debug` in or out?** R-0017 deferred it
-   ([#81](https://github.com/westerngazoo/ufl/issues/81)) once I measured that it
-   is never invoked from library code. **That answer does not transfer.** `{:?}`
-   is likewise absent from `ufl-geo`/`ufl-evolve` library code — but §1.1's
-   `GradeError::Incoherent` embeds a tree, so `Debug` on the *error* is a
-   recursive walk over caller data reachable from any `unwrap`, log, or
-   `assert_eq!` on a `Result`. *My recommendation: `Debug` is **in** for this
-   requirement, and #81 should be reconsidered in the same light.*
-2. **Is depth 10⁵ the right target** for a surface whose production trees are
-   ≤ 60 nodes? R-0017's answer was "no cap, so pick a depth far past anything
-   real". *My recommendation: keep 10⁵ for consistency — it costs ~0.2 s.*
-3. **Is `Mv`-per-frame worth attacking separately?** `eval`'s 215 is driven by
-   frame size, not recursion count alone. An iterative `eval` moves those `Mv`s
-   to the heap — worth confirming that is a win and not a throughput regression
-   on the hot path the search calls for every candidate. *My recommendation: make
-   AC4's differential fuzz double as a throughput comparison, so the answer is
-   measured rather than assumed.*
-4. **Does `GradeError` keep its tree payload at all?** Carrying the offending
-   subtree is genuinely useful for diagnostics, but it is what puts a recursive
-   walk on a `pub` error type. Alternatives: keep it (and make the derives
-   iterative), or replace it with a `render`ed `String` — cheaper and already
-   human-readable, at the cost of losing structured access. *No recommendation —
-   this is a design trade the three-lens should argue.*
+```
+GeoExpr → GradeError::Incoherent(GeoExpr)        grade.rs:49
+        → GeoLaneError::Grade(#[from] GradeError) lane.rs:23
+        → RunError<E>::Lane(E)                    ufl-search/src/lib.rs:56
+```
 
-## 6. A note on how §1 was produced
+Four types, three crates, each deriving `Debug`/`Clone`/`PartialEq`. And
+`r_0011m_gate1.rs:92`'s `.expect(…)` formats that chain via `Debug` — a derived
+recursive walk over a `GeoExpr`, invoked from a committed test, four types away
+from the type anyone would think to audit.
 
-The `ufl-evolve` thresholds were measured **twice**. The first run reported all
-three walks surviving 200,000 — because the test-name filter matched nothing and
-`libtest` exits 0 when it runs zero tests, so every probe "passed" without
-executing. The corrected harness asserts `1 passed` before believing a result.
+This generalizes R-0017's lesson. That one was *a derived trait on the recursive
+type is a walk no grep for `fn` finds*. This one is stronger: **the audit set is
+the transitive closure of types containing `T` by value, plus every site that
+materializes `T` into one of them** — here `grade.rs:178`'s `e.clone()`, which
+puts a full tree walk on a `pub fn`'s *failure* path. Worth promoting to
+`docs/conventions.md` once this lands.
 
-That is precisely the false-pass `docs/conventions.md` — *Bounded-Stack
-Regression Arena* — was written to prevent, walked into in an ad-hoc harness
-three days after writing the convention. Recorded here because the same trap will
-be waiting for whoever builds this requirement's arena.
+`Display` is safe: `grade.rs:48`'s `#[error]` string has no `{0}`.
+
+## 6. How the numbers were produced
+
+Two of §1's measurement passes were wrong before they were right, and both
+failures are more useful than the numbers.
+
+**The false pass.** The `ufl-evolve` walks first reported surviving 200,000 —
+because the test-name filter matched nothing and `libtest` exits 0 having run
+zero tests, so every probe "passed" without executing. The corrected harness
+asserts `1 passed` before believing a result. This is exactly the false-pass
+`docs/conventions.md` — *Bounded-Stack Regression Arena* — exists to prevent,
+walked into in an ad-hoc harness three days after writing the convention.
+
+**The mislabelled stack.** The whole table was attributed to an 8 MB main-thread
+stack when it was measured on libtest's 2 MiB spawned thread — a 4× error in the
+quantity the requirement's argument rests on, caught by the architect and
+verified with a standalone binary (§1.1).
+
+Both point the same way: **a measurement is not a fact until its harness has been
+checked as carefully as its result.** Recorded so whoever builds this
+requirement's arena is warned twice over.
