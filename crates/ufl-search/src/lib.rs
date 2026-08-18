@@ -17,6 +17,10 @@
 //! [`Screen`], and a post-screen eval [`Ledger`].
 
 #![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
 
 use core::fmt;
 

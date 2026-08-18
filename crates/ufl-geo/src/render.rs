@@ -106,12 +106,15 @@ fn node(e: &GeoExpr, ctx: &mut Ctx, out: &mut String) {
         GeoExpr::GradeProject(k, a) => {
             out.push('⟨');
             node(a, ctx, out);
-            use std::fmt::Write;
-            write!(out, "⟩_{k}").unwrap();
+            // Writing to a `String` is infallible, so this is `push_str` rather
+            // than a `write!` whose `Result` could only be discarded (AC7).
+            out.push_str("⟩_");
+            out.push_str(&k.to_string());
         }
         GeoExpr::GradeLift(k, a) => {
-            use std::fmt::Write;
-            write!(out, "𝒢_{k}(").unwrap();
+            out.push_str("𝒢_");
+            out.push_str(&k.to_string());
+            out.push('(');
             node(a, ctx, out);
             out.push(')');
         }
@@ -146,8 +149,8 @@ fn blade_name(i: u8, out: &mut String) {
         return;
     }
     if i >= 16 {
-        use std::fmt::Write;
-        write!(out, "e?{i}").unwrap();
+        out.push_str("e?");
+        out.push_str(&i.to_string());
         return;
     }
     const GENERATORS: [(u8, char); 4] = [(8, '₀'), (1, '₁'), (2, '₂'), (4, '₃')];
