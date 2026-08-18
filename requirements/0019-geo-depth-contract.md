@@ -1,7 +1,6 @@
 # R-0019 — Extend the depth contract to the geometric surface
 
-- **Status:** **Draft** — ACs revised after the three-lens; §4 needs Gustavo's
-  re-confirmation because §2's justification changed materially.
+- **Status:** **Draft — recommended for SHELVING.** The cap probe (§2.1) removed the stated justification; §7 recommends severing AC8 into its own requirement.
 - **Milestone:** M5 (geometric neuroevolution).
 - **Tracks:** [#83](https://github.com/westerngazoo/ufl/issues/83).
 - **Precedent:** [R-0017](0017-depth-contract.md) / [SPEC-0017](../specs/0017-depth-contract.md)
@@ -146,6 +145,38 @@ So the honest statement is: **the depth contract is a prerequisite for the
 `max_nodes` experiment, and it is not sufficient — §1.2 must be fixed too.** Both
 are latent today.
 
+### 2.1 The conditional was tested — and it does not hold
+
+§2's case rests on *wanting* to raise `max_nodes`. That is testable without
+building any of R-0019: `eval` survives to depth 215 on a test thread and real
+genomes sit at depth 32, so the cap can go to ~150 today, unchanged.
+
+Pre-registered sweep (`crates/ufl-evolve/tests/r_0019_cap_probe.rs`), release,
+`max_nodes` the only varying knob:
+
+| cap | wins/16 | per-seed | wall-clock |
+|-----|---------|----------|------------|
+| **60 (control)** | **6/16** | `...#...###..#.#.` | 34 s |
+| 100 | 4/16 | `...#..#.#..#....` | 258 s (7.6×) |
+| 150 | 4/16 | `.#......#...#..#` | 436 s (12.8×) |
+
+The control reproduces the pilot's 6/16 exactly.
+
+**What this supports.** No evidence that the cap is binding on search quality.
+Raising it is **expensive**: 7.6× and 12.8× wall-clock, one seed alone taking
+145 s.
+
+**What it does not support.** It is *not* evidence that raising the cap hurts.
+6 vs 4 is **1.03 SD** on `Binomial(16, 6/16)`, and `P(X ≤ 4 | p = 6/16) = 0.223`
+— 4/16 is an ordinary draw from the control. Resolving 0.375 vs 0.50 at 80%
+power would take ~247 seeds per arm. The win-rate comparison *is* unconfounded by
+the cost, since `GENS` is fixed at 400 regardless of speed.
+
+**Consequence for this requirement.** §2's justification was explicitly
+conditional, and the condition now has no empirical support: we have no measured
+reason to want a larger `max_nodes`, and a measured reason not to. R-0019 as
+scoped is **not justified** — see §7.
+
 ## 3. What this requirement is *not*
 
 - **Not a bug fix.** §1.3 shows no live abort and no live blowup.
@@ -237,3 +268,27 @@ verified with a standalone binary (§1.1).
 Both point the same way: **a measurement is not a fact until its harness has been
 checked as carefully as its result.** Recorded so whoever builds this
 requirement's arena is warned twice over.
+
+## 7. Recommendation after the cap probe (2026-08-18)
+
+**Do not build R-0019 as scoped.** §2.1 removed its stated justification. What
+remains is latent safety for a hazard §1.3 measured as unreached — real, but not
+worth fourteen rewrites across two crates and four PRs.
+
+Two pieces are worth keeping, and they are severable:
+
+1. **AC8 (§1.2's exponential `grade`) should become its own requirement.** It is
+   a *complexity* bug, not a depth bug, with a live measured cost: `typecheck` at
+   71 ms on a 55-node genome that fits **inside today's cap**, ~1,150× the
+   `eval` it screens for, on a path that runs for every candidate. It needs no
+   depth contract, no arena, and no iterative rewrite — only that `grade(r)` be
+   computed once per `Sandwich`. It very likely also explains most of §2.1's
+   7.6×/12.8× cost, which means fixing it first would make any future cap
+   experiment both cheaper **and** fairer.
+2. **The measurement itself stays** — `r_0019_cap_probe.rs` is committed with its
+   verdict, so the next person to propose raising `max_nodes` starts from data
+   rather than from the same intuition I had.
+
+The depth work proper (AC1–AC5, AC7) should be **shelved**, not closed: if the
+exponential fix lands and a properly powered sweep (~247 seeds/arm) then shows
+the cap *is* binding, the justification returns and this document is ready.
