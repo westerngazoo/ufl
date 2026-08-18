@@ -12,6 +12,10 @@
 //! `ufl-discovery` here preserves its exact stream.
 
 #![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
 
 /// A seeded SplitMix64 generator. Same seed ⇒ same stream (the determinism
 /// contract). `Clone` so a sub-search can fork a reproducible sub-stream.

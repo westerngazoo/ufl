@@ -13,6 +13,10 @@
 //! type — see SPEC-0009 §2.4.
 
 #![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
 
 /// UFL's geometric value: a `Cl(3,0,1)` PGA multivector over `f64`. A
 /// transparent alias for garust's kernel — its inherent methods (`wedge`,
