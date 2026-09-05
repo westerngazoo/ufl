@@ -56,12 +56,12 @@ Three things this settles:
   **50×** from cap 60 to cap 150 (117 µs → 8.9 ms). It averages out today because
   the GA rarely produces the triggering shape.
 
-## 3. Why fix it anyway — corrected a third time, on measurement
+## 3. Why fix it anyway
 
-An earlier draft of this section said the defect is exponential "on exactly the
-solution class the lane exists to find" — motor chains. **Measured false.** The
-doubling is of `grade(r)`, the *rotor* subtree, and a motor chain nests in the
-*operand* position with small rotors, so its doubled work is O(1) per level:
+(This section's claim has changed three times on measurement; the history is in
+§7. What follows is the current truth.) The doubling is of `grade(r)`, the
+*rotor* subtree, and a motor chain nests in the *operand* position with small
+rotors, so its doubled work is O(1) per level:
 
 | k | (A) motor chain — operand-nested, versor rotors | (B) operand-nested, non-versor rotors | (C) rotor-nested |
 |---|---|---|---|
@@ -74,7 +74,7 @@ doubling is of `grade(r)`, the *rotor* subtree, and a motor chain nests in the
 `Exp(Sandwich(Exp(Sandwich(…))))` — is 2^depth. And (C) is algebraically
 redundant: `R·exp(B)·R̃ = exp(R·B·R̃)`, so it is not a shape a solution needs.
 
-What survives all three corrections is smaller and still true:
+What survives is smaller and still true:
 
 1. **A screen that a small input can hang is a defect in a screen.** `typecheck`
    is `pub`, total by contract, and runs on every candidate. Shape (C) at k = 22
@@ -135,3 +135,15 @@ pass returning `(GradeSet, bool)` should make it 1 — the versor test for
 `GeoProduct(a, b)` is `versor(a) && versor(b)`, which the tuple carries up without
 a re-walk. The spec should state the bound it actually achieves and the counter
 should assert that bound, not a hoped-for one.
+
+## 7. Changelog
+
+| date | commit | what changed, and why |
+|---|---|---|
+| 2026-09-04 | `1598938` | Drafted. §3 claimed the exponential "very likely explains most" of the R-0019 cap sweep's 7.6×/12.8× cost. |
+| 2026-09-04 | `1598938` | **Corrected §2/§3:** a timed run showed the screen is 15–26% of wall-clock and `eval` 63–71%; the 145 s outlier was a 5× call-count increase from the refiner's neighbor scaling. §3 re-based on "exponential on the target class (motor chains)". |
+| 2026-09-05 | `1db825c` | **Corrected §3 again:** measured (A)/(B)/(C) — motor chains are linear; only rotor-nested `Exp(Sandwich(…))` is 2^depth, and it is algebraically redundant. §3 re-based on "a `pub` screen a small input can hang". ACs signed off; unaffected, since they never depended on the retracted claims. |
+| 2026-09-05 | rev 2 of SPEC-0020 | Three-lens round 1: the fix as first specified was *slower* on every production shape (per-node `Vec`); the corrected form is −50% on the screen. Recorded in SPEC-0020 §2.5, not here — R-0020's pricing ("hygiene") stands. |
+
+Three cost claims, each refuted by a shape-specific measurement, converging on
+one protocol: **a cost claim names its shape.**
