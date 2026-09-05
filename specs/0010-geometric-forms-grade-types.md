@@ -173,6 +173,13 @@ is `∅`, unsatisfiable) — and the out-of-range `BadBlade`/`BadGrade` leaves.
 produces; `typecheck` reads it), so they cannot disagree. This is the decidable
 signal R-0011 prunes on **without evaluating** the candidate.
 
+> **Note (2026-09-05, SPEC-0020):** "one source of truth" was true by *call* —
+> `typecheck` invoked `grade` at every node, which made it O(n²) over a `grade`
+> that was itself 2^depth on rotor-nested `Sandwich`es. After SPEC-0020 it is
+> true by *construction*: both are one `rule` over a per-node
+> `Analysis { grade, versor }`, and `typecheck` is `grade` with its totality
+> defaults promoted to errors. The stronger form of the same claim.
+
 ### 2.6 The s-expr textual reader — deferred (the §5 resolution)
 
 `GeoExpr` is the **homoiconic form representation** (code-as-data: an inspectable
