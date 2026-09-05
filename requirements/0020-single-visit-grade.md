@@ -1,6 +1,7 @@
 # R-0020 — `grade` and `typecheck` visit each node once
 
-- **Status:** **Draft** — acceptance criteria await Gustavo's sign-off (CLAUDE.md §4 step 1).
+- **Status:** **Accepted** — ACs signed off 2026-09-05. §3 was corrected *after* sign-off (see
+  its note); the ACs are unaffected because they never depended on the claim that changed.
 - **Milestone:** M5 (geometric neuroevolution).
 - **Severed from:** [R-0019](0019-geo-depth-contract.md) AC8 / §7. R-0019 is
   recommended for shelving; this is the one piece of it that stands on its own.
@@ -55,24 +56,42 @@ Three things this settles:
   **50×** from cap 60 to cap 150 (117 µs → 8.9 ms). It averages out today because
   the GA rarely produces the triggering shape.
 
-## 3. Why fix it anyway
+## 3. Why fix it anyway — corrected a third time, on measurement
 
-Not for speed — §2 rules that out as the headline. For two reasons that survive
-§2:
+An earlier draft of this section said the defect is exponential "on exactly the
+solution class the lane exists to find" — motor chains. **Measured false.** The
+doubling is of `grade(r)`, the *rotor* subtree, and a motor chain nests in the
+*operand* position with small rotors, so its doubled work is O(1) per level:
 
-1. **It is exponential on exactly the solution class the lane exists to find.**
-   The triggering shape is a nested versor sandwich — `Sandwich(Exp(…), …)` inside
-   `Sandwich(Exp(…), …)` — which is what a **motor chain** is. A 6-DoF rigid-body
-   map is 61 nodes of precisely this shape (nice-guy, SPEC-0019 review). The GA
-   does not produce it at random, so the defect is latent; but if the search ever
-   converges *toward* the answers R-0011 wants, the screen becomes the bottleneck
-   at the worst possible moment. An algorithm that is 2^depth on the target class
-   is a landmine, whatever its average cost.
-2. **The fix is small and local.** One post-order pass that returns
-   `(GradeSet, is_versor)` per node, with `grade`/`is_versor` as thin wrappers,
-   and a `typecheck` that threads its children's `GradeSet`s up instead of
-   recomputing them. No public signature changes, no depth work, no arena. On the
-   order of thirty lines in one file.
+| k | (A) motor chain — operand-nested, versor rotors | (B) operand-nested, non-versor rotors | (C) rotor-nested |
+|---|---|---|---|
+| 10 | 4.0 µs | 5.9 µs | 133 µs |
+| 14 | 4.3 µs | 14.4 µs | 2.1 ms |
+| 18 | 4.1 µs | 7.0 µs | 21.4 ms |
+| 22 | 3.5 µs | 4.8 µs | **203.6 ms** |
+
+(A) and (B) are flat. Only (C) — nesting **inside the rotor**,
+`Exp(Sandwich(Exp(Sandwich(…))))` — is 2^depth. And (C) is algebraically
+redundant: `R·exp(B)·R̃ = exp(R·B·R̃)`, so it is not a shape a solution needs.
+
+What survives all three corrections is smaller and still true:
+
+1. **A screen that a small input can hang is a defect in a screen.** `typecheck`
+   is `pub`, total by contract, and runs on every candidate. Shape (C) at k = 22
+   is ~70 nodes and costs 204 ms; at k = 30 it is ~95 nodes and ~50 s; at k = 40
+   it is ~125 nodes and hours. Any caller — a future reader, a user-supplied
+   program, a mutation the GA has not yet found — can express it. An algorithm
+   that is 2^n on a reachable input of that size is wrong regardless of how often
+   the current search reaches it.
+2. **The fix is small and local.** One post-order pass computing
+   `(GradeSet, versor)` per node, with `grade`/`is_versor` as thin wrappers, and a
+   `typecheck` that composes its children's grades instead of recomputing them.
+   No public signature changes. On the order of sixty lines replacing a hundred.
+
+What does **not** survive: any claim that this speeds up the search (§2 —
+15–26% of wall-clock, and the tail is rare), or that it lies on the path to the
+answers R-0011 wants (it does not — those are linear already). This is hygiene on
+a public function, priced as such.
 
 ## 4. What this is *not*
 
@@ -84,7 +103,7 @@ Not for speed — §2 rules that out as the headline. For two reasons that survi
 - **Not a semantics change.** The versor predicate stays exactly as conservative
   as today; only how many times a subtree is *visited* changes, never the answer.
 
-## 5. Proposed acceptance criteria — **for Gustavo's sign-off**
+## 5. Acceptance criteria — **signed off 2026-09-05**
 
 - **AC1 (single visit, asserted by mechanism).** `grade` visits each node at most
   a small constant *c* times, proven by a **node-visit counter**, not a timing
