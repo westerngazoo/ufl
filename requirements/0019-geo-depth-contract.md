@@ -282,9 +282,12 @@ Two pieces are worth keeping, and they are severable:
    71 ms on a 55-node genome that fits **inside today's cap**, ~1,150× the
    `eval` it screens for, on a path that runs for every candidate. It needs no
    depth contract, no arena, and no iterative rewrite — only that `grade(r)` be
-   computed once per `Sandwich`. It very likely also explains most of §2.1's
-   7.6×/12.8× cost, which means fixing it first would make any future cap
-   experiment both cheaper **and** fairer.
+   computed once per `Sandwich`. **It does *not* explain §2.1's 7.6×/12.8×
+   cost** — an earlier draft of this paragraph said it "very likely" did, and a
+   timed run proved otherwise: the screen is 15–26% of wall-clock at every cap
+   and `eval` is 63–71%; the 145 s outlier is a 5× *call-count* increase from
+   the refiner's neighbor count scaling with `Param` slots. The measurement and
+   the honest case for the fix are in R-0020 §2.
 2. **The measurement itself stays** — `r_0019_cap_probe.rs` is committed with its
    verdict, so the next person to propose raising `max_nodes` starts from data
    rather than from the same intuition I had.
