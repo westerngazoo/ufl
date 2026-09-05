@@ -152,6 +152,38 @@ and ulp bound unconditionally.
 
 **Decided:** 2026-07-26.
 
+### Fused Synthesized Attributes
+
+Two bottom-up analyses over one tree that **read each other at any non-leaf
+arm** are one function returning a product — never two mutually recursive
+functions. Each cross-dependency becomes a field read; no arm calls a walk; every
+node is visited once.
+
+The review check is mechanical: *does any arm of a walk call a **different** walk
+on a child?* If yes, the pair is exponential on some nesting of that arm — and the
+fix is a `struct Analysis { a, b }` with one `rule` written over children's
+analyses, not memoization.
+
+The reason this is a convention and not a refactor: the exponential hides.
+`grade`'s `Sandwich` arm called `is_versor(r)`, whose `Exp` arm called
+`grade(b)`; the non-versor branch then called `grade(r)`, whose `Exp` arm called
+`grade(b)` again. Two walks per level, 2^depth on rotor-nested inputs, 204 ms at
+70 nodes — invisible on every shape the search actually produced (worst real
+genome: 23 µs), and found only by counting entries: 5,116 for 31 nodes.
+
+Assert it by **mechanism, not clock**: a `#[cfg(test)] thread_local!` counter
+ticked on entry, asserting `visits == node_count` on the shapes that would
+re-walk, at ascending depths in one test. A field summing children's counts does
+**not** work — a discarded re-walk never enters the sum.
+
+Counter-instance, recorded for the right reason: SPEC-0019 §2.2 declined to
+merge the same two functions for *depth safety*, correctly — merging buys nothing
+against stack depth. It is the *complexity* question this convention answers.
+
+Instances: SPEC-0020 (`grade` + `is_versor` → `Analysis { grade, versor }`).
+
+**Decided:** 2026-09-05.
+
 ### Structural Frugality over Wall-Clock
 
 Performance acceptance criteria assert the **mechanism** (a cached field, a

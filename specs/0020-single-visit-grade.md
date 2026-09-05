@@ -1,12 +1,11 @@
 # SPEC-0020 — One pass for `grade` and `typecheck`
 
 - **Realizes:** [R-0020](../requirements/0020-single-visit-grade.md) (Accepted).
-- **Status:** **Draft (rev 3)** — three-lens round 1 complete (architect REQUEST
-  CHANGES, hater NEEDS WORK, nice-guy SOLID) and folded. **Round 2: both the
-  architect and hater agents stalled twice**, so the main session ran their
-  checks itself (§6, §8) — the spec's code compiled as printed, fuzzed 0/300,000
-  against the old functions, and the ladder held. **One open decision remains for
-  Gustavo (§7).**
+- **Status:** **Accepted** (2026-09-05). Three-lens round 1 folded; round-2
+  checks run by the main session after both agents stalled twice (§6, §8);
+  **form chosen by Gustavo: slice + buffer** (§2.2). The substitution of
+  main-session verification for architect-agent approval is recorded in
+  [`decisions/0002`](../decisions/0002-spec-0020-form-and-verification.md).
 - **Crate touched:** `ufl-geo`, one file — `src/grade.rs`. No public signature
   changes: `GradeSet`, `GradeCtx`, `GradeError`, `grade`, `typecheck` keep their
   types exactly. `is_versor` (`pub(crate)`) is **deleted** (§2.4).
@@ -67,63 +66,83 @@ for *complexity*, where the merge **is** the fix — every cross-dependency beco
 a field read and no arm calls a walk. Both decisions are correct; they answer
 different questions.
 
-### 2.2 `rule` — the per-node algebra, written once, owning its own arity
+### 2.2 `rule` — the per-node algebra, written once
 
-The rule at a node is a function of the node and its children's analyses. Rather
-than collect the children into a buffer and pattern-match on arity (rev 1 —
-which cost an allocation per node and a wildcard arm that lost exhaustiveness),
-`rule` receives the recursion as a visitor and calls it exactly where each child
-is named:
+The rule at a node is a function of the node and its children's analyses.
+`children` is the **single arity source**; `rule` matches `e` exhaustively (a
+twelfth variant is E0004, as today) and destructures each non-leaf arm's kids
+through one of two helpers — the only two places `rule` relies on `children`:
 
 ```rust
-/// The grade/versor rule at one node. `kid` is the recursion — `rule` never
-/// walks; it only says *which* children to visit, *in which order*, and *what*
-/// to conclude. Total on every node: the totality defaults (`⊤` for an
-/// out-of-range leaf, `∅` for a bad projection) are here, exactly as in today's
-/// `grade` (SPEC-0010 §2.3); it is `check` that promotes them to errors.
-fn rule<E>(
-    e: &GeoExpr,
-    ctx: &GradeCtx,
-    kid: &mut impl FnMut(&GeoExpr) -> Result<Analysis, E>,
-) -> Result<Analysis, E> {
+/// The children of a node, in left-to-right order — the single arity source.
+fn children(e: &GeoExpr) -> [Option<&GeoExpr>; 2] {
+    match e {
+        GeoExpr::Param(_) | GeoExpr::Basis(_) | GeoExpr::Var(_) => [None, None],
+        GeoExpr::GradeLift(_, a)
+        | GeoExpr::Reverse(a)
+        | GeoExpr::GradeProject(_, a)
+        | GeoExpr::Exp(a) => [Some(a), None],
+        GeoExpr::GeoProduct(a, b)
+        | GeoExpr::Wedge(a, b)
+        | GeoExpr::Inner(a, b)
+        | GeoExpr::Sandwich(a, b) => [Some(a), Some(b)],
+    }
+}
+
+/// Where `rule` relies on `children`. Unreachable by construction: the arm that
+/// calls `one`/`two` is the arm whose variant `children` maps to that arity.
+fn one(kids: &[Analysis]) -> &Analysis {
+    let [a] = kids else { unreachable!("`children` gives a unary node exactly one kid") };
+    a
+}
+fn two(kids: &[Analysis]) -> (&Analysis, &Analysis) {
+    let [a, b] = kids else { unreachable!("`children` gives a binary node exactly two kids") };
+    (a, b)
+}
+
+/// The grade/versor rule at one node, from its children's analyses. Total: the
+/// totality defaults (`⊤` for an out-of-range leaf, `∅` for a bad projection)
+/// are here, exactly as in today's `grade` (SPEC-0010 §2.3); it is `check`
+/// that promotes them to errors.
+fn rule(e: &GeoExpr, kids: &[Analysis], ctx: &GradeCtx) -> Analysis {
     let out = |grade, versor| Analysis { grade, versor };
-    Ok(match e {
+    match e {
         GeoExpr::Param(_) => out(GradeSet::singleton(0), false),
         GeoExpr::Basis(i) => out(
             if *i >= 16 { GradeSet::full(N) } else { GradeSet::singleton(i.count_ones() as usize) },
             *i < 16 && i.count_ones() == 1,
         ),
         GeoExpr::Var(name) => out(ctx.get(name), false),
-        GeoExpr::GradeLift(k, a) => {
-            kid(a)?; // visited so `check` can reject it; its analysis is not consulted (as today)
+        GeoExpr::GradeLift(k, _) => {
+            let _ = one(kids); // visited so `check` can reject it; not consulted (as today)
             out(if *k > 4 { GradeSet::full(N) } else { GradeSet::singleton(*k as usize) }, false)
         }
-        GeoExpr::GeoProduct(a, b) => {
-            let (a, b) = (kid(a)?, kid(b)?); // left, then right
+        GeoExpr::GeoProduct(..) => {
+            let (a, b) = two(kids);
             out(Op::Geometric.output_grades(&[a.grade, b.grade], N), a.versor && b.versor)
         }
-        GeoExpr::Wedge(a, b) => {
-            let (a, b) = (kid(a)?, kid(b)?);
+        GeoExpr::Wedge(..) => {
+            let (a, b) = two(kids);
             out(Op::Wedge.output_grades(&[a.grade, b.grade], N), false)
         }
-        GeoExpr::Inner(a, b) => {
-            let (a, b) = (kid(a)?, kid(b)?);
+        GeoExpr::Inner(..) => {
+            let (a, b) = two(kids);
             out(Op::Inner.output_grades(&[a.grade, b.grade], N), false)
         }
-        GeoExpr::Reverse(a) => {
-            let a = kid(a)?;
+        GeoExpr::Reverse(_) => {
+            let a = one(kids);
             out(Op::Reverse.output_grades(&[a.grade], N), a.versor)
         }
-        GeoExpr::GradeProject(k, a) => {
-            let a = kid(a)?;
+        GeoExpr::GradeProject(k, _) => {
+            let a = one(kids);
             // Guard the raw `u8` before garust: `singleton(k) = 1 << k` overflows
             // `u32` for `k ≥ 32`. Projecting onto a grade the algebra lacks is ∅.
             out(if *k > 4 { GradeSet::EMPTY } else { Op::GradeProject(*k).output_grades(&[a.grade], N) }, false)
         }
-        GeoExpr::Sandwich(r, x) => {
-            let (r, x) = (kid(r)?, kid(x)?);
+        GeoExpr::Sandwich(..) => {
+            let (r, x) = two(kids);
             let grade = if r.versor {
-                x.grade // a versor sandwich preserves the operand's grade
+                x.grade // the sandwich rule preserves the operand's grade
             } else {
                 // The sound product bound: grades of `(r ∗ x) ∗ r` (`~r` carries
                 // the same grades as `r`).
@@ -132,8 +151,8 @@ fn rule<E>(
             };
             out(grade, false)
         }
-        GeoExpr::Exp(a) => {
-            let a = kid(a)?;
+        GeoExpr::Exp(_) => {
+            let a = one(kids);
             let grade = if subset_of(a.grade, &[0]) {
                 GradeSet::singleton(0)
             } else if subset_of(a.grade, &[0, 2]) {
@@ -143,103 +162,67 @@ fn rule<E>(
             };
             out(grade, subset_of(a.grade, &[2]))
         }
-    })
+    }
 }
 ```
 
-What this buys, each verified by a lens:
+What this buys, each verified (§8):
 
-- **Exhaustive on `e`.** A twelfth `GeoExpr` variant is E0004 at compile time,
-  as today (hater F4). No wildcard, no `unreachable!`, no `children` helper — the
-  arm that names a child is the arm that visits it, so there is one arity source
-  by construction.
-- **Allocation-free.** No buffer of children's analyses (architect 2, hater F1).
-- **Order is explicit at the binding site**: `(kid(a)?, kid(b)?)` is
-  left-then-right, and `?` makes the first error win.
+- **Exhaustive on `e`** — no wildcard arm (hater F4 closed).
+- **Allocation-free** — a two-slot stack buffer in the drivers, never a `Vec`
+  (architect 2, hater F1 closed).
+- **Two `unreachable!`s in the whole file**, not one per arm, each justified by
+  `children` being the sole arity source — of the class CLAUDE.md §6 permits
+  and this repo already uses (`eval.rs:101,109`, `eml.rs:69,76`, `eval_pred.rs`).
 - **Every cross-dependency is a field read** — `Sandwich` reads `r.versor`,
-  `Exp` sets `versor` from `a.grade`. No arm calls a walk. That is the whole fix.
+  `Exp` sets `versor` from `a.grade`. No arm calls a walk. That is the fix.
 
 One quirk is preserved deliberately: `Exp` of an ∅-graded operand is a vacuous
-versor (`subset_of(∅, {2})` is `true`). Sound — ∅ means identically zero, and
+witness (`subset_of(∅, {2})` is `true`). Sound — ∅ means identically zero, and
 `exp(0) = 1`.
 
-### 2.2b The alternative: slice patterns over a fixed buffer
+### 2.2b The form not chosen, and why
 
-The rev-1 shape, corrected per hater F4 (match on `e` exhaustively; arity checked
-**per arm** with `let … else`, so a twelfth variant is still E0004):
+An architect-proposed **visitor form** — `rule<E>(e, ctx, kid: &mut impl
+FnMut(&GeoExpr) -> Result<Analysis, E>)`, with each arm calling `kid(child)?`
+where it names the child, and the drivers supplying the recursion as a closure —
+is equally correct (0 mismatches on the same 300,000 trees), needs no
+`children`, no buffer, and no `unreachable!` at all, and is 6% faster in
+release. It was **not** chosen on this measurement (main session, 1 MiB thread):
 
-```rust
-/// The children of a node, in left-to-right order — the single arity source.
-fn children(e: &GeoExpr) -> [Option<&GeoExpr>; 2] {
-    match e {
-        GeoExpr::Param(_) | GeoExpr::Basis(_) | GeoExpr::Var(_) => [None, None],
-        GeoExpr::GradeLift(_, a) | GeoExpr::Reverse(a) | GeoExpr::GradeProject(_, a) | GeoExpr::Exp(a) => [Some(a), None],
-        GeoExpr::GeoProduct(a, b) | GeoExpr::Wedge(a, b) | GeoExpr::Inner(a, b) | GeoExpr::Sandwich(a, b) => [Some(a), Some(b)],
-    }
-}
-
-fn rule(e: &GeoExpr, kids: &[Analysis], ctx: &GradeCtx) -> Analysis {
-    let out = |grade, versor| Analysis { grade, versor };
-    match e {
-        GeoExpr::Param(_) => out(GradeSet::singleton(0), false),
-        // … leaves as in §2.2 …
-        GeoExpr::GeoProduct(..) => {
-            let [a, b] = kids else { unreachable!("`children` gives GeoProduct two kids") };
-            out(Op::Geometric.output_grades(&[a.grade, b.grade], N), a.versor && b.versor)
-        }
-        // … one arm per variant, each destructuring its own arity …
-    }
-}
-
-fn analyse(e: &GeoExpr, ctx: &GradeCtx) -> Analysis {
-    let mut buf = [Analysis::EMPTY; 2];
-    let mut n = 0;
-    for c in children(e).into_iter().flatten() { buf[n] = analyse(c, ctx); n += 1; }
-    rule(e, &buf[..n], ctx)
-}
-// `check` identically, with the pre-order guards and post-order ∅ of §2.3.
-```
-
-Same semantics (0 mismatches on the same 300,000 trees), same single-visit
-property, allocation-free, exhaustive on `e`. Costs one `unreachable!` per
-non-leaf arm, justified under existing precedent (`eval.rs:101,109`,
-`eml.rs:69,76`, `eval_pred.rs`) because `children` is the sole arity source.
-
-### 2.2c The measured trade between the two forms
-
-| | visitor (§2.2) | slice + buffer (§2.2b) |
+| | slice + buffer (chosen) | visitor |
 |---|---|---|
-| semantics vs old, 300K trees | 0 mismatches | 0 mismatches |
-| `typecheck` ns/call, release, random ≤60 (architect) | **115 (0.50×)** | 121 (0.53×) |
-| `analyse` depth ceiling, **release**, 1 MiB | 16,567 | 16,566 |
-| `check` depth ceiling, **release**, 1 MiB | 9,466 | 9,466 |
-| `analyse` depth ceiling, **debug**, 1 MiB | **958** (old: 2,362) | 2,203 |
-| `check` depth ceiling, **debug**, 1 MiB | **400** (old: 1,406) | 1,377 |
-| `unreachable!` in library code | none | one per non-leaf arm |
-| exhaustive on `GeoExpr` | yes | yes |
+| `typecheck` ns/call, release (architect) | 121 (0.53×) | **115 (0.50×)** |
+| `analyse` depth, **release** | 16,566 | 16,567 |
+| `check` depth, **release** | 9,466 | 9,466 |
+| `analyse` depth, **debug** | **2,203** (old: 2,362) | 958 |
+| `check` depth, **debug** | **1,377** (old: 1,406) | 400 |
 
 In release the two are indistinguishable — LLVM inlines the closure. In
 **debug**, `cargo test`'s profile, the visitor keeps `rule`'s frame *and* the
-closure's on the stack during recursion — three frames per level instead of one
-— and loses **59–72%** of depth against today's code, on a `pub` surface. The
-slice form is at parity with today. The visitor's whole advantage is 6% of a
-function that is 15–26% of lane wall-clock: ~1% end to end.
-
-**Recommendation: the slice form (§2.2b).** Debug is the profile every test
-runs in, depth on a `pub` function is a stated property (§2.6), and 1% release
-throughput is inside the noise of the R-0020 §2 time split. The cost is the
-`unreachable!`s, which are of the class CLAUDE.md §6 permits and this repo
-already uses. This **reverses the architect's round-1 preference** on data it
-did not have (it measured release only); it is put to Gustavo as §7 Q1, and
-whichever form is chosen, the other's section is deleted at Acceptance.
+closure's on the stack during recursion — three frames per level — and loses
+59–72% of depth against today's code, on a `pub` surface. The visitor's whole
+advantage is 6% of a function that is 15–26% of lane wall-clock: ~1% end to end.
+**Gustavo chose the slice form on that trade (2026-09-05)**, reversing the
+architect's round-1 preference, which had been formed on release numbers alone.
 
 ### 2.3 The two drivers
 
 ```rust
+impl Analysis {
+    /// A slot filler for the two-child buffer; never read.
+    const PLACEHOLDER: Self = Self { grade: GradeSet::EMPTY, versor: false };
+}
+
 /// The total pass: every node visited exactly once (§4.3 asserts it).
 fn analyse(e: &GeoExpr, ctx: &GradeCtx) -> Analysis {
-    let Ok(a) = rule(e, ctx, &mut |c| Ok::<_, Infallible>(analyse(c, ctx)));
-    a
+    let mut buf = [Analysis::PLACEHOLDER; 2];
+    let mut n = 0;
+    for (slot, c) in buf.iter_mut().zip(children(e).into_iter().flatten()) {
+        *slot = analyse(c, ctx); // left, then right
+        n += 1;
+    }
+    rule(e, &buf[..n], ctx)
 }
 
 pub fn grade(e: &GeoExpr, ctx: &GradeCtx) -> GradeSet {
@@ -258,7 +241,13 @@ fn check(e: &GeoExpr, ctx: &GradeCtx) -> Result<Analysis, GradeError> {
         }
         _ => {}
     }
-    let a = rule(e, ctx, &mut |c| check(c, ctx))?;
+    let mut buf = [Analysis::PLACEHOLDER; 2];
+    let mut n = 0;
+    for (slot, c) in buf.iter_mut().zip(children(e).into_iter().flatten()) {
+        *slot = check(c, ctx)?; // left to right; the first error wins
+        n += 1;
+    }
+    let a = rule(e, &buf[..n], ctx);
     if a.grade.is_empty() {
         Err(GradeError::Incoherent(e.clone()))
     } else {
@@ -271,14 +260,14 @@ pub fn typecheck(e: &GeoExpr, ctx: &GradeCtx) -> Result<GradeSet, GradeError> {
 }
 ```
 
-The irrefutable `let Ok(a) = …` over `Result<_, Infallible>` is stable Rust
-(1.82+; CI is `stable`, local 1.95).
+The `zip` bounds the loop by the buffer, so no index can overrun; `&buf[..n]`
+with `n ≤ 2` cannot panic. No `unwrap`, no `expect`, no bare index.
 
 **Error precedence is preserved exactly** (SPEC-0019 §2.3): own
 `BadBlade`/`BadGrade` before descent; children left to right with `?`; own
-`Incoherent` after both. The architect traced all three §4.6 cases through both
-implementations; the hater fuzzed 370,079 trees; zero divergence, including
-*which* subtree `Incoherent` carries.
+`Incoherent` after both. Traced through all four §4.6 cases and fuzzed on
+370,079 + 300,000 trees across the two verification passes; zero divergence,
+including *which* subtree `Incoherent` carries.
 
 **The bound, stated** (R-0020 §6): *c* = **1**. `analyse` enters each node
 exactly once. `check` enters exactly the nodes it reaches before the first
@@ -316,14 +305,15 @@ and 20K crossover-bloated ≤ 60:
 | old `typecheck` | 230 | 146 | 390 |
 | rev 1 — `Vec` per node | 228 (0.99×) | **171–176 (+18–20%)** | **435–444 (+11–15%)** |
 | `[Analysis; 2]` buffer | 121 (0.53×) | 100 (−31%) | 254 (−35%) |
-| **§2.2 visitor** | **115 (0.50×)** | — | — |
+| **§2.2 slice + buffer (chosen)** | **121 (0.53×)** | 100 (−31%) | 254 (−35%) |
+| visitor (§2.2b, not chosen) | 115 (0.50×) | — | — |
 
 On production shapes the old `typecheck` is O(n²) over an O(n) `grade` at small
 n, so the algorithmic win is ~2× — and one heap allocation per node ate exactly
 that. Rev 1 deferred the buffer "if the throughput test shows the allocation";
 it does, and since the screen is 15–26% of lane wall-clock (R-0020 §2), rev 1 was
-a ~3–5% *regression* sold as hygiene. The visitor form is the fastest measured
-and is adopted. R-0020 §3's pricing stands — this is still hygiene — but the
+a ~3–5% *regression* sold as hygiene. The slice form is adopted on §2.2b's
+trade. R-0020 §3's pricing stands — this is still hygiene — but the
 ~10% end-to-end is now a real, measured side effect rather than a claim.
 
 ### 2.6 Depth — stated, not hidden
@@ -331,12 +321,10 @@ and is adopted. R-0020 §3's pricing stands — this is still hygiene — but th
 Both drivers add a frame per level versus today (the closure). Two consequences
 the hater measured on a 1 MiB thread:
 
-- `grade` on a plain `Reverse` chain, **measured** (§2.2c): release — old 9,466,
-  either new form ≈ 16,570 (**+75%**); debug — old 2,362, slice form 2,203
-  (parity), visitor form **958**. `typecheck`: release parity at 9,466 for all
-  three; debug — old 1,406, slice 1,377, visitor **400**. Rev 2's "expected
-  between" was wrong in both directions at once; the numbers are now in the spec
-  rather than deferred to a test.
+- `grade` on a plain `Reverse` chain, **measured** (§2.2b): release — old 9,466,
+  new **16,566** (+75%); debug — old 2,362, new 2,203 (parity). `typecheck`:
+  release parity at 9,466; debug — old 1,406, new 1,377 (parity). The chosen
+  form is never shallower than today in either profile.
 - `analyse` descends into `GradeLift`'s child; today's `grade` does not. So
   `grade(GradeLift(1, Reverse^N(Param)))` survives N = 4,000,000 today and
   ~4,700 after. This bites only `pub fn grade` called directly on a deep
@@ -440,18 +428,13 @@ size.
 | — `is_versor` wrapper | dead code, CI red; deleted | architect |
 | **round 2** (agents stalled ×2 each) | main session ran the checks: spec code compiled **as printed** under `#![deny(warnings)]`; 0/300,000 vs old (both forms); (C) k≤16 pinned, 0 mismatches; ladder `visits == nodes` on (A)/(B)/(C) × k∈{10,20,40,64}, both drivers; all four §4.6 precedence cases agree, incl. `Incoherent(Var z)` over `BadBlade(20)`; depth bisected in both profiles; `is_versor` grep complete | main session |
 
-## 7. Open — for Gustavo
+## 7. Resolved by Gustavo (2026-09-05)
 
-1. **Which form: visitor (§2.2) or slice + buffer (§2.2b)?** §2.2c has the
-   complete measurement. Recommendation: **slice**, on debug depth. The
-   architect's round-1 preference was the visitor, on release throughput only.
-   Both are correct; this is the one decision the data does not make alone
-   because it weighs a `pub`-surface property in the CI profile against 1% of
-   wall-clock in the production one.
-2. **Accept on the main-session verification (§6), or re-attempt the architect
-   agent?** Every round-1 finding is folded and every round-2 check the
-   architect was asked to make has been run and passed — but by me, not by the
-   agent CLAUDE.md §4 names. Stated plainly so the record shows who verified what.
+1. **Form:** slice + buffer (§2.2), on §2.2b's debug-depth trade. The visitor is
+   kept in §2.2b as the recorded alternative; its code is not part of the design.
+2. **Acceptance basis:** the main-session verification (§6, §8), in place of an
+   architect-agent round-2 approval the agent could not deliver. Recorded in
+   `decisions/0002` so the record shows who verified what.
 
 ## 8. What the main-session verification ran
 
