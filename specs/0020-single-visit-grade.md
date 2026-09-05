@@ -1,9 +1,12 @@
 # SPEC-0020 — One pass for `grade` and `typecheck`
 
 - **Realizes:** [R-0020](../requirements/0020-single-visit-grade.md) (Accepted).
-- **Status:** **Draft (rev 2)** — three-lens round 1 complete (architect REQUEST
-  CHANGES, hater NEEDS WORK, nice-guy SOLID); every finding folded below.
-  Awaiting architect round 2.
+- **Status:** **Draft (rev 3)** — three-lens round 1 complete (architect REQUEST
+  CHANGES, hater NEEDS WORK, nice-guy SOLID) and folded. **Round 2: both the
+  architect and hater agents stalled twice**, so the main session ran their
+  checks itself (§6, §8) — the spec's code compiled as printed, fuzzed 0/300,000
+  against the old functions, and the ladder held. **One open decision remains for
+  Gustavo (§7).**
 - **Crate touched:** `ufl-geo`, one file — `src/grade.rs`. No public signature
   changes: `GradeSet`, `GradeCtx`, `GradeError`, `grade`, `typecheck` keep their
   types exactly. `is_versor` (`pub(crate)`) is **deleted** (§2.4).
@@ -41,11 +44,18 @@ Every arm of `grade` depends only on its children's grade sets, and every arm of
 struct Analysis {
     /// A sound over-approximation of the result grades (SPEC-0010 §2.3).
     grade: GradeSet,
-    /// `true` only when the node is *provably* a versor (SPEC-0010 §2.4), so a
-    /// `Sandwich` with it as rotor preserves grade. Conservative: may be `false`
-    /// for a real versor; never `true` for a non-versor. Witnesses: `Exp` of a
-    /// pure bivector, a single basis *vector*, a `GeoProduct` of versors,
-    /// `Reverse` of a versor.
+    /// `true` only when the sandwich rule `r ∗ x ∗ ~r` provably **preserves
+    /// `x`'s grade set** (SPEC-0010 §2.4) — the property `Sandwich` needs, and
+    /// the only thing this flag promises. Conservative: may be `false` for a
+    /// real versor (the safe product bound then applies). Witnesses: `Exp` of a
+    /// pure bivector, a single basis *vector*, a `GeoProduct` of witnesses,
+    /// `Reverse` of a witness.
+    ///
+    /// Not "is a versor": `Basis(8) = e₀` is null and non-invertible, yet the
+    /// flag is `true` and *sound* — `e₀ x e₀ = 0`, whose grade set ∅ is a subset
+    /// of anything. The old doc comment claimed "never `true` for a non-versor";
+    /// `docs/tasks/14` (#70) recorded that as false, and this spec fixes the
+    /// claim rather than moving it.
     versor: bool,
 }
 ```
@@ -153,6 +163,76 @@ One quirk is preserved deliberately: `Exp` of an ∅-graded operand is a vacuous
 versor (`subset_of(∅, {2})` is `true`). Sound — ∅ means identically zero, and
 `exp(0) = 1`.
 
+### 2.2b The alternative: slice patterns over a fixed buffer
+
+The rev-1 shape, corrected per hater F4 (match on `e` exhaustively; arity checked
+**per arm** with `let … else`, so a twelfth variant is still E0004):
+
+```rust
+/// The children of a node, in left-to-right order — the single arity source.
+fn children(e: &GeoExpr) -> [Option<&GeoExpr>; 2] {
+    match e {
+        GeoExpr::Param(_) | GeoExpr::Basis(_) | GeoExpr::Var(_) => [None, None],
+        GeoExpr::GradeLift(_, a) | GeoExpr::Reverse(a) | GeoExpr::GradeProject(_, a) | GeoExpr::Exp(a) => [Some(a), None],
+        GeoExpr::GeoProduct(a, b) | GeoExpr::Wedge(a, b) | GeoExpr::Inner(a, b) | GeoExpr::Sandwich(a, b) => [Some(a), Some(b)],
+    }
+}
+
+fn rule(e: &GeoExpr, kids: &[Analysis], ctx: &GradeCtx) -> Analysis {
+    let out = |grade, versor| Analysis { grade, versor };
+    match e {
+        GeoExpr::Param(_) => out(GradeSet::singleton(0), false),
+        // … leaves as in §2.2 …
+        GeoExpr::GeoProduct(..) => {
+            let [a, b] = kids else { unreachable!("`children` gives GeoProduct two kids") };
+            out(Op::Geometric.output_grades(&[a.grade, b.grade], N), a.versor && b.versor)
+        }
+        // … one arm per variant, each destructuring its own arity …
+    }
+}
+
+fn analyse(e: &GeoExpr, ctx: &GradeCtx) -> Analysis {
+    let mut buf = [Analysis::EMPTY; 2];
+    let mut n = 0;
+    for c in children(e).into_iter().flatten() { buf[n] = analyse(c, ctx); n += 1; }
+    rule(e, &buf[..n], ctx)
+}
+// `check` identically, with the pre-order guards and post-order ∅ of §2.3.
+```
+
+Same semantics (0 mismatches on the same 300,000 trees), same single-visit
+property, allocation-free, exhaustive on `e`. Costs one `unreachable!` per
+non-leaf arm, justified under existing precedent (`eval.rs:101,109`,
+`eml.rs:69,76`, `eval_pred.rs`) because `children` is the sole arity source.
+
+### 2.2c The measured trade between the two forms
+
+| | visitor (§2.2) | slice + buffer (§2.2b) |
+|---|---|---|
+| semantics vs old, 300K trees | 0 mismatches | 0 mismatches |
+| `typecheck` ns/call, release, random ≤60 (architect) | **115 (0.50×)** | 121 (0.53×) |
+| `analyse` depth ceiling, **release**, 1 MiB | 16,567 | 16,566 |
+| `check` depth ceiling, **release**, 1 MiB | 9,466 | 9,466 |
+| `analyse` depth ceiling, **debug**, 1 MiB | **958** (old: 2,362) | 2,203 |
+| `check` depth ceiling, **debug**, 1 MiB | **400** (old: 1,406) | 1,377 |
+| `unreachable!` in library code | none | one per non-leaf arm |
+| exhaustive on `GeoExpr` | yes | yes |
+
+In release the two are indistinguishable — LLVM inlines the closure. In
+**debug**, `cargo test`'s profile, the visitor keeps `rule`'s frame *and* the
+closure's on the stack during recursion — three frames per level instead of one
+— and loses **59–72%** of depth against today's code, on a `pub` surface. The
+slice form is at parity with today. The visitor's whole advantage is 6% of a
+function that is 15–26% of lane wall-clock: ~1% end to end.
+
+**Recommendation: the slice form (§2.2b).** Debug is the profile every test
+runs in, depth on a `pub` function is a stated property (§2.6), and 1% release
+throughput is inside the noise of the R-0020 §2 time split. The cost is the
+`unreachable!`s, which are of the class CLAUDE.md §6 permits and this repo
+already uses. This **reverses the architect's round-1 preference** on data it
+did not have (it measured release only); it is put to Gustavo as §7 Q1, and
+whichever form is chosen, the other's section is deleted at Acceptance.
+
 ### 2.3 The two drivers
 
 ```rust
@@ -216,6 +296,13 @@ count, not `≤`.
   "fuzz the predicate directly" holds with `analyse(r, ctx).versor` as the
   subject, in the same in-`src` test module.
 
+  Every reference the deletion touches (grepped): `slots.rs:8` (prose — update);
+  `specs/0010 §2.4/§2.5 :148,:192` and `specs/0011 :283` (accepted specs — a
+  dated note, not a rewrite); `docs/tasks/14 :13` and `docs/tasks/README :91`
+  (historical task notes — leave, and close their `is_versor` doc-claim item as
+  discharged by §2.1's reworded field doc); `specs/0019` and `requirements/0019`
+  (shelved — leave).
+
 Net: three walks become one algebra plus two ten-line drivers.
 
 ### 2.5 Cost — measured, and the reason rev 1 was wrong
@@ -244,9 +331,12 @@ and is adopted. R-0020 §3's pricing stands — this is still hygiene — but th
 Both drivers add a frame per level versus today (the closure). Two consequences
 the hater measured on a 1 MiB thread:
 
-- `grade` on a plain `Reverse` chain: old survives 9,300; rev 1's `Vec` form
-  **4,660**; the array-buffer form 16,130. The visitor form is expected between
-  the last two; §4.8 pins the actual number.
+- `grade` on a plain `Reverse` chain, **measured** (§2.2c): release — old 9,466,
+  either new form ≈ 16,570 (**+75%**); debug — old 2,362, slice form 2,203
+  (parity), visitor form **958**. `typecheck`: release parity at 9,466 for all
+  three; debug — old 1,406, slice 1,377, visitor **400**. Rev 2's "expected
+  between" was wrong in both directions at once; the numbers are now in the spec
+  rather than deferred to a test.
 - `analyse` descends into `GradeLift`'s child; today's `grade` does not. So
   `grade(GradeLift(1, Reverse^N(Param)))` survives N = 4,000,000 today and
   ~4,700 after. This bites only `pub fn grade` called directly on a deep
@@ -348,14 +438,27 @@ size.
 | — `Vec` per node | measured to cancel the gain; visitor form adopted | architect, hater |
 | — `match (e, kids)` wildcard | lost exhaustiveness; visitor form matches `e` | hater, architect |
 | — `is_versor` wrapper | dead code, CI red; deleted | architect |
+| **round 2** (agents stalled ×2 each) | main session ran the checks: spec code compiled **as printed** under `#![deny(warnings)]`; 0/300,000 vs old (both forms); (C) k≤16 pinned, 0 mismatches; ladder `visits == nodes` on (A)/(B)/(C) × k∈{10,20,40,64}, both drivers; all four §4.6 precedence cases agree, incl. `Incoherent(Var z)` over `BadBlade(20)`; depth bisected in both profiles; `is_versor` grep complete | main session |
 
-## 7. Open for round 2
+## 7. Open — for Gustavo
 
-1. **Visitor form (§2.2) versus slice-pattern + `[Analysis; 2]` buffer.** The
-   visitor is fastest, exhaustive, and allocation-free, at the cost of a generic
-   `E` and a closure parameter. The slice form separates the algebra from the
-   recursion more visibly but needs a wildcard `unreachable!` (under existing
-   precedent) and measured 0.53× vs 0.50×. The architect prefers the visitor and
-   this rev adopts it; **this is a style call Gustavo may reverse** without
-   changing anything else in the spec.
-2. Anything the fold introduced.
+1. **Which form: visitor (§2.2) or slice + buffer (§2.2b)?** §2.2c has the
+   complete measurement. Recommendation: **slice**, on debug depth. The
+   architect's round-1 preference was the visitor, on release throughput only.
+   Both are correct; this is the one decision the data does not make alone
+   because it weighs a `pub`-surface property in the CI profile against 1% of
+   wall-clock in the production one.
+2. **Accept on the main-session verification (§6), or re-attempt the architect
+   agent?** Every round-1 finding is folded and every round-2 check the
+   architect was asked to make has been run and passed — but by me, not by the
+   agent CLAUDE.md §4 names. Stated plainly so the record shows who verified what.
+
+## 8. What the main-session verification ran
+
+`scratchpad/spec20` (not committed): §2.1–§2.3 transcribed *as printed*, plus
+§2.2b, plus verbatim `old_grade`/`old_typecheck` via the real crate; a random
+generator over all 11 variants, `Basis` 0..=255, `k ∈ {0..=5, 31, 255}`, vars
+declared `{1}`/`{0,2}`/`∅` and undeclared; the three shapes at four rungs with a
+`thread_local!` entry counter; the four precedence cases; and a 1 MiB-thread
+depth bisect per form per profile. Corpus split: 106,331 `Ok` / 45,131
+`Incoherent` / 86,488 `BadBlade` / 62,050 `BadGrade`.
