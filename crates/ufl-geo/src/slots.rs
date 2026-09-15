@@ -5,7 +5,7 @@
 //! pre-order; [`params`] is the read-only snapshot in the **same** order (it is
 //! implemented *through the same traversal*, so the two cannot drift). The slots
 //! are grade-`{0}` **by construction** — `grade(Param(_)) = {0}` and no
-//! `grade`/`typecheck`/`is_versor` rule reads a `Param`'s value — so writing any
+//! `grade`/`typecheck` rule reads a `Param`'s value — so writing any
 //! `f64` through a slot preserves `typecheck(..).is_ok()` and the inferred
 //! `Ok(GradeSet)` (the *scoped* invariant; the `Err` payload may embed the value
 //! and is deliberately out of scope — SPEC-0011M §2.2 caveat).

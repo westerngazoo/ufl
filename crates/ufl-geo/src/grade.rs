@@ -55,27 +55,184 @@ pub enum GradeError {
     BadGrade(u8),
 }
 
-/// A conservative, sound static versor predicate (SPEC-0010 §2.4) — `true` only
-/// when `r` is *provably* a versor, so `Sandwich(r, ·)` preserves grade. It may
-/// say `false` for a real versor (the grade rule then falls back to the safe
-/// product bound — still sound); it never says `true` for a non-versor.
-///
-/// Versor witnesses: `Exp(b)` of a pure bivector (`grade(b) ⊆ {2}` — a rotor or
-/// motor), a single basis *vector* (`Basis(i)`, one set bit), a `GeoProduct` of
-/// versors, and `Reverse` of a versor.
-pub(crate) fn is_versor(r: &GeoExpr, ctx: &GradeCtx) -> bool {
-    match r {
-        GeoExpr::Exp(b) => subset_of(grade(b, ctx), &[2]),
-        GeoExpr::GeoProduct(a, b) => is_versor(a, ctx) && is_versor(b, ctx),
-        GeoExpr::Basis(i) => *i < 16 && i.count_ones() == 1,
-        GeoExpr::Reverse(a) => is_versor(a, ctx),
-        _ => false,
-    }
-}
-
 /// Is every grade in `g` one of `allowed`? (`g ⊆ allowed`.)
 fn subset_of(g: GradeSet, allowed: &[usize]) -> bool {
     g.iter().all(|k| allowed.contains(&k))
+}
+
+/// What one post-order visit learns about a node (SPEC-0020 §2.1). `grade` and
+/// the versor predicate cross-read each other at two arms (`Exp` reads a grade,
+/// `Sandwich` reads a versor flag), so they are **one** bottom-up function with
+/// two outputs — every cross-dependency is a field read and no arm calls a walk
+/// (`docs/conventions.md` — *Fused Synthesized Attributes*).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Analysis {
+    /// A sound over-approximation of the result grades (SPEC-0010 §2.3).
+    grade: GradeSet,
+    /// `true` only when the sandwich rule `r ∗ x ∗ ~r` provably **preserves
+    /// `x`'s grade set** (SPEC-0010 §2.4) — the property `Sandwich` needs, and
+    /// the only thing this flag promises. Conservative: may be `false` for a
+    /// real versor (the safe product bound then applies). Witnesses: `Exp` of a
+    /// pure bivector, a single basis *vector*, a `GeoProduct` of witnesses,
+    /// `Reverse` of a witness.
+    ///
+    /// Not "is a versor": `Basis(8) = e₀` is null and non-invertible, yet the
+    /// flag is `true` and *sound* — `e₀ x e₀ = 0`, whose grade set ∅ is a subset
+    /// of anything.
+    versor: bool,
+}
+
+impl Analysis {
+    /// A slot filler for the two-child buffer; never read.
+    const PLACEHOLDER: Self = Self {
+        grade: GradeSet::EMPTY,
+        versor: false,
+    };
+}
+
+/// The children of a node, in left-to-right order — the single arity source.
+fn children(e: &GeoExpr) -> [Option<&GeoExpr>; 2] {
+    match e {
+        GeoExpr::Param(_) | GeoExpr::Basis(_) | GeoExpr::Var(_) => [None, None],
+        GeoExpr::GradeLift(_, a)
+        | GeoExpr::Reverse(a)
+        | GeoExpr::GradeProject(_, a)
+        | GeoExpr::Exp(a) => [Some(a), None],
+        GeoExpr::GeoProduct(a, b)
+        | GeoExpr::Wedge(a, b)
+        | GeoExpr::Inner(a, b)
+        | GeoExpr::Sandwich(a, b) => [Some(a), Some(b)],
+    }
+}
+
+/// Where `rule` relies on `children`. Unreachable by construction: the arm that
+/// calls `one`/`two` is the arm whose variant `children` maps to that arity.
+fn one(kids: &[Analysis]) -> &Analysis {
+    let [a] = kids else {
+        unreachable!("`children` gives a unary node exactly one kid")
+    };
+    a
+}
+
+fn two(kids: &[Analysis]) -> (&Analysis, &Analysis) {
+    let [a, b] = kids else {
+        unreachable!("`children` gives a binary node exactly two kids")
+    };
+    (a, b)
+}
+
+/// The grade/versor rule at one node, from its children's analyses. Total: the
+/// totality defaults (`⊤` for an out-of-range leaf, `∅` for a bad projection)
+/// are here, exactly as SPEC-0010 §2.3 specifies for `grade`; it is `check`
+/// that promotes them to errors. The catalog forms delegate to garust's
+/// `Op::output_grades`; only `Sandwich`/`Exp`/`GradeLift` are hand-ruled.
+fn rule(e: &GeoExpr, kids: &[Analysis], ctx: &GradeCtx) -> Analysis {
+    let out = |grade, versor| Analysis { grade, versor };
+    match e {
+        GeoExpr::Param(_) => out(GradeSet::singleton(0), false),
+        GeoExpr::Basis(i) => out(
+            if *i >= 16 {
+                GradeSet::full(N)
+            } else {
+                GradeSet::singleton(i.count_ones() as usize)
+            },
+            *i < 16 && i.count_ones() == 1,
+        ),
+        GeoExpr::Var(name) => out(ctx.get(name), false),
+        GeoExpr::GradeLift(k, _) => {
+            // 𝒢ₖ lifts the child's scalar part (SPEC-0010 §2.2): the child is
+            // visited so `check` can reject it, but its analysis is not consulted.
+            let _ = one(kids);
+            out(
+                if *k > 4 {
+                    GradeSet::full(N)
+                } else {
+                    GradeSet::singleton(*k as usize)
+                },
+                false,
+            )
+        }
+        GeoExpr::GeoProduct(..) => {
+            let (a, b) = two(kids);
+            out(
+                Op::Geometric.output_grades(&[a.grade, b.grade], N),
+                a.versor && b.versor,
+            )
+        }
+        GeoExpr::Wedge(..) => {
+            let (a, b) = two(kids);
+            out(Op::Wedge.output_grades(&[a.grade, b.grade], N), false)
+        }
+        GeoExpr::Inner(..) => {
+            let (a, b) = two(kids);
+            out(Op::Inner.output_grades(&[a.grade, b.grade], N), false)
+        }
+        GeoExpr::Reverse(_) => {
+            let a = one(kids);
+            out(Op::Reverse.output_grades(&[a.grade], N), a.versor)
+        }
+        GeoExpr::GradeProject(k, _) => {
+            let a = one(kids);
+            // Guard the raw `u8` before garust (its `singleton(k) = 1 << k`
+            // overflows `u32` for `k ≥ 32`): projecting onto a grade the algebra
+            // lacks (`k > 4`) is the empty set. Keeps `grade` total.
+            out(
+                if *k > 4 {
+                    GradeSet::EMPTY
+                } else {
+                    Op::GradeProject(*k).output_grades(&[a.grade], N)
+                },
+                false,
+            )
+        }
+        GeoExpr::Sandwich(..) => {
+            let (r, x) = two(kids);
+            let grade = if r.versor {
+                // The sandwich rule preserves the operand's grade.
+                x.grade
+            } else {
+                // The sound product bound: grades of `(r ∗ x) ∗ r` (reverse
+                // preserves grade, so `~r` carries the same grades as `r`).
+                let rx = Op::Geometric.output_grades(&[r.grade, x.grade], N);
+                Op::Geometric.output_grades(&[rx, r.grade], N)
+            };
+            out(grade, false)
+        }
+        GeoExpr::Exp(_) => {
+            let a = one(kids);
+            let grade = if subset_of(a.grade, &[0]) {
+                GradeSet::singleton(0)
+            } else if subset_of(a.grade, &[0, 2]) {
+                // exp of an even element is even — covers rotors and motors.
+                GradeSet::EMPTY.with(0).with(2).with(4)
+            } else {
+                GradeSet::full(N)
+            };
+            out(grade, subset_of(a.grade, &[2]))
+        }
+    }
+}
+
+// Entry counter for the single-visit tests (SPEC-0020 §4.3): ticked once at
+// the top of `analyse` and `check`, so a re-walk is counted even if its result
+// is discarded. Zero cost outside the test build. (A `///` here would document
+// nothing — the macro produces the item.)
+#[cfg(test)]
+thread_local! {
+    static VISITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// The total pass: every node visited exactly once.
+fn analyse(e: &GeoExpr, ctx: &GradeCtx) -> Analysis {
+    #[cfg(test)]
+    VISITS.with(|c| c.set(c.get() + 1));
+    let mut buf = [Analysis::PLACEHOLDER; 2];
+    let mut n = 0;
+    for (slot, c) in buf.iter_mut().zip(children(e).into_iter().flatten()) {
+        *slot = analyse(c, ctx); // left, then right
+        n += 1;
+    }
+    rule(e, &buf[..n], ctx)
 }
 
 /// Infer a **sound over-approximation** of a form's result grades (SPEC-0010
@@ -84,62 +241,35 @@ fn subset_of(g: GradeSet, allowed: &[usize]) -> bool {
 /// hand-ruled. Total and decidable — out-of-range leaves return `⊤ = full(4)`
 /// (it is `typecheck` that turns those into errors).
 pub fn grade(e: &GeoExpr, ctx: &GradeCtx) -> GradeSet {
+    analyse(e, ctx).grade
+}
+
+/// `typecheck`'s pass — `grade` with its totality defaults promoted to errors:
+/// the same `rule` at every node; the heads where `grade` returns ⊤/∅ to stay
+/// total are rejected *before* descent, and an ∅ that survives composition is
+/// rejected *after* it — so the innermost incoherent subtree is the one reported.
+/// Enters exactly the nodes it reaches before the first error.
+fn check(e: &GeoExpr, ctx: &GradeCtx) -> Result<Analysis, GradeError> {
+    #[cfg(test)]
+    VISITS.with(|c| c.set(c.get() + 1));
     match e {
-        GeoExpr::Param(_) => GradeSet::singleton(0),
-        GeoExpr::Basis(i) => {
-            if *i >= 16 {
-                GradeSet::full(N)
-            } else {
-                GradeSet::singleton(i.count_ones() as usize)
-            }
+        GeoExpr::Basis(i) if *i >= 16 => return Err(GradeError::BadBlade(*i)),
+        GeoExpr::GradeLift(k, _) | GeoExpr::GradeProject(k, _) if *k > 4 => {
+            return Err(GradeError::BadGrade(*k))
         }
-        GeoExpr::Var(name) => ctx.get(name),
-        GeoExpr::GradeLift(k, _) => {
-            if *k > 4 {
-                GradeSet::full(N)
-            } else {
-                GradeSet::singleton(*k as usize)
-            }
-        }
-        GeoExpr::GeoProduct(a, b) => {
-            Op::Geometric.output_grades(&[grade(a, ctx), grade(b, ctx)], N)
-        }
-        GeoExpr::Wedge(a, b) => Op::Wedge.output_grades(&[grade(a, ctx), grade(b, ctx)], N),
-        GeoExpr::Inner(a, b) => Op::Inner.output_grades(&[grade(a, ctx), grade(b, ctx)], N),
-        GeoExpr::Reverse(a) => Op::Reverse.output_grades(&[grade(a, ctx)], N),
-        GeoExpr::GradeProject(k, a) => {
-            // Guard the raw `u8` before garust (its `singleton(k) = 1 << k`
-            // overflows `u32` for `k ≥ 32`): projecting onto a grade the algebra
-            // lacks (`k > 4`) is the empty set. Keeps `grade` total (SPEC-0010 §2.3).
-            if *k > 4 {
-                GradeSet::EMPTY
-            } else {
-                Op::GradeProject(*k).output_grades(&[grade(a, ctx)], N)
-            }
-        }
-        GeoExpr::Sandwich(r, x) => {
-            if is_versor(r, ctx) {
-                // A versor sandwich preserves the operand's grade.
-                grade(x, ctx)
-            } else {
-                // The sound product bound: grades of `(r ∗ x) ∗ r` (reverse
-                // preserves grade, so `~r` carries the same grades as `r`).
-                let rg = grade(r, ctx);
-                let rx = Op::Geometric.output_grades(&[rg, grade(x, ctx)], N);
-                Op::Geometric.output_grades(&[rx, rg], N)
-            }
-        }
-        GeoExpr::Exp(a) => {
-            let g = grade(a, ctx);
-            if subset_of(g, &[0]) {
-                GradeSet::singleton(0)
-            } else if subset_of(g, &[0, 2]) {
-                // exp of an even element is even — covers rotors and motors.
-                GradeSet::EMPTY.with(0).with(2).with(4)
-            } else {
-                GradeSet::full(N)
-            }
-        }
+        _ => {}
+    }
+    let mut buf = [Analysis::PLACEHOLDER; 2];
+    let mut n = 0;
+    for (slot, c) in buf.iter_mut().zip(children(e).into_iter().flatten()) {
+        *slot = check(c, ctx)?; // left to right; the first error wins
+        n += 1;
+    }
+    let a = rule(e, &buf[..n], ctx);
+    if a.grade.is_empty() {
+        Err(GradeError::Incoherent(e.clone()))
+    } else {
+        Ok(a)
     }
 }
 
@@ -149,36 +279,7 @@ pub fn grade(e: &GeoExpr, ctx: &GradeCtx) -> GradeSet {
 /// is `∅` (e.g. `GradeProject(k, a)` with `k ∉ grade(a)`) is `Incoherent` — it
 /// can only ever be zero. The decidable pruning signal R-0011 reads.
 pub fn typecheck(e: &GeoExpr, ctx: &GradeCtx) -> Result<GradeSet, GradeError> {
-    match e {
-        GeoExpr::Param(_) | GeoExpr::Var(_) => {}
-        GeoExpr::Basis(i) => {
-            if *i >= 16 {
-                return Err(GradeError::BadBlade(*i));
-            }
-        }
-        GeoExpr::GradeLift(k, a) | GeoExpr::GradeProject(k, a) => {
-            if *k > 4 {
-                return Err(GradeError::BadGrade(*k));
-            }
-            typecheck(a, ctx)?;
-        }
-        GeoExpr::Reverse(a) | GeoExpr::Exp(a) => {
-            typecheck(a, ctx)?;
-        }
-        GeoExpr::GeoProduct(a, b)
-        | GeoExpr::Wedge(a, b)
-        | GeoExpr::Inner(a, b)
-        | GeoExpr::Sandwich(a, b) => {
-            typecheck(a, ctx)?;
-            typecheck(b, ctx)?;
-        }
-    }
-    let g = grade(e, ctx);
-    if g.is_empty() {
-        Err(GradeError::Incoherent(e.clone()))
-    } else {
-        Ok(g)
-    }
+    check(e, ctx).map(|a| a.grade)
 }
 
 #[cfg(test)]
