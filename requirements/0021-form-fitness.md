@@ -1,6 +1,6 @@
 # R-0021 — `FormFitness`: the acceptance property as a discharged UFL form
 
-- **Status:** **Draft** — acceptance criteria await Gustavo's sign-off (CLAUDE.md §4 step 1).
+- **Status:** **Accepted** — ACs approved by Gustavo 2026-09-16 (CLAUDE.md §4 step 1).
 - **Milestone:** M5 · rung 3 of the self-eval staircase (*the language scores itself* —
   in the bounded sense §4 pins, never the autonomous one).
 - **Tracks:** [#66](https://github.com/westerngazoo/ufl/issues/66) (T10), brief at
@@ -97,7 +97,7 @@ document the envelope on the public item; the spec decides which.
   work than `*score == 0`. The cost is the transparency window's price; the spec
   measures it and states it.
 
-## 5. Proposed acceptance criteria — **for Gustavo's sign-off**
+## 5. Acceptance criteria — **approved 2026-09-16**
 
 - **AC1 (the form decides).** A `FormFitness` implements
   `ufl_search::Fitness<Genome, i64>`, with `score` delegating to the same
