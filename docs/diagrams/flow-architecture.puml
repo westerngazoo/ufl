@@ -1,0 +1,17 @@
+@startuml
+title ufl — flujo de componentes
+start
+:SEXPRs-expr;
+:SYNufl-syntax;
+:SYN;
+:EMLufl-core;
+:EML;
+:PREDufl-predicate;
+:PRED;
+:DISCufl-discovery;
+:GEOufl-geo;
+:EVOufl-evolve;
+:EVO;
+stop
+
+@enduml
