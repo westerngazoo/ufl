@@ -1,7 +1,11 @@
 # SPEC-0021 — `FormFitness`: the acceptance verdict from a discharged UFL form
 
 - **Realizes:** [R-0021](../requirements/0021-form-fitness.md) (ACs approved 2026-09-16).
-- **Status:** **Draft** — awaiting the three-lens (CLAUDE.md §4 step 2).
+- **Status:** **Draft — RESCOPE RECOMMENDED.** Three-lens round 1 complete:
+  architect **REQUEST CHANGES** (3 blocking), hater **NEEDS WORK** (3 blocking),
+  nice-guy **STRONG WORK**. Both critical lenses independently concluded the
+  spec as drafted should not be built, and **two survive** as worth ~100 lines.
+  See §7. Gustavo's call before any rev 2.
 - **Crates touched:** `ufl-discovery` (the new instance + its tests). `ufl-search`,
   `ufl-predicate`, `ufl-syntax`, `ufl-core` are **used, not modified**.
 
@@ -183,3 +187,84 @@ alternative is a wrong verdict nobody can see.
    the search loop and the cheapest possible one; the honest risk is that it is
    machinery on the path that must stay trustworthy. §1 keeps `score` untouched
    precisely to bound that risk. Hater: is that bound real?
+
+## 7. Three-lens round 1 — what the lenses measured, and the recommendation
+
+Every finding below was **measured**, not argued. Nothing in §1–§5 above has been
+revised yet; this section records the round and the recommendation so the
+decision is Gustavo's rather than mine.
+
+### 7.1 Three of my own claims were falsified
+
+| my claim | measured reality |
+|---|---|
+| §2.1: "an acceptance form cannot be written without the verifier handing over its own numbers" | **False.** `(eml 1 (eml (eml 1 1) 1))` evaluates to `0.0`, **bit-exact**, and `(= residual (eml 1 (eml (eml 1 1) 1)))` decides correctly with **no binding at all**. The grammar refuses *readable* constants, not constants. R-0021 §2.1 even lists this route and dismisses it as "unreadable" — without noticing it destroys the argument built on top. (nice-guy) |
+| §2.4 row 3: the two construction probes pin the form's *meaning* | **False, with a counterexample.** `(not (= residual one))` passes both probes `{0 ⇒ true, 1 ⇒ false}` and then **accepts every residual ∉ {1}**. And `one` is *the* literal R-0001 lowers, so it is the likeliest constant to be in scope. Two points do not pin a predicate over `i64`. (hater) |
+| §3: the envelope guard | **Wrong at its own boundary, and unnecessary.** `i64::MIN.abs()` panics in debug and equals `i64::MIN` in release — which is `< 1<<53`, so the guard *admits* the one value it exists to reject. And it is unnecessary: `r as f64 == 0.0 ⟺ r == 0` for **all** `i64` (fuzzed 200,261 values incl. `i64::MIN`/`MAX`/every `±2^k`: 0 errors). It is also unreachable — coefficients are pinned to `{−1,0,+1}`, so the sweep's max residual is **370** against 2⁵³. (both) |
+
+### 7.2 Three facts that change what the requirement is
+
+- **`solved` is called once per *generation*, not per candidate.** Instrumented:
+  7,200 `score` calls vs **132** `solved` calls on the sweep. So AC6's
+  "per-candidate overhead" measures a quantity that does not exist. The real
+  numbers: 283 ns per discharge vs 0.5 ns for `*score == 0` — **565× per call**
+  but **0.489% of run wall-clock**, and an interleaved 30-sweep A/B measured
+  **−0.33%**, i.e. below noise. The cost objection in §5 Q4 is dead; AC6 must
+  report per-run or it will print "565×" and imply a 565×-slower search.
+- **The form shows a *weaker* property than the verifier's.**
+  `RankDecomposition::discharge` is `residual == 0 && rank == self.rank`;
+  `ACCEPT_FORM` transcribes only the first conjunct — it mirrors
+  `MatmulFitness::solved`, not `discharge`. A transparency window showing half
+  the property is worse than none. `engine.rs:122` carries the rank conjunct as a
+  **`debug_assert` only**, so `(and (= residual zero) (= rank claimed))` would
+  promote a debug-only assertion to a release artifact — and exercise the `and`
+  spine instead of one `=` leaf.
+- **§2.3's C1/C3 argument is refuted by a runnable counterexample**, and the hole
+  is in the *existing seam*, not this spec — filed as
+  [#94](https://github.com/westerngazoo/ufl/issues/94). A `CheatingProposer`
+  holding a `RankDecomposition`, built from public API only, made **500,000
+  verifier consultations against a `Ledger` reporting 5**.
+
+### 7.3 #66's KILL condition **does** fire — for the other lane
+
+Both critical lenses, independently. The predicate language's boolean heads are
+exactly `{and, or, not, =, eq?, pred}` — **no ordering relation at any arity**:
+
+```
+(<= rot_err eps)  →  Err(Pred(ExpectedBool { found: "form `<=`" }))
+```
+
+`GeoFitness::solved` is `score.value() <= 1e-6`. So R-0021 §2.1's "no form is
+missing" holds **only for a lane whose criterion is an exact `== 0`**. #66 asked
+for exactly this: *record which forms are missing as the next predicate-layer
+requirement*. The answer is **one ordering head**, and it is not a drop-in —
+`Value` is `Complex<f64>` with no total order, so the next requirement must
+*decide* the semantics (require `im == 0` and compare `re` with a typed
+`ExpectedReal`; or `norm()`, which conflates ±1; or `total_cmp` on `re`).
+
+### 7.4 What survives, and the recommendation
+
+The hater's verdict: *"Against the spec as drafted, yes [the case against wins].
+Against a rescoped one, no."* Two deliverables survive both critical lenses:
+
+1. **§7.3's negative result** — form-as-acceptance works exactly for exact-zero
+   criteria, and the missing form is one ordering head with a real design
+   question behind it. This is what #66's KILL clause asked for and belongs in
+   the register regardless of whether any code ships.
+2. **An existence proof at the seam** — a `Fitness` whose verdict is a discharged
+   `Sexpr` plugs into `run_generic` unchanged at **0.489%** of run wall-clock,
+   below measurement noise. That is a materially different claim from R-0021
+   §2's six `check_str` calls, and it is the one thing that makes the Rung-4 C3
+   story structural rather than aspirational.
+
+**Recommendation: rescope to those two**, at roughly 100 lines — a `pub(crate)`
+`FormFitness` (which also retires the `unreachable!` argument, §2.5, and §5 Q2
+outright), the form carrying **both** conjuncts, a probe set of `{0, 1, −1, 7}`,
+no envelope guard, and AC6 reported per-run. Everything else in §1–§5 above is
+either falsified (§7.1), mis-unitised (§7.2), or unimplementable as written.
+
+The honest alternative is to **shelve it** and keep only §7.3's negative in the
+register. R-0015 — the Rung-4 loop this makes C3 structural *for* — is a
+documented negative with no headroom on any substrate, so deliverable 2 is
+infrastructure for a loop that may never run. That is Gustavo's call, not mine,
+and it should be weighed against the Gate-2 work (R-0022), which has an audience.
