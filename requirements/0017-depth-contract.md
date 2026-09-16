@@ -1,6 +1,6 @@
 # R-0017 — One iterative depth contract (bounded code↔data recursion)
 
-- **Status:** **Accepted** (2026-07-23) — SPEC-0017 Accepted after a two-round three-lens; scope expanded to close the whole class (iterative `Clone`/`PartialEq`/`raise`). **Implementation outstanding** — handed to the dev team as [#63](https://github.com/westerngazoo/ufl/issues/63).
+- **Status:** **Done** (2026-08-15) — SPEC #75, implementation #80, arena visibility #85; [#63](https://github.com/westerngazoo/ufl/issues/63) closed. Architect APPROVE; qa verified post-merge.
   The policy decided with Gustavo: **iterative everywhere, no cap**.
 - **Milestone:** the self-eval staircase, **Rung 1 substrate** — the soundness
   contract `quote`/`eval` (R-0016) depend on; see `theory/two-language-substrate.md`.

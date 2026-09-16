@@ -111,8 +111,11 @@ and reframed:
 | [R-0014](requirements/0014-discovery-framework.md) | **The shared discovery framework** — one genome-generic, deterministic search loop; the lanes become **verifier instances** keeping their own atoms. | **Done.** AC1/AC2/AC4 → SPEC-0014 (the pure `ufl-search` seam: `Proposer`/`Fitness`/`Screen`/`Refiner`, PRs #58/#72). **AC3 → SPEC-0014N** (PR #76): the literal `eml`-NAND tree is **bit-exact** through `ufl-core` and the universality ledger's one *Owed* row is **closed** — with its caveats attached (formula-not-circuit; integers are **ulp-accurate, never exact**). |
 | [R-0015](requirements/0015-evolve-operator-semantics.md) | **Evolve operator *semantics*** — the staircase's **Rung-4 decision node**. | **CLOSED — documented negative** (PR #74, SPEC-0015 §11 case-1). The probe architecture was three-lens-validated, but the mandatory pre-run found **no headroom window on any substrate**: matmul is structurally dead (rank-7 `T_2` is an isolated fixpoint), and the geometric lane has B0 **at the ceiling** (N=64). The probe was never armed ⇒ **Rung-5 deferred, not killed** — no Lisp self-modification layer without earned efficacy evidence. |
 | [R-0016](requirements/0016-reflection-quote-eval-raise.md) | **Reflection rung 1** — `quote` / `eval` / `eq?` / `raise` (code-as-data). | **Done** — SPEC-0016 Accepted and shipped. |
-| [R-0017](requirements/0017-depth-contract.md) | **One iterative depth contract** — every tree-walk on the code↔data surface uses an explicit heap stack: no cap, no constant, no library-code abort at any depth. | **Accepted, implementation outstanding** ([#63](https://github.com/westerngazoo/ufl/issues/63)). Two-round three-lens; scope **expanded** after the hater proved the 5-walk scope still aborts `(eq?/eval (quote DEEP))` — now also iterative `Clone`/`PartialEq`/`raise`. |
+| [R-0017](requirements/0017-depth-contract.md) | **One iterative depth contract** — every tree-walk on the code↔data surface uses an explicit heap stack: no cap, no constant, no library-code abort at any depth. | **Done** (SPEC #75, implementation #80, arena visibility #85; [#63](https://github.com/westerngazoo/ufl/issues/63) closed). Two-round three-lens; scope **expanded** after the hater proved the 5-walk scope still aborts `(eq?/eval (quote DEEP))` — so also iterative `Clone`/`PartialEq`/`raise`. The cap is **removed, not relocated**: no `MAX_DEPTH`, all three `RecursionDepthExceeded` variants deleted, depth bounded by the heap. Subprocess arena at 10⁵, **dev-profile pinned** — measured: a recursive `eval_pred` overflows at 10⁵ in debug but returns `Ok` at 3·10⁶ under `--release` (TCO), so a release arena would false-pass at any depth. |
 | [R-0018](requirements/0018-beyond-strassen-search.md) | **Beyond-⟨2,2,2⟩ matmul** — rectangular (square-embedded) flip-graph + the plateau walk. | **Done** (PR #77) — a **certified rank-11 ⟨2,2,3⟩** reduction found from a naive start (Hopcroft–Kerr optimal; the object is the known block form — the result is the *search* reaching it unseeded on an unfamiliar target). **And its measured boundary** (PR #78): every reduction the engine finds is Strassen-on-a-2×2×2-sub-block + naive remainder; ⟨2,3,3⟩ never crossed the block bound at 10⁸ flips, nor under 200 start-from-known restarts. |
+| [R-0019](requirements/0019-geo-depth-contract.md) | **The depth contract on the geometric surface** — extend R-0017's policy to `GeoExpr`'s fourteen recursive walks across `ufl-geo` + `ufl-evolve`. | **Draft — recommended for SHELVING** (#86). Killed by its own pre-registered probe, not by argument: the case was conditional on wanting a larger `max_nodes`, and the sweep measured **6/16 (cap 60, control) → 4/16 (100) → 4/16 (150)** at 7.6×/12.8× the wall-clock. 6-vs-4 is 1.03 SD on `Binomial(16, 6/16)`, so this is *no evidence of improvement*, not evidence of harm — but no reason to want the cap raised either. Real search depth is 32 against `eval`'s 215 ceiling, so nothing aborts today. The probe is committed (`r_0019_cap_probe.rs`) so the next proposal starts from data. AC8 was **severed into R-0020**. |
+| [R-0020](requirements/0020-single-visit-grade.md) | **`grade` and `typecheck` visit each node once** — severed from R-0019 AC8; a *complexity* fix, not a depth fix. | **Done** (SPEC + req #86, implementation #89). `grade` and the versor predicate cross-read each other at two arms, so they became **one** bottom-up function returning `Analysis { grade, versor }` — every cross-dependency a field read, no arm calling a walk. Was 2^depth on rotor-nested `Sandwich`es (**5,116 entries for 31 nodes**) with `typecheck` O(n²) over it; now single-visit, asserted by a `#[cfg(test)]` **entry counter**, not a clock. Measured **34.5 ms → 825 ns** at 55 nodes (41,768×) and −17% on production shapes. Architect APPROVE (622K-tree differential, 0 mismatches) + qa SIGNED OFF (both re-walk mutants killed by name, while *every semantic test stayed green* — the blind spot the counter exists for). |
+| [R-0021](requirements/0021-form-fitness.md) | **`FormFitness`** — the acceptance property as a **discharged UFL form**: rung 3 of the self-eval staircase, and the first time a UFL form participates in the search loop at all. | **Draft** (branch `R-0021-form-fitness`) — **ACs await Gustavo** (§4 step 1). Measured in the discuss phase: the brief's proposed form `(= residual 0)` **does not lower** (`UnsupportedLiteral`) because R-0001's grammar makes `1` the only numeric literal. #66's KILL condition does *not* fire — `(= residual zero)` with the constant **bound by the verifier as a state variable** works, and is *better* than the literal: an acceptance form then cannot be written without the verifier handing over its own numbers, so C1/C3 is enforced by what the grammar refuses to express. |
 
 ### M4 / language-build — *paused for the discovery pivot*
 
@@ -150,19 +153,36 @@ Universality: R-0014 AC3 closed the ledger's one *Owed* row — `eml` builds NAN
 bit-exactly, is **self-correcting** with a golden-ratio noise margin at any circuit
 depth, and is **ulp-accurate but never exact** on integers.
 
-**Live work:** R-0017's implementation ([#63](https://github.com/westerngazoo/ufl/issues/63)),
-then the rung-2/3 spine (T10/T12/T13). The `run_walk` generalization is *earned* but
-deliberately unbuilt — prove the instance, then lift.
+**Live work:** **R-0021** (`FormFitness`, rung 3) — the requirement is drafted and
+its ACs are the one thing blocking the spec. The `run_walk` generalization is
+*earned* but deliberately unbuilt — prove the instance, then lift.
 
-- **R-0013** — the matmul moonshot's **Gate 0** (rediscover rank-7 Strassen) is
-  in flight on branch `R-0013-flipgraph` with a flip-graph proposer.
-- **R-0014** — the generic discovery seam is **merged as Draft** (PR #50);
-  **SPEC-0014 is owed** (task 07), then the byte-identical GA re-host claim gets
-  its spec-grade footing.
-- **R-0011** — SPEC accepted, partial merges landed (printer, `ufl-prng`,
-  fair-MLP Gate-2 baseline); **Gate 1 and Gate 2 runs are pending**.
-- **R-0015 / R-0016** — the staircase requirements (operator semantics,
-  reflection rung 1) are **in drafting** (task 04).
+The substrate work under the spine is now finished and gated:
+
+- **The depth/complexity thread is closed.** R-0017 **Done** (iterative
+  everywhere, no cap); R-0019 **recommended for shelving** on its own measured
+  negative; R-0020 **Done** (the exponential `grade` gone, 41,768× at 55 nodes).
+  That discharges the depth half of
+  [#83](https://github.com/westerngazoo/ufl/issues/83) by shelving and the
+  complexity half by shipping.
+- **The no-panic rule is a mechanical gate in all 10 crates**
+  ([#82](https://github.com/westerngazoo/ufl/issues/82) → #87, #90), and
+  CLAUDE.md §6 now permits a **mission-abort** panic under three obligations
+  (message, `# Panics` section, `#[should_panic]` test) plus a targeted `#[allow]`
+  and a `decisions/` entry — amended #92 after
+  [#88](https://github.com/westerngazoo/ufl/issues/88) put `ufl-tensor`'s two
+  guards to the owner.
+- **R-0011** — SPEC accepted, Gate-1 rediscovery **6/16 vs 2/16 ablation**
+  landed (PRs #72/#73); **Gate 2** (the equivariant-OOD headline) is pending, and
+  qa sign-off on Gate-1 is still outstanding.
+- **Open, not started:** rung-2/3 spine
+  [#69](https://github.com/westerngazoo/ufl/issues/69) (T13, un-shelve R-0005) and
+  [#70](https://github.com/westerngazoo/ufl/issues/70) (T14, grade harness);
+  [#65](https://github.com/westerngazoo/ufl/issues/65) (T9);
+  [#81](https://github.com/westerngazoo/ufl/issues/81) (iterative `Debug` — a
+  *caller* hazard, measured never invoked from library code);
+  [#91](https://github.com/westerngazoo/ufl/issues/91) (persist run state on a
+  mission abort, implied by D-0003).
 
 **The Phase-1 arc (decided 2026-06-12 — [[project-neuroevolution-direction]]):**
 R-0008 (engine, **Done**) → R-0009 (`Cl(3,0,1)` PGA kernel, **Done**) → R-0010
