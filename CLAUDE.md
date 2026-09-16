@@ -98,8 +98,21 @@ Every requirement `R-NNNN` passes through these eight steps. None is skipped.
 ## 6. Rust conventions
 
 - Edition 2021. One crate per bounded responsibility (see `crates/README.md`).
-- No `unwrap`/`expect`/`panic!` in library code — return `Result`. Panics are
-  for genuinely unreachable states only, with a justifying message.
+- No `unwrap`/`expect`/`panic!` in library code — return `Result`. A panic is
+  permitted in exactly two cases:
+  - a **genuinely unreachable state** — one a surrounding invariant makes
+    impossible, not merely unlikely;
+  - a **mission abort no caller can handle** — continuing would corrupt data the
+    verifier trusts, so a `Result` could only ever be propagated, never acted on.
+
+  Both carry the same three obligations: a **justifying message**, a `# Panics`
+  doc section on the public item stating the threshold, and a `#[should_panic]`
+  test pinning that message. "No caller can handle it" is a claim about the
+  **data**, not about convenience — a `Result` that is merely tedious to thread
+  is not a mission abort. The no-panic lint is mechanical and cannot tell the two
+  cases from a lazy one, so a permitted panic still needs a targeted
+  `#[allow(…, reason = "…")]` at the site **and** a `decisions/` entry: the
+  exception stays visible in the code and in the record.
 - Every public item is documented. Doc examples compile.
 - No `unsafe` without a spec section justifying it and an architect review.
 - Errors are typed (`thiserror` or explicit enums), never stringly-typed.
