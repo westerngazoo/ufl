@@ -1,6 +1,6 @@
 # R-0020 — `grade` and `typecheck` visit each node once
 
-- **Status:** **Draft** — acceptance criteria await Gustavo's sign-off (CLAUDE.md §4 step 1).
+- **Status:** **Done** — ACs signed off 2026-09-05; SPEC-0020 Accepted; implemented and merged in #89 (architect APPROVE, qa SIGNED OFF). §3 was corrected three times on measurement; the history is in §7.
 - **Milestone:** M5 (geometric neuroevolution).
 - **Severed from:** [R-0019](0019-geo-depth-contract.md) AC8 / §7. R-0019 is
   recommended for shelving; this is the one piece of it that stands on its own.
