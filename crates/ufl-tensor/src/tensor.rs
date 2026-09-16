@@ -15,7 +15,8 @@ impl Tensor {
     ///
     /// Panics with `tensor capacity overflow` if `dim³` exceeds `usize` —
     /// `dim > 2_642_245`, i.e. a matmul `n > 1_625`. This is a **mission
-    /// abort**, not a recoverable error, and it is deliberate (D-0003): without
+    /// abort** in the sense of CLAUDE.md §6, not a recoverable error, and it is
+    /// deliberate (D-0003): without
     /// the `checked_mul` the product wraps, `vec![0; wrapped]` under-allocates,
     /// and [`add_at`](Tensor::add_at) then corrupts memory silently. The guard
     /// converts a silent wrap into a named abort. Reaching it requires
@@ -23,7 +24,7 @@ impl Tensor {
     /// the multiply can wrap; pinned by `tests/security.rs`.
     #[allow(
         clippy::expect_used,
-        reason = "D-0003: a named mission abort beats a silent wrap"
+        reason = "CLAUDE.md §6 mission abort (D-0003): a named abort beats a silent wrap"
     )]
     pub fn zeros(dim: usize) -> Self {
         let capacity = dim
@@ -80,11 +81,12 @@ impl Tensor {
 ///
 /// Panics with `target dimension overflow` if `n²` exceeds `usize`
 /// (`n > 4_294_967_296`), and via [`Tensor::zeros`] with `tensor capacity
-/// overflow` for `n > 1_625`. Both are deliberate mission aborts (D-0003);
+/// overflow` for `n > 1_625`. Both are deliberate CLAUDE.md §6 mission aborts
+/// (D-0003);
 /// pinned by `tests/security.rs`.
 #[allow(
     clippy::expect_used,
-    reason = "D-0003: a named mission abort beats a silent wrap"
+    reason = "CLAUDE.md §6 mission abort (D-0003): a named abort beats a silent wrap"
 )]
 pub fn target(n: usize) -> Tensor {
     let d = n.checked_mul(n).expect("target dimension overflow");

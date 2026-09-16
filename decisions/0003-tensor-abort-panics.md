@@ -46,7 +46,7 @@ a `Result` nobody can act on, and far better than the wrap.
   it cannot do anything with but propagate. Rejected.
 - **(c) Amend CLAUDE.md §6.** Not taken *yet* — see below.
 
-## The open constitutional question
+## The constitutional question — **resolved 2026-09-16**
 
 CLAUDE.md §6 reads: *"Panics are for genuinely unreachable states only, with a
 justifying message."* These states are **reachable** — `tests/security.rs`
@@ -60,9 +60,21 @@ If §6 should instead *permit* this class, the amendment would read roughly:
 > verifier trusts. Either way: a justifying message, a `# Panics` doc section,
 > and a `#[should_panic]` test pinning the message.
 
-`ufl-tensor`'s two sites satisfy all three of those conditions today. **Amending
-the constitution is Gustavo's call and has not been made** — until it is, the
-`#[allow]`s stand as exceptions and this entry is the record of why.
+`ufl-tensor`'s two sites satisfied all three conditions already. **Gustavo
+accepted the amendment on 2026-09-16** and CLAUDE.md §6 now reads with the
+mission-abort clause, plus two guards the draft did not have:
+
+- *"'No caller can handle it' is a claim about the **data**, not about
+  convenience — a `Result` that is merely tedious to thread is not a mission
+  abort."* The clause's failure mode is someone reaching for it to avoid
+  threading an error; this says so outright.
+- The lint stays mechanical and cannot distinguish a permitted panic from a lazy
+  one, so a permitted panic **still** needs a targeted `#[allow(…, reason)]`
+  *and* a `decisions/` entry. The cost of the exception is what keeps it rare,
+  and the decision log is what puts it in front of the owner.
+
+So the two `#[allow]`s are no longer exceptions *to* §6 — they are §6 mission
+aborts, and the attribute reasons and `# Panics` sections cite the clause.
 
 ## Follow-up the rationale implies
 
