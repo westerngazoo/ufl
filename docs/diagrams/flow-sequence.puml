@@ -1,0 +1,13 @@
+@startuml
+title ufl — secuencia principal
+
+participant "Syntax" as Syntax0
+participant "Eval" as Eval1
+participant "Predicates" as Predicates2
+participant "Evolution" as Evolution3
+
+Syntax0 -> Eval1: `ufl-core` evaluates over `Complex<f64>` log-domain arithmetic.
+Eval1 -> Predicates2: Wrap in ⟦P⟧ → `ufl-predicate` checks pre/post state.
+Predicates2 -> Evolution3: `ufl-evolve` proposes GeoExpr mutations; verifier is honest gate.
+
+@enduml

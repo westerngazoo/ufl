@@ -11,6 +11,10 @@
 //! injective, so every entry is 0/1 and `error == 0` means exact equality.
 
 #![forbid(unsafe_code)]
+#![cfg_attr(
+    not(test),
+    deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)
+)]
 
 mod reconstruct;
 mod scheme;

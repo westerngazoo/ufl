@@ -10,6 +10,21 @@ pub struct Tensor {
 
 impl Tensor {
     /// An all-zero tensor of shape `(dim, dim, dim)`.
+    ///
+    /// # Panics
+    ///
+    /// Panics with `tensor capacity overflow` if `dim³` exceeds `usize` —
+    /// `dim > 2_642_245`, i.e. a matmul `n > 1_625`. This is a **mission
+    /// abort**, not a recoverable error, and it is deliberate (D-0003): without
+    /// the `checked_mul` the product wraps, `vec![0; wrapped]` under-allocates,
+    /// and [`add_at`](Tensor::add_at) then corrupts memory silently. The guard
+    /// converts a silent wrap into a named abort. Reaching it requires
+    /// allocating ~128 EiB of `i64` first, so the allocator aborts long before
+    /// the multiply can wrap; pinned by `tests/security.rs`.
+    #[allow(
+        clippy::expect_used,
+        reason = "D-0003: a named mission abort beats a silent wrap"
+    )]
     pub fn zeros(dim: usize) -> Self {
         let capacity = dim
             .checked_mul(dim)
@@ -60,6 +75,17 @@ impl Tensor {
 /// The matmul target tensor `T_n` (SPEC-0006 §2.1): `T_n[i·n+j, j·n+k, i·n+k] =
 /// 1` for all `i,j,k ∈ 0..n`, else 0. The map is injective, so every entry is
 /// 0 or 1.
+///
+/// # Panics
+///
+/// Panics with `target dimension overflow` if `n²` exceeds `usize`
+/// (`n > 4_294_967_296`), and via [`Tensor::zeros`] with `tensor capacity
+/// overflow` for `n > 1_625`. Both are deliberate mission aborts (D-0003);
+/// pinned by `tests/security.rs`.
+#[allow(
+    clippy::expect_used,
+    reason = "D-0003: a named mission abort beats a silent wrap"
+)]
 pub fn target(n: usize) -> Tensor {
     let d = n.checked_mul(n).expect("target dimension overflow");
     let mut t = Tensor::zeros(d);
