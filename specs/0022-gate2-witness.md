@@ -1,7 +1,11 @@
 # SPEC-0022 — Gate 2's witness and the fair comparison, as one reproducible artifact
 
 - **Realizes:** [R-0022](../requirements/0022-gate2-witness.md) (ACs approved 2026-09-16).
-- **Status:** **Draft** — awaiting the three-lens (CLAUDE.md §4 step 2).
+- **Status:** **Draft (rev 2)** — all three lens agents **stalled** (six stalls
+  this session), so the main session ran their two decisive checks itself: the
+  integrity of the exactness claim (§4.1) and the fairness of the MLP baseline
+  (§4.2). Both are folded below; one **materially changes how the result must be
+  stated**. Verification-substitution precedent: `decisions/0002`.
 - **Crates touched:** `ufl-evolve` only — a new `witness.rs` module and one
   acceptance test. `ufl-geo`/`ufl-ga` are **used, not modified** (SPEC-0011 §7's
   2026-06-21 decision: the geometric crate stays frozen).
@@ -70,7 +74,72 @@ Angles arrive as `Var`-bound grade-0 `Mv`s (SPEC-0011 §2.5). Declaring
 `t1`/`t2` as grade `{0}` in the `GradeCtx` is what makes the motor a *provable*
 versor — without it `typecheck` cannot tighten to `{3}`.
 
-## 4. The readout is the kernel's, not an invention — and it computes nothing
+## 4. Where the transcendental lives — state this before anyone asks
+
+### 4.1 The trigonometry is inside `Exp`, and the claim must say so
+
+`garust-core/src/transform.rs:194-206` — `exp_scalar_square` for `c < 0`:
+
+```rust
+let s = (-c).sqrt();
+Self::scalar(s.cos()) + *self * (s.sin() / s)
+```
+
+A rotor is `Exp(−t/2 · e₁₂)`, and `e₁₂² = −1`, so `c < 0` and **this branch
+computes `cos(t/2)` and `sin(t/2)`.** The witness does not avoid trigonometry; it
+*relocates* it into the algebra's canonical exponential, which is what a rotation
+**is** in GA.
+
+One precision in the result's favour: the two **translators** use `Basis(9)`
+(e₁e₀), which is **null**, so `c == 0` and `exp` takes the `1 + self` branch —
+**no transcendental at all**. Only the two rotors evaluate `cos`/`sin`.
+
+**So the claim is not "exact FK without trig."** It is:
+
+> With the right algebraic structure, this map is **exactly expressible** in 4
+> parameters and holds **everywhere**; a generic function approximator needs 322
+> and holds only where it was trained.
+
+That is an **inductive-bias** claim — precisely the claim GATr and CliffordNet
+make — with the difference that this one is *exact and machine-checked* rather
+than learned. Any write-up that says "no trigonometry" is false and would be
+caught on first reading.
+
+### 4.2 The MLP baseline is fair — measured by trying to break it
+
+The obvious attack on the headline is *"the MLP was set up to fail."* Tested
+directly (release, `ArmFk { l1: 1.0, l2: 0.7 }`):
+
+| config | H | params | in-dist | OOD | ratio |
+|---|---|---|---|---|---|
+| default (700 ep) | 64 | 322 | 2.39e-3 | 3.29e-1 | 138× |
+| **20,000 epochs** | 64 | 322 | **8.08e-4** | 2.78e-1 | **344×** |
+| **5,000 ep + 4× train data** | 64 | 322 | **6.73e-4** | 2.70e-1 | **402×** |
+| 20,000 ep | 256 | 1,282 | 3.34e-3 | 3.17e-1 | 95× |
+| 20,000 ep | 16 | 82 | 1.52e-3 | 3.17e-1 | 209× |
+
+Seed variance at H=64 / 5,000 epochs (five seeds): OOD **2.61e-1 … 3.00e-1**.
+
+Three things follow, and all three favour the result:
+
+1. **Training 28× harder improves in-distribution ~3× and moves OOD by 16%.**
+   Four times the data does the same. The OOD floor is ~2.7e-1 regardless.
+2. **More width does not help** — H=256 at 1,282 params is *worse*
+   in-distribution than H=64 and flat OOD.
+3. **The ratio gets *worse* with better training** (138× → 402×), because
+   in-distribution error falls and OOD does not.
+
+The collapse is **structural, not under-training**. On `[2,3]²` the angle sum
+`t1+t2` reaches `[4,6]` — phase the network never saw — and a smooth
+interpolator cannot know a periodic map outside its samples. That is the honest
+mechanism, and it is a stronger statement than "the MLP is bad."
+
+**Reproducibility gap (AC3):** `train_report_with` and `TrainConfig` are `pub` in
+`baseline.rs` but **not re-exported** from `lib.rs:18`, so this table cannot be
+reproduced from outside the crate. §5's artifact must either re-export them or
+live in-crate.
+
+### 4.3 The readout is the kernel's, not an invention — and it computes nothing
 
 SPEC-0011 §7 permits "readout in the verifier", which is exactly the permission a
 dishonest witness would abuse by doing the trigonometry outside the `GeoExpr`.
