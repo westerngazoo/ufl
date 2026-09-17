@@ -134,10 +134,19 @@ The collapse is **structural, not under-training**. On `[2,3]²` the angle sum
 interpolator cannot know a periodic map outside its samples. That is the honest
 mechanism, and it is a stronger statement than "the MLP is bad."
 
-**Reproducibility gap (AC3):** `train_report_with` and `TrainConfig` are `pub` in
-`baseline.rs` but **not re-exported** from `lib.rs:18`, so this table cannot be
-reproduced from outside the crate. §5's artifact must either re-export them or
-live in-crate.
+**Reproducibility: no gap** — correcting rev 2's own claim. An earlier draft of
+this paragraph said `train_report_with`/`TrainConfig` "cannot be reproduced from
+outside the crate" because they are not re-exported from `lib.rs:18`. That was a
+misdiagnosis of an import error of mine: `baseline` is `pub mod` (`lib.rs:15`),
+so both are reachable as `ufl_evolve::baseline::{train_report_with, TrainConfig}`.
+Verified from a standalone external crate:
+
+```
+REACHABLE from outside: H=16 params=82 in-dist=2.92e-3 ood=4.62e-1
+```
+
+A root re-export would be a convenience, not a fix. §5's artifact therefore needs
+nothing extra for AC3's reproducibility clause beyond printing what it measures.
 
 ### 4.3 The readout is the kernel's, not an invention — and it computes nothing
 
