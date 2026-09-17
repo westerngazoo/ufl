@@ -1,6 +1,6 @@
 # R-0022 — Gate 2's witness, in-repo: the exact equivariant program vs the fair MLP
 
-- **Status:** **Draft** — acceptance criteria await Gustavo's sign-off (CLAUDE.md §4 step 1).
+- **Status:** **Accepted** — ACs approved by Gustavo 2026-09-16 (CLAUDE.md §4 step 1).
 - **Milestone:** M5 — this **is** R-0011's headline (AC5 primary), not a new direction.
 - **Realizes:** [R-0011](0011-geometric-neuroevolution.md) **AC5 primary** +
   **AC6** (honest reporting). SPEC-0011 §2.5 defines the gate; §2.6 de-risked the
@@ -61,10 +61,16 @@ bivector; the end-effector is the motor sandwiched onto the origin point, with
 the `(x, y)` readout taken in the verifier (SPEC-0011 §7: "readout in the
 verifier").
 
-§2.6 reported ~25 nodes, **4 `Param`s**, and RMSE ≈ 2.5e-16. **None of those three
-numbers is currently reproducible**, so R-0022 treats all of them as *claims to
-re-measure*, not givens. If the derivation lands at a different node or `Param`
-count, the measured number is what ships.
+§2.6 reported ~25 nodes, **4 `Param`s**, and RMSE ≈ 2.5e-16 — and R-0022 treated
+all three as claims to re-measure rather than givens.
+
+**Re-measured 2026-09-16, and §2.6 was right.** A five-family derivation fan-out
+with adversarial per-candidate verification, reproduced independently by the main
+session with its own grids and counters: the motor-sandwich witness is **25
+nodes, 4 `Param`s, RMSE 2.55e-16 in-dist and 2.54e-16 OOD**, `typecheck` `Ok({3})`,
+zero failures over 3,600 samples per band. A far `[−8,8]` band — four times
+outside the training range, not required by any AC — measures **2.59e-16**. See
+[SPEC-0022](../specs/0022-gate2-witness.md) §1.
 
 ## 4. What this must NOT claim
 
@@ -80,7 +86,7 @@ count, the measured number is what ships.
   §5's AC3 says otherwise. The value is *exactness + equivariance*, not a
   leaderboard.
 
-## 5. Proposed acceptance criteria — **for Gustavo's sign-off**
+## 5. Acceptance criteria — **approved 2026-09-16**
 
 - **AC1 (the witness is in-repo and exact).** A committed `GeoExpr` — a named
   `pub fn` or a const-built value in `ufl-geo` or `ufl-evolve` — whose evaluation
