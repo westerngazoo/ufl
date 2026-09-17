@@ -1,6 +1,11 @@
 # R-0021 — `FormFitness`: the acceptance property as a discharged UFL form
 
-- **Status:** **Accepted** — ACs approved by Gustavo 2026-09-16 (CLAUDE.md §4 step 1).
+- **Status:** **SHELVED** (2026-09-16, Gustavo) — not killed. ACs were approved
+  and the three-lens then found the spec as drafted should not be built
+  ([SPEC-0021 §7](../specs/0021-form-fitness.md#7-three-lens-round-1--what-the-lenses-measured-and-the-recommendation)).
+  Decision and what survives: [`decisions/0004`](../decisions/0004-shelve-form-fitness.md).
+  **The finding this requirement produced is §1.1 below — read that even if you
+  never build this.**
 - **Milestone:** M5 · rung 3 of the self-eval staircase (*the language scores itself* —
   in the bounded sense §4 pins, never the autonomous one).
 - **Tracks:** [#66](https://github.com/westerngazoo/ufl/issues/66) (T10), brief at
@@ -8,7 +13,42 @@
 - **Builds on:** R-0004 (`impl Predicate for Sexpr`), R-0014 (the `ufl-search`
   seam), R-0008 (`RankDecomposition::residual`).
 
-## 1. What this is
+## 1.1 The finding, hoisted — the form language has no ordering relation
+
+This is what #66's KILL clause asked for, and it is the durable output of R-0021
+whether or not any code ships.
+
+The predicate language's boolean heads are **exactly**
+`{and, or, not, =, eq?, pred}` (`ufl-predicate/src/eval_pred.rs:35-37`).
+**There is no ordering relation at any arity.** Measured:
+
+```
+(<= rot_err eps)  →  Err(Pred(ExpectedBool { found: "form `<=`" }))
+(<  rot_err eps)  →  Err(Pred(ExpectedBool { found: "form `<`"  }))
+```
+
+`GeoFitness::solved` is `score.value() <= 1e-6` (`ufl-evolve/src/memetic.rs:112`).
+So **form-as-acceptance works exactly for a lane whose criterion is an exact
+`== 0`** — matmul — and not for the geometric lane, which is every other lane so
+far.
+
+The missing form is **one ordering head**, and it is *not* a drop-in: `Value` is
+`Complex<f64>`, which has **no total order**. So the next predicate-layer
+requirement must *decide* the semantics rather than add a symbol:
+
+- require `im == 0` and compare `re`, with a new typed `PredError::ExpectedReal`
+  (consistent with this project's preference for typed refusal over silent
+  projection); or
+- compare `norm()` — total, but conflates `+1` and `−1`; or
+- `total_cmp` on `re` alone, ignoring `im` silently.
+
+A fourth fact for whoever writes that requirement: `RotErr::new` already
+normalises the non-finite class at construction, so the geo form needs no NaN
+clause — **the cost type owns the binding's totality; the form only compares.**
+That rule is derivable from two lanes written independently, and it is the
+cleanest transferable thing R-0021 produced.
+
+## 2. What this is
 
 `ufl-discovery`'s `MatmulFitness` (`generic.rs:41-49`) decides acceptance in Rust:
 

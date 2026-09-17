@@ -1,11 +1,12 @@
 # SPEC-0021 — `FormFitness`: the acceptance verdict from a discharged UFL form
 
 - **Realizes:** [R-0021](../requirements/0021-form-fitness.md) (ACs approved 2026-09-16).
-- **Status:** **Draft — RESCOPE RECOMMENDED.** Three-lens round 1 complete:
-  architect **REQUEST CHANGES** (3 blocking), hater **NEEDS WORK** (3 blocking),
-  nice-guy **STRONG WORK**. Both critical lenses independently concluded the
-  spec as drafted should not be built, and **two survive** as worth ~100 lines.
-  See §7. Gustavo's call before any rev 2.
+- **Status:** **SHELVED** (2026-09-16, Gustavo) — not killed. Three-lens round 1
+  found the spec as drafted should not be built (§7); the two deliverables that
+  survived are preserved in [R-0021 §1.1](../requirements/0021-form-fitness.md)
+  and [#94](https://github.com/westerngazoo/ufl/issues/94). Decision:
+  [`decisions/0004`](../decisions/0004-shelve-form-fitness.md). If Rung-4 ever
+  earns headroom, §7.4's rescope is the starting point.
 - **Crates touched:** `ufl-discovery` (the new instance + its tests). `ufl-search`,
   `ufl-predicate`, `ufl-syntax`, `ufl-core` are **used, not modified**.
 
