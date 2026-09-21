@@ -578,6 +578,7 @@ dependencies = [
 name = "ufl-evolve"
 version = "0.1.0"
 dependencies = [
+ "thiserror",
  "ufl-ga",
  "ufl-geo",
  "ufl-prng",
