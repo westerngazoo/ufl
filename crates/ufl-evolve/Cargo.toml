@@ -9,5 +9,6 @@ repository.workspace = true
 
 [dependencies]
 ufl-geo = { path = "../ufl-geo" }
+ufl-ga = { path = "../ufl-ga" }
 ufl-prng = { path = "../ufl-prng" }
 ufl-search = { path = "../ufl-search" }

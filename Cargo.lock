@@ -578,6 +578,7 @@ dependencies = [
 name = "ufl-evolve"
 version = "0.1.0"
 dependencies = [
+ "ufl-ga",
  "ufl-geo",
  "ufl-prng",
  "ufl-search",
