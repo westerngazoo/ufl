@@ -90,7 +90,7 @@ The repair is structural, cheap, and measured. Name the motor subtree
 | assertion | excludes | measured |
 |---|---|---|
 | `typecheck(M, ctx) == Ok({0,2,4})` — **even** | every reflection and every odd blade | motor `Ok({0,2,4})`; `Basis(1)` and `Basis(8)` are `Ok({1})` |
-| `M ∗ M̃ == 1` — **unit** | the null/degenerate case, and any scaled versor | motor scalar part **0.99999999999999989**, non-scalar residue 2.78e-17; `Basis(8)` gives **0.0** |
+| `M ∗ M̃ == 1` — **unit** | the null/degenerate case, and any scaled versor | motor scalar part **0.9999999999999999**, non-scalar residue 2.78e-17; `Basis(8)` gives **0.0** |
 | `typecheck(Sandwich(M, e₁₂₃), ctx) == Ok({3})` | a result outside point space | `Ok({3})` |
 
 Even **and** unit **and** `{3}` together is *a proper rigid motion applied to
@@ -139,7 +139,8 @@ fn rotor(joint: &str) -> GeoExpr { … Exp(GeoProduct(GeoProduct(Param(-0.5), Va
 fn translator(link: f64) -> GeoExpr { … Exp(GeoProduct(Param(0.5 * link), Basis(9))) }
 
 /// `M = R(t1)·T(l1)·R(t2)·T(l2)` — the motor, **exposed as its own function**
-/// so §2.1's even/unit assertions have something to name. 21 nodes, 4 `Param`s.
+/// so §2.1's even/unit assertions have something to name. 23 nodes, 4 `Param`s
+/// (the witness's 25 less the `Sandwich` node and the `Basis(7)` origin).
 pub fn fk_motor(l1: f64, l2: f64) -> GeoExpr { … }
 
 /// `Sandwich(M, e₁₂₃)` — the rightmost factor acts first, so the origin walks
@@ -309,8 +310,11 @@ cross-check (§5.4).
    over a 40×40 grid with `a = 0.37`: **max deviation 1.11e-15, measured**.
    This is what AC5's "equivariant" means here and the only sense in which the
    word is earned (§7 Q3).
-8. **T-null-blade-addition (§6)** — `Exp(a·e₁e₀) ∗ Exp(b·e₁e₀) == Exp((a+b)·e₁e₀)`,
-   exactly. The durable finding, as a one-line regression.
+8. **T-null-blade-addition (§6)** — `Exp(a·e₁e₀) ∗ Exp(b·e₁e₀) == Exp((a+b)·e₁e₀)`.
+   Measured **bitwise identical** (`to_bits()` equality on all 16 coefficients)
+   across 54 `(a,b)` pairs spanning `[−3.25, 17]`; max coefficient difference
+   exactly `0e0`. The durable finding, as a regression that asserts equality of
+   bits rather than a tolerance.
 9. **T-comparison (AC3)** — the deliverable artifact. One `#[ignore]`d release
    test printing **unconditionally**: node count, `Param` count, all three
    `typecheck` results, every band's RMSE, the full MLP sweep, the
@@ -328,6 +332,12 @@ no addition form**, yet FK is a sum of two rotated vectors. Its mechanism:
 closed form truncates), and because the two register slots annihilate,
 **multiplying two such `Exp` factors adds their arguments**. Addition, obtained
 from a multiplicative form set via a null blade.
+
+Measured, and the measurement is stronger than the claim needed to be: the two
+sides are **bitwise identical**, not merely equal to within rounding — 54 pairs,
+every one of the 16 coefficients matching on `to_bits()`, max difference `0e0`.
+`Basis(9)²` evaluates to all-zero, which is the property the truncation rests
+on. Addition here is not approximated by the algebra; it *is* the algebra.
 
 Recorded because it is a durable fact about what this form set can express — and
 because the same trick is what a future `FormFitness`-style requirement or an
