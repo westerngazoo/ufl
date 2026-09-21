@@ -923,6 +923,31 @@ fn comparison_artifact() {
         );
     }
 
+    println!("  ONE SEED. Read no floor off this table: at H=32 seed 42 draws OOD 1.935e-1,");
+    println!("  about 4 SD below that width's 8-seed mean — an outlier, not a capability.");
+    println!("  The across-seed block below is what pins the floor.");
+
+    println!("\n-- the floor, across seeds (widths × seeds 0..7, default config) --");
+    println!("   H  params     OOD min      OOD mean      OOD max");
+    let mut floor_rows = Vec::new();
+    for h in [16usize, 32, 64] {
+        let oods: Vec<f64> = (0..8u64)
+            .map(|seed| train_report_with(&ARM, h, seed, &TrainConfig::default()).ood_rmse)
+            .collect();
+        let lo = oods.iter().copied().fold(f64::INFINITY, f64::min);
+        let hi = oods.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        let mean = oods.iter().sum::<f64>() / oods.len() as f64;
+        println!(
+            "  {h:>2}  {:>6}   {lo:.3e}     {mean:.3e}    {hi:.3e}",
+            2 + h * 5
+        );
+        floor_rows.push((h, lo, mean, hi));
+    }
+    println!("  No width's 8-seed minimum goes below 2.9e-1 at the default budget; the");
+    println!("  best OOD measured in ANY config or seed is 1.9e-1 — fifteen orders of");
+    println!("  magnitude above the witness, so the headline does not depend on the floor's");
+    println!("  exact value. It is stated as a range because a single draw is not a floor.");
+
     println!("\n-- smallest-at-error (SPEC-0011 §2.5's anti-strawman rule) --");
     let mut selections = Vec::new();
     for target in [0.05_f64, 0.01] {
@@ -996,4 +1021,15 @@ fn comparison_artifact() {
         "both smallest-at-error targets must be decided (Some or None)",
     );
     assert_eq!(seed_oods.len(), 5, "all five stability seeds must report");
+    assert_eq!(
+        floor_rows.len(),
+        3,
+        "all three across-seed floor widths must report",
+    );
+    assert!(
+        floor_rows
+            .iter()
+            .all(|&(_, lo, mean, hi)| lo <= mean && mean <= hi && lo.is_finite()),
+        "each floor row must record an ordered, finite min/mean/max",
+    );
 }

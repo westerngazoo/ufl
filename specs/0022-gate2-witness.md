@@ -239,7 +239,15 @@ Seed variance at H=64 / 5,000 epochs (five seeds): OOD **2.61e-1 … 3.00e-1**.
 Three things follow, and all three favour the result:
 
 1. **Training 28× harder improves in-distribution ~3× and moves OOD by 16%.**
-   Four times the data does the same. The OOD floor is ~2.7e-1 regardless.
+   Four times the data does the same. The OOD floor is a **range, not a point** —
+   across widths `{16, 32, 64}` × seeds `0..7` at the default budget, the
+   per-width minima are 3.06e-1 / 2.95e-1 / 3.21e-1 and the means 3.90e-1 /
+   3.56e-1 / 3.44e-1. The best OOD measured in **any** config or seed is
+   **1.935e-1** (H=32, seed 42), which is ≈4 SD below that width's own 8-seed
+   mean — an outlier draw, not a capability. Quoting a single point as "the
+   floor" is what let rev 3's artifact print a 1.9e-1 row directly above a
+   "~2.7e-1 floor" claim; the artifact now prints the across-seed block and says
+   so. The headline is fifteen orders of magnitude away either way.
 2. **More width does not help** — H=256 at 1,282 params is *worse*
    in-distribution than H=64 and flat OOD.
 3. **The ratio gets *worse* with better training** (138× → 402×), because
