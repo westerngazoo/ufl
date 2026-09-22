@@ -1,8 +1,9 @@
 # D-0005 — R-0022: the red-first deviation, and AC4's sampled clause
 
-- **Date:** 2026-09-21
-- **Decided by:** *pending Gustavo's ratification* — drafted by the main session
-  so both items are in the record rather than in a PR description
+- **Date:** 2026-09-22
+- **Decided by:** **Gustavo**, 2026-09-22 — both dispositions approved as
+  drafted. Raised by the architect review of PR #96 and written up by the main
+  session so neither item lived only in a PR description.
 - **Touches:** [R-0022](../requirements/0022-gate2-witness.md),
   [SPEC-0022](../specs/0022-gate2-witness.md) §2.1,
   [PR #96](https://github.com/westerngazoo/ufl/pull/96)
@@ -64,7 +65,7 @@ induction: `(cos + sin B̂)(cos − sin B̂) = cos² − sin²B̂² = 1` for `B�
 `(1 + uB)(1 − uB) = 1` for null `B`, and a product of unit versors is unit. The
 sweep would then measure f64 rounding rather than establish unitness.
 
-**Proposed disposition.** Accept AC4 as *partially met* for R-0022, with the
+**Disposition (approved).** AC4 is *partially met* for R-0022, with the
 honest label **"unit by algebraic identity, f64 residual 2 ulp"** in §2.1, and
 defer the syntactic predicate. Grounds: the predicate belongs in `ufl-geo`
 beside `typecheck`, and SPEC-0011 §7's 2026-06-21 decision freezes that crate;
@@ -76,6 +77,13 @@ The algebra also bounds how much is actually at risk. For even
 "even ∧ `M M̃ = 1`" is two equations on an 8-dimensional space — the
 6-dimensional motor group, up to sign. The sampled clause is pinning a
 codimension-2 condition, not standing in for an open-ended one.
+
+## Follow-up
+
+The syntactic versor predicate is **deferred, not dropped** — tracked as
+[#97](https://github.com/westerngazoo/ufl/issues/97). It lands when `ufl-geo`
+reopens; until then §2.1's label stands and the sampled clause is disclosed
+wherever the guard is described.
 
 ## What this does not decide
 

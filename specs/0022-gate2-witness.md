@@ -115,8 +115,8 @@ it structural is a syntactic predicate over the motor tree — every factor an
 null `B`; a product of unit versors is unit), and the 2-ulp sweep demotes from
 *proof* to *rounding measurement*. That construction is **not built here**; the
 honest label for what ships is **"unit by algebraic identity, f64 residual 2
-ulp"**, and AC4 is therefore **partially met**. Recorded, not papered over —
-`decisions/0005`.
+ulp"**, and AC4 is therefore **partially met** — approved as such by
+Gustavo on 2026-09-22 (`decisions/0005`), with the predicate deferred to #97.
 
 Even **and** unit **and** `{3}` together is *a proper rigid motion applied to
 the origin, yielding a point*. Neither check alone suffices: `Basis(1)` is a
