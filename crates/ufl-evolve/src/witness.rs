@@ -39,6 +39,18 @@ pub enum WitnessError {
     /// like a sweep.
     #[error("a band needs at least 2 grid points per axis, got {0}")]
     DegenerateGrid(usize),
+    /// A band whose bounds do not strictly increase, or are incomparable.
+    /// `lo == hi` would report a
+    /// healthy-looking `n × n` sweep of a **single pose** — the same
+    /// silent-perfect-score class as `n = 0`, which is why both are rejected
+    /// at the same seam rather than documented as preconditions.
+    #[error("a band needs lo < hi, got lo = {lo}, hi = {hi}")]
+    DegenerateBand {
+        /// The rejected lower bound.
+        lo: f64,
+        /// The rejected upper bound.
+        hi: f64,
+    },
     /// A sample failed to evaluate. An evaluation failure is a result, not
     /// something to average away.
     #[error(transparent)]
@@ -165,13 +177,11 @@ pub fn node_count(e: &GeoExpr) -> usize {
 }
 
 /// How many `Param` slots an expression carries — the witness's headline "4".
+///
+/// Delegates to `ufl_geo::params`, the slot enumeration the evolver's refiner
+/// already uses, rather than re-walking the tree: one traversal, one answer.
 pub fn param_count(e: &GeoExpr) -> usize {
-    let here = usize::from(matches!(e, GeoExpr::Param(_)));
-    here + children(e)
-        .into_iter()
-        .flatten()
-        .map(param_count)
-        .sum::<usize>()
+    ufl_geo::params(e).len()
 }
 
 /// The children of a node, as the single arity source (the R-0020 convention:
@@ -195,15 +205,64 @@ pub fn sample(expr: &GeoExpr, t1: f64, t2: f64) -> Result<Mv, GeoError> {
     eval(expr, &witness_env(t1, t2))
 }
 
+/// A validated angle band: the closed `lo..=hi` lattice with `n` points per
+/// axis, swept as `n × n` poses.
+///
+/// Constructed only through [`Band::new`], so a degenerate grid or band cannot
+/// reach [`measure`] at all — both failure modes report a healthy RMSE over
+/// nothing, which is the one thing a measurement harness must never do.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Band {
+    lo: f64,
+    hi: f64,
+    n: usize,
+}
+
+impl Band {
+    /// A band, or the reason it is not one.
+    ///
+    /// Rejects `n < 2` ([`WitnessError::DegenerateGrid`]) and `lo >= hi`
+    /// ([`WitnessError::DegenerateBand`]).
+    pub fn new(lo: f64, hi: f64, n: usize) -> Result<Self, WitnessError> {
+        if n < 2 {
+            return Err(WitnessError::DegenerateGrid(n));
+        }
+        if !matches!(lo.partial_cmp(&hi), Some(core::cmp::Ordering::Less)) {
+            // `partial_cmp` rather than `!(lo < hi)`: it makes the NaN case
+            // explicit rather than incidental. A NaN bound is incomparable, so
+            // it is rejected here instead of producing a band of NaN poses.
+            return Err(WitnessError::DegenerateBand { lo, hi });
+        }
+        Ok(Self { lo, hi, n })
+    }
+
+    /// Inclusive lower bound of both angles.
+    pub fn lo(&self) -> f64 {
+        self.lo
+    }
+
+    /// Inclusive upper bound of both angles.
+    pub fn hi(&self) -> f64 {
+        self.hi
+    }
+
+    /// Grid resolution per axis.
+    pub fn n(&self) -> usize {
+        self.n
+    }
+
+    /// The `i`th lattice coordinate. `n >= 2` is an invariant, so the divisor
+    /// is never zero.
+    fn step(&self, i: usize) -> f64 {
+        self.lo + (self.hi - self.lo) * i as f64 / (self.n - 1) as f64
+    }
+}
+
 /// What a deterministic sweep over one angle band measured.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BandReport {
-    /// Grid resolution per axis; the band holds `n × n` samples.
-    pub n: usize,
-    /// Inclusive lower bound of both angles.
-    pub lo: f64,
-    /// Inclusive upper bound of both angles.
-    pub hi: f64,
+    /// The band swept.
+    pub band: Band,
     /// **Per-component** RMSE against [`crate::baseline::ArmFk::forward`] —
     /// `sqrt(Σ[(Δx)² + (Δy)²] / 2n)`, `baseline.rs`'s own formula (SPEC-0022
     /// §1). Never the per-point variant; the two differ by √2 and rev 2 of the
@@ -216,31 +275,29 @@ pub struct BandReport {
     pub max_z: f64,
 }
 
-/// Sweep one band and report it. Deterministic: the grid is a closed
-/// `lo..=hi` lattice, so a run is reproducible from `(lo, hi, n)` alone.
+/// Sweep `expr` over `band` against `arm` and report it. Deterministic: the
+/// grid is a closed `lo..=hi` lattice, so a run is reproducible from the
+/// `Band` alone.
 ///
-/// Returns [`WitnessError::DegenerateGrid`] for `n < 2`, and
-/// [`WitnessError::Eval`] if any sample fails to evaluate — an evaluation
-/// failure is a result, not something to average away.
-pub fn measure_band(
-    l1: f64,
-    l2: f64,
-    lo: f64,
-    hi: f64,
-    n: usize,
+/// **Takes the expression rather than building it.** SPEC-0022 §2's
+/// counterexample table — the wrong rotor plane, garbage `Param`s, swapped
+/// angles — is measurable through this harness precisely because the
+/// expression is a parameter. An earlier version hard-coded [`fk_witness`],
+/// which is why those rows had to be produced off-repo and could not be
+/// rebuilt from it.
+///
+/// Returns [`WitnessError::Eval`] if any sample fails to evaluate — an
+/// evaluation failure is a result, not something to average away.
+pub fn measure(
+    expr: &GeoExpr,
+    arm: &crate::baseline::ArmFk,
+    band: Band,
 ) -> Result<BandReport, WitnessError> {
-    if n < 2 {
-        return Err(WitnessError::DegenerateGrid(n));
-    }
-    let arm = crate::baseline::ArmFk { l1, l2 };
-    let expr = fk_witness(l1, l2);
     let (mut se, mut max_weight_error, mut max_z) = (0.0f64, 0.0f64, 0.0f64);
-    // `n >= 2` is guaranteed above, so the divisor is never zero.
-    let step = |i: usize| lo + (hi - lo) * i as f64 / (n - 1) as f64;
-    for i in 0..n {
-        for j in 0..n {
-            let (t1, t2) = (step(i), step(j));
-            let mv = sample(&expr, t1, t2)?;
+    for i in 0..band.n {
+        for j in 0..band.n {
+            let (t1, t2) = (band.step(i), band.step(j));
+            let mv = sample(expr, t1, t2)?;
             max_weight_error = max_weight_error.max((weight(&mv) - 1.0).abs());
             max_z = max_z.max(read_z(&mv).abs());
             let (x, y) = read_xy(&mv);
@@ -248,15 +305,22 @@ pub fn measure_band(
             se += (x - gx).powi(2) + (y - gy).powi(2);
         }
     }
-    let count = (n * n) as f64;
+    let count = (band.n * band.n) as f64;
     Ok(BandReport {
-        n,
-        lo,
-        hi,
+        band,
         rmse: (se / (count * 2.0)).sqrt(),
         max_weight_error,
         max_z,
     })
+}
+
+/// Sweep the witness for `arm` over `band` — the common case, and the one the
+/// acceptance bands use.
+pub fn measure_witness(
+    arm: &crate::baseline::ArmFk,
+    band: Band,
+) -> Result<BandReport, WitnessError> {
+    measure(&fk_witness(arm.l1, arm.l2), arm, band)
 }
 
 /// The homogeneous weight of a PGA point — the `e₁₂₃` coefficient.
@@ -292,6 +356,7 @@ mod tests {
     /// The arm the spec's figures are quoted for.
     const L1: f64 = 1.0;
     const L2: f64 = 0.7;
+    const ARM: crate::baseline::ArmFk = crate::baseline::ArmFk { l1: L1, l2: L2 };
 
     #[test]
     fn node_and_param_counts_are_the_headline_numbers() {
@@ -337,23 +402,46 @@ mod tests {
     }
 
     #[test]
-    fn a_degenerate_grid_is_an_error_not_a_perfect_score() {
-        // The regression this exists for: `n = 0` once reported `rmse: 0.0`.
+    fn a_degenerate_grid_or_band_is_an_error_not_a_perfect_score() {
+        // The regressions these exist for: `n = 0` once reported `rmse: 0.0`,
+        // and `lo == hi` once reported a 3,600-sample sweep of one pose.
         assert_eq!(
-            measure_band(L1, L2, -2.0, 2.0, 0),
+            Band::new(-2.0, 2.0, 0),
             Err(WitnessError::DegenerateGrid(0))
         );
         assert_eq!(
-            measure_band(L1, L2, -2.0, 2.0, 1),
+            Band::new(-2.0, 2.0, 1),
             Err(WitnessError::DegenerateGrid(1))
         );
-        assert!(measure_band(L1, L2, -2.0, 2.0, 2).is_ok());
+        assert_eq!(
+            Band::new(2.0, 2.0, 60),
+            Err(WitnessError::DegenerateBand { lo: 2.0, hi: 2.0 })
+        );
+        assert_eq!(
+            Band::new(3.0, 1.0, 60),
+            Err(WitnessError::DegenerateBand { lo: 3.0, hi: 1.0 })
+        );
+        // A NaN bound is incomparable, not ordered — rejected, never swept.
+        assert!(matches!(
+            Band::new(f64::NAN, 2.0, 60),
+            Err(WitnessError::DegenerateBand { .. })
+        ));
+        assert!(matches!(
+            Band::new(-2.0, f64::NAN, 60),
+            Err(WitnessError::DegenerateBand { .. })
+        ));
+        assert!(Band::new(-2.0, 2.0, 2).is_ok());
     }
 
     #[test]
     fn a_band_spans_its_endpoints_inclusively() {
-        let report = measure_band(L1, L2, -2.0, 2.0, 5).expect("a 5×5 band evaluates");
-        assert_eq!((report.n, report.lo, report.hi), (5, -2.0, 2.0));
+        let band = Band::new(-2.0, 2.0, 5).expect("a valid band");
+        assert_eq!((band.step(0), band.step(4)), (-2.0, 2.0), "closed lattice");
+        let report = measure_witness(&ARM, band).expect("a 5×5 band evaluates");
+        assert_eq!(
+            (report.band.n(), report.band.lo(), report.band.hi()),
+            (5, -2.0, 2.0)
+        );
         // The lattice must *reach* hi, or an "OOD band" would silently omit its
         // far corner — the sample that carries the claim.
         let corner = sample(&fk_witness(L1, L2), 2.0, 2.0).expect("the far corner evaluates");
@@ -420,6 +508,76 @@ mod tests {
             null_scalar, 0.0,
             "e₀ is null — this is what the unit check excludes"
         );
+    }
+
+    /// **The two kernel facts §4.1 and §2.1 rest on, pinned.**
+    ///
+    /// `Basis(E12)² = −1` is what forces garust's `exp` into its `c < 0`
+    /// branch, which is the branch that computes `cos`/`sin` — so §4.1's "the
+    /// trigonometry lives inside `Exp`" is true only while this holds. And
+    /// `sandwich(r, x) == r ∗ x ∗ r̃` is what lets a check on `M ∗ M̃` say
+    /// anything at all about the sandwich.
+    #[test]
+    fn the_kernel_identities_the_guard_depends_on() {
+        let env = witness_env(0.0, 0.0);
+        let rot_plane =
+            eval(&product(GeoExpr::Basis(E12), GeoExpr::Basis(E12)), &env).expect("e₁₂² evaluates");
+        assert_eq!(
+            rot_plane.coeffs.as_slice()[0],
+            -1.0,
+            "e₁₂² must be −1, or Exp takes the wrong branch and no cos/sin runs"
+        );
+        let null_plane = eval(&product(GeoExpr::Basis(E1E0), GeoExpr::Basis(E1E0)), &env)
+            .expect("(e₁e₀)² evaluates");
+        assert!(
+            null_plane.coeffs.as_slice().iter().all(|c| *c == 0.0),
+            "e₁e₀ must be null, or Exp does not truncate"
+        );
+
+        // The sandwich is the conjugation the unit check reasons about.
+        let m = sample(&fk_motor(L1, L2), 0.7, -0.3).expect("motor evaluates");
+        let x = sample(&GeoExpr::Basis(ORIGIN), 0.0, 0.0).expect("origin evaluates");
+        let by_hand = m * x * m.reverse();
+        let by_kernel = sample(&fk_witness(L1, L2), 0.7, -0.3).expect("witness evaluates");
+        assert!(
+            by_hand
+                .coeffs
+                .as_slice()
+                .iter()
+                .zip(by_kernel.coeffs.as_slice())
+                .all(|(a, b)| a.to_bits() == b.to_bits()),
+            "Sandwich(M, e₁₂₃) must be bitwise M ∗ e₁₂₃ ∗ M̃"
+        );
+    }
+
+    /// **M4 — `read_z` must not be vacuous.** Hard-wiring it to `0.0` once
+    /// passed every test in the suite, including the planarity cross-check
+    /// whose whole purpose it is. An out-of-plane rotor gives a non-zero z, so
+    /// the constant-folded version now fails here.
+    #[test]
+    fn read_z_reports_a_real_coordinate_not_a_constant() {
+        // The origin is a FIXED POINT of any rotor about it, so a bare e₁₃
+        // rotor leaves z at −0. The point must be translated off the axis
+        // first, then swung out of the plane.
+        let out_of_plane = GeoExpr::Sandwich(
+            Box::new(product(
+                GeoExpr::Exp(Box::new(product(
+                    product(GeoExpr::Param(-0.5), GeoExpr::Var("t1".to_owned())),
+                    GeoExpr::Basis(5), // e₁₃ — rotates out of the e₁₂ plane
+                ))),
+                translator(L1),
+            )),
+            Box::new(GeoExpr::Basis(ORIGIN)),
+        );
+        let mv = sample(&out_of_plane, 1.1, 0.0).expect("evaluates");
+        assert!(
+            read_z(&mv).abs() > 0.1,
+            "an e₁₃ rotor must move the origin out of the z = 0 plane, got {}",
+            read_z(&mv)
+        );
+        // …while the witness itself stays planar.
+        let planar = sample(&fk_witness(L1, L2), 1.1, 0.4).expect("evaluates");
+        assert_eq!(read_z(&planar), 0.0);
     }
 
     #[test]

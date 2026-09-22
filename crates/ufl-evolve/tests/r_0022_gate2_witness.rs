@@ -32,8 +32,8 @@
 //! | far RMSE `[−8,8]²`, 60×60 | 1.8329e-16 | `< 1e-15`, within 10× of in-dist |
 //! | `fk_motor` / `fk_witness` nodes | 23 / 25 | exact |
 //! | `Param`s | 4 = `[−0.5, 0.5, −0.5, 0.35]` | exact |
-//! | worst `\|⟨M ∗ M̃⟩₀ − 1\|`, all bands | 6.66e-16 (3 ulp) | `< 1e-15` |
-//! | worst non-scalar residue of `M ∗ M̃` | 1.67e-16 | `< 1e-15` |
+//! | worst `\|⟨M ∗ M̃⟩₀ − 1\|`, 409 poses | 4.44e-16 (2 ulp) | `< 1e-15` |
+//! | worst non-scalar residue of `M ∗ M̃` | 1.11e-16 | `< 1e-15` |
 //! | `max abs(w − 1)`, all bands | 6.66e-16 | `< 1e-15` |
 //! | `z`, every sample of every band | exactly `0.0` | exactly `0.0` |
 //! | reparametrisation max deviation, 40×40, `a = 0.37` | 1.1102e-15 | `< 5e-15` (4.5×) |
@@ -64,8 +64,9 @@
 
 use ufl_evolve::baseline::{smallest_at, sweep, train_report_with, ArmFk, TrainConfig};
 use ufl_evolve::witness::{
-    even_grades, fk_motor, fk_witness, measure_band, motor_unit_check, node_count, param_count,
-    read_xy, read_z, sample, witness_ctx, witness_env, BandReport, E12, E1E0, ORIGIN,
+    even_grades, fk_motor, fk_witness, measure, measure_witness, motor_unit_check, node_count,
+    param_count, read_xy, read_z, sample, witness_ctx, witness_env, Band, BandReport, E12, E1E0,
+    ORIGIN,
 };
 use ufl_geo::{params, typecheck, GeoExpr, GradeCtx, GradeSet, Mv};
 
@@ -102,7 +103,7 @@ const FAR: (f64, f64) = (-8.0, 8.0);
 /// The boundary band from SPEC-0022 §4.1, where an absolute `1e-14` bound fails.
 const BOUNDARY: (f64, f64) = (-1000.0, 1000.0);
 
-/// The same deterministic closed lattice `measure_band` sweeps: `n` points per
+/// The same deterministic closed lattice `measure` sweeps: `n` points per
 /// axis, endpoints included, `t_i = lo + (hi − lo)·i/(n − 1)`.
 /// [`metric_is_per_component`] holds the two implementations together.
 fn grid(lo: f64, hi: f64, n: usize) -> Vec<f64> {
@@ -111,13 +112,15 @@ fn grid(lo: f64, hi: f64, n: usize) -> Vec<f64> {
         .collect()
 }
 
-/// Sweep a band, or fail by name. `measure_band` returns `Err` on any evaluation
+/// Sweep a band, or fail by name. `measure` returns `Err` on any evaluation
 /// failure, so `Ok` *is* SPEC-0022 §1's "zero evaluation failures".
 fn band(name: &str, (lo, hi): (f64, f64)) -> BandReport {
-    let report = measure_band(ARM.l1, ARM.l2, lo, hi, GRID)
+    let b = Band::new(lo, hi, GRID)
+        .unwrap_or_else(|e| panic!("{name} band [{lo}, {hi}] is not a band: {e}"));
+    let report = measure_witness(&ARM, b)
         .unwrap_or_else(|e| panic!("{name} band [{lo}, {hi}] failed to evaluate: {e}"));
     assert_eq!(
-        report.n * report.n,
+        report.band.n() * report.band.n(),
         GRID * GRID,
         "{name}: the band must sweep {GRID}×{GRID} = {} samples",
         GRID * GRID,
@@ -209,7 +212,7 @@ fn exact_in_dist() {
 /// `fk_witness` is 25 nodes / 4 `Param`s, reproducing SPEC-0011 §2.6's discarded
 /// count. The motor is the 23 that leaves once `Sandwich` and `Basis(7)` come
 /// off: two 6-node rotors, two 4-node translators, three `GeoProduct`s.
-/// (`witness.rs`'s `fk_motor` doc comment still says "21 nodes" — that is an
+/// (`witness.rs`'s `fk_motor` doc comment says 23, corrected from an
 /// arithmetic slip; 21 + 2 could not be the triply-reproduced 25.)
 #[test]
 fn witness_shape() {
@@ -345,6 +348,18 @@ fn structure() {
     let witness = fk_witness(ARM.l1, ARM.l2);
     let ctx = witness_ctx();
 
+    // (0) THE TIE. Without this, the even/unit clauses below are about an
+    // expression that need not be the one `Ok({3})` is proved for, and the
+    // three parts of the guard would not compose into a single claim. The
+    // equality also lives in `witness_shape`; it is duplicated here on purpose
+    // so weakening that test cannot silently untie this one.
+    assert_eq!(
+        witness,
+        GeoExpr::Sandwich(Box::new(motor.clone()), Box::new(GeoExpr::Basis(7))),
+        "the witness must BE Sandwich(motor, e₁₂₃) — the three guard clauses \
+         below are otherwise about two unrelated expressions (SPEC-0022 §2.1)",
+    );
+
     // (1) EVEN. The literal set is spelled out so the library's `even_grades`
     // helper is checked rather than trusted.
     assert_eq!(
@@ -415,7 +430,7 @@ fn structure() {
     assert!(
         worst_residue < EXACT,
         "AC4 structural guard 2/3 (UNIT, residue) broke: M ∗ M̃ carries \
-         {worst_residue:e} outside grade 0 (bound {EXACT:e}; 1.67e-16 when the \
+         {worst_residue:e} outside grade 0 (bound {EXACT:e}; 1.11e-16 when the \
          bound was chosen), so M is not a versor",
     );
 
@@ -642,6 +657,121 @@ fn planar() {
 }
 
 // ---------------------------------------------------------------------------
+// SPEC-0022 §2's counterexample table, rebuilt from the repo
+// ---------------------------------------------------------------------------
+
+/// **SPEC-0022 §2's counterexample table, measured through the committed
+/// harness.** Every row here typechecks `Ok({3})` — the result rev 2 mistook
+/// for a rigid-motion certificate — and every row is wrong.
+///
+/// This test exists because the table's figures were originally produced
+/// off-repo by a harness that hard-coded `fk_witness`. `measure` now takes the
+/// expression, so the spec's numbers are rebuilt on every run and the exact
+/// constants that produce them live in code rather than in a deleted scratch
+/// file.
+#[test]
+fn the_counterexamples_are_measurable_from_the_repo() {
+    let ctx = witness_ctx();
+    let b = Band::new(-2.0, 2.0, GRID).expect("the in-dist band");
+
+    // A motor from named parts, so each row differs from the witness in exactly
+    // one way. `half` is the rotor's half-angle Param, `plane` its bivector.
+    fn motor_from(j1: &str, j2: &str, plane: u8, half: f64, l1: f64, l2: f64) -> GeoExpr {
+        let rotor = |j: &str| {
+            GeoExpr::Exp(Box::new(GeoExpr::GeoProduct(
+                Box::new(GeoExpr::GeoProduct(
+                    Box::new(GeoExpr::Param(half)),
+                    Box::new(GeoExpr::Var(j.to_owned())),
+                )),
+                Box::new(GeoExpr::Basis(plane)),
+            )))
+        };
+        let tr = |l: f64| {
+            GeoExpr::Exp(Box::new(GeoExpr::GeoProduct(
+                Box::new(GeoExpr::Param(0.5 * l)),
+                Box::new(GeoExpr::Basis(E1E0)),
+            )))
+        };
+        let limb = |j: &str, l: f64| GeoExpr::GeoProduct(Box::new(rotor(j)), Box::new(tr(l)));
+        GeoExpr::GeoProduct(Box::new(limb(j1, l1)), Box::new(limb(j2, l2)))
+    }
+    let sandwich = |m: GeoExpr| GeoExpr::Sandwich(Box::new(m), Box::new(GeoExpr::Basis(ORIGIN)));
+
+    // The exact constants SPEC-0022 §2 quotes — recorded here, not in prose.
+    let rows: [(&str, GeoExpr); 4] = [
+        (
+            "witness",
+            sandwich(motor_from("t1", "t2", E12, -0.5, ARM.l1, ARM.l2)),
+        ),
+        (
+            "wrong plane e13",
+            sandwich(motor_from("t1", "t2", 5, -0.5, ARM.l1, ARM.l2)),
+        ),
+        (
+            "garbage params",
+            sandwich(motor_from("t1", "t2", E12, 1.7, 2.9, 4.1)),
+        ),
+        (
+            "swapped angles",
+            sandwich(motor_from("t2", "t1", E12, -0.5, ARM.l1, ARM.l2)),
+        ),
+    ];
+
+    let mut wrong = 0usize;
+    for (name, expr) in &rows {
+        let report = measure(expr, &ARM, b).expect("every counterexample evaluates");
+        let grades = typecheck(expr, &ctx);
+        println!(
+            "  {name:<16} typecheck={grades:?}  rmse={:.4e}",
+            report.rmse
+        );
+        assert_eq!(
+            grades,
+            Ok(GradeSet::singleton(3)),
+            "{name} must ALSO typecheck Ok({{3}}) — that is the whole point of \
+             SPEC-0022 §2: the point-space clause does not distinguish these",
+        );
+        if *name == "witness" {
+            assert!(report.rmse < 1e-15, "the witness must still be exact");
+        } else {
+            assert!(
+                report.rmse > 1e-2,
+                "{name} must be measurably wrong (got {:.4e}) — otherwise it is \
+                 not a counterexample and §2's table is misleading",
+                report.rmse,
+            );
+            wrong += 1;
+        }
+    }
+    assert_eq!(wrong, 3, "all three wrong-motor rows must be measured");
+
+    // The two rows that are not motors at all: both `Ok({3})`, neither usable.
+    let reflection = sandwich(GeoExpr::Basis(1));
+    let null = sandwich(GeoExpr::Basis(8));
+    for (name, expr) in [("reflection e1", &reflection), ("null e0", &null)] {
+        assert_eq!(
+            typecheck(expr, &ctx),
+            Ok(GradeSet::singleton(3)),
+            "{name} must typecheck Ok({{3}}) — the point-space clause admits it",
+        );
+        assert_ne!(
+            typecheck(expr, &ctx),
+            Ok(even_grades()),
+            "{name} must FAIL the even clause — that is what excludes it",
+        );
+    }
+    // The null row is degenerate in the readout; the even clause catches it
+    // before anything divides by a zero weight.
+    let mv = sample(&null, 0.9, -0.4).expect("e₀ evaluates");
+    let (x, y) = read_xy(&mv);
+    assert!(
+        x.is_nan() && y.is_nan(),
+        "Sandwich(e₀, e₁₂₃) is the zero multivector; its readout must be NaN, \
+         got ({x}, {y}) — SPEC-0022 §2",
+    );
+}
+
+// ---------------------------------------------------------------------------
 // AC5 — equivariance, in the only sense the word is earned
 // ---------------------------------------------------------------------------
 
@@ -700,7 +830,7 @@ fn reparametrisation() {
     // clean, not confounded). `FK ≡ origin` satisfies the identity vacuously:
     // `0 == R_a·0·R_a~`. Measured on a reflection-collapsed motor the two
     // assertions below still pass, so without this the AC5 evidence would be
-    // worthless. Measured displacement 0.6251 — the chord `2·r·sin(a/2)` at the
+    // worthless. Measured displacement 0.6252 — the chord `2·r·sin(a/2)` at the
     // arm's reach `r ≤ l1 + l2 = 1.7`.
     assert!(
         motion > 0.5,
@@ -798,7 +928,7 @@ fn far_band() {
     assert!(
         far < EXACT,
         "far-band RMSE {far:e} exceeds {EXACT:e} (1.8329e-16 when the bound was \
-         chosen). Note SPEC-0022 §4.1: the error grows as O(ε·|θ|), so this bound \
+         chosen). Note SPEC-0022 §4.1: this bound is scoped to the AC bands \
          is scoped to |θ| ≤ 8 and would legitimately fail on [−10³,10³]",
     );
     assert!(
@@ -904,8 +1034,13 @@ fn comparison_artifact() {
         "  witness OOD ÷ in-dist = {:.3}x      <-- THE HEADLINE",
         ood / in_dist
     );
-    println!("  the boundary row is why no absolute 1e-14 bound is asserted: error grows as");
-    println!("  O(ε·|θ|), and SPEC-0022 §4.1 measures the f64 reference degrading identically.");
+    println!("  the boundary row is why no absolute 1e-14 bound is asserted — and it is");
+    println!("  the f64 REFERENCE drifting, not the witness: measured against an 80-digit");
+    println!("  reference the witness is flat at ~1.4e-16 across nine orders of magnitude of |θ|,");
+    println!("  while ArmFk::forward reaches 1.43e-8 at 1e9. The whole growth is the f64 rounding");
+    println!("  of t1+t2 at baseline.rs:27 — the one operation the witness never performs.");
+    println!("  Rebuild: cargo run -p ufl-evolve --release --example boundary_samples \\");
+    println!("           | python3 experiments/0022-exact-fk-reference.py");
 
     println!("\n-- the fair MLP: seed 42, TrainConfig::default() (700 epochs, 4000 train) --");
     let widths = [2usize, 4, 8, 16, 32, 64];

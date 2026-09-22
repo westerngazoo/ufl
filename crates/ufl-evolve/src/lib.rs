@@ -19,5 +19,6 @@ pub mod witness;
 pub use baseline::{smallest_at, sweep, train_report, ArmFk, MlpReport};
 pub use memetic::{gate1_fitness, magnitude, GeoFitness, GeoProposer, RotErr};
 pub use witness::{
-    fk_motor, fk_witness, measure_band, read_xy, witness_ctx, witness_env, BandReport,
+    fk_motor, fk_witness, measure, measure_witness, read_xy, witness_ctx, witness_env, Band,
+    BandReport, WitnessError,
 };

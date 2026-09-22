@@ -1,14 +1,20 @@
 # SPEC-0022 — Gate 2's witness and the fair comparison, as one reproducible artifact
 
 - **Realizes:** [R-0022](../requirements/0022-gate2-witness.md) (ACs approved 2026-09-16).
-- **Status:** **Draft (rev 3)** — architect review returned **APPROVE WITH
-  CHANGES**, one finding **blocking**. All nine are folded below; the blocking
-  one **refutes rev 2's central structural claim** and is repaired with a
-  measured three-part guard (§2). The hater and nice-guy lenses stalled (six
-  agent stalls this session), so the main session ran their two decisive checks
-  itself. Verification-substitution precedent: `decisions/0002`.
+- **Status:** **Accepted (rev 4)** — two architect rounds. Round 1 (on rev 2)
+  returned APPROVE WITH CHANGES with Finding 5 **blocking**: `Ok({3})` does not
+  prove rigid motion. Round 2 (on rev 3) returned REQUEST CHANGES with three
+  blocking items, the first of which **reversed rev 3's boundary claim in the
+  result's favour** — the witness does not drift at large `|θ|`; the f64
+  reference does (§4.1). All twelve findings across both rounds are folded.
+  The hater and nice-guy lenses stalled (six agent stalls this session), so the
+  main session ran their two decisive checks itself; verification-substitution
+  precedent `decisions/0002`, and this spec's own process deviations are recorded
+  in `decisions/0005`.
 - **Crates touched:** `ufl-evolve` only — a new `witness.rs` module, one
-  acceptance test, and a new `ufl-ga` path dependency (§4.3). `ufl-geo`/`ufl-ga`
+  acceptance test, an `examples/boundary_samples.rs` emitter, a committed
+  80-digit reference at `experiments/0022-exact-fk-reference.py`, and new
+  `ufl-ga` + `thiserror` dependencies (§4.1, §4.3). `ufl-geo`/`ufl-ga`
   are **used, not modified** (SPEC-0011 §7's 2026-06-21 decision: the geometric
   crate stays frozen).
 
@@ -36,8 +42,11 @@ one table. Every number below is per-component.
 |---|---|---|---|---|---|---|
 | **motor-sandwich (the witness)** | **25** | **4** | `Ok({3})` | **1.803e-16** | **1.797e-16** | **1.833e-16** |
 
-3,600 samples per band, **zero** evaluation failures. `max abs(w − 1)` ranges
-4.44e-16 … 7.77e-16; the z coordinate is **exactly `0.0`** at every sample.
+3,600 samples per band, **zero** evaluation failures. `max abs(w − 1)` over the
+three committed bands is **6.66e-16** at worst (4.44e-16 on the in-dist and far
+bands); it reaches 7.77e-16 only on the wider `[−10²,10²]` diagnostic band,
+which is not an acceptance band. The z coordinate is **exactly `0.0`** at every
+sample of every band.
 
 The `[−8,8]` band is not in SPEC-0011 §2.5 — it was added to test the claim
 harder, and the error does not move at **four times** outside the training
@@ -90,8 +99,24 @@ The repair is structural, cheap, and measured. Name the motor subtree
 | assertion | excludes | measured |
 |---|---|---|
 | `typecheck(M, ctx) == Ok({0,2,4})` — **even** | every reflection and every odd blade | motor `Ok({0,2,4})`; `Basis(1)` and `Basis(8)` are `Ok({1})` |
-| `M ∗ M̃ == 1` — **unit** | the null/degenerate case, and any scaled versor | motor scalar part **0.9999999999999999**, non-scalar residue 2.78e-17; `Basis(8)` gives **0.0** |
+| `M ∗ M̃ == 1` — **unit** (*sampled, not proved — see below*) | the null/degenerate case, and any scaled versor | over the suite's 409 poses: worst `abs(⟨M∗M̃⟩₀ − 1)` = **4.44e-16** (2 ulp), worst non-scalar residue **1.11e-16**; `Basis(8)` gives **0.0** |
 | `typecheck(Sandwich(M, e₁₂₃), ctx) == Ok({3})` | a result outside point space | `Ok({3})` |
+
+**Two of the three are structural; one is not, and AC4 asks for structural.**
+The even and point-space clauses hold for *all* inputs with nothing evaluated.
+The unit clause is a **measurement at sampled poses** — `ufl-geo` has no versor
+judgement to appeal to, and `grade.rs:79-82` explicitly disclaims being one, so
+there is nothing structural to ask. Widening the sweep does not change the kind
+of evidence: 409 poses and 4,000,000 poses are both sampling. What *would* make
+it structural is a syntactic predicate over the motor tree — every factor an
+`Exp` of a scalar-chain times a whitelisted bivector, combined only by
+`GeoProduct` — after which unitness follows in ℝ by induction
+(`(cos + sin B̂)(cos − sin B̂) = cos² − sin²B̂² = 1`; `(1 + uB)(1 − uB) = 1` for
+null `B`; a product of unit versors is unit), and the 2-ulp sweep demotes from
+*proof* to *rounding measurement*. That construction is **not built here**; the
+honest label for what ships is **"unit by algebraic identity, f64 residual 2
+ulp"**, and AC4 is therefore **partially met**. Recorded, not papered over —
+`decisions/0005`.
 
 Even **and** unit **and** `{3}` together is *a proper rigid motion applied to
 the origin, yielding a point*. Neither check alone suffices: `Basis(1)` is a
@@ -196,29 +221,50 @@ reading that the comparison was rigged, and the reading would be fair. The
 learning claim — that a search can *find* these 4 without being told them — is
 R-0011 §2.8's, and it is not made here.
 
-#### The boundary, measured — "holds everywhere" was false as written
+#### The boundary, measured against the true map — and it is the witness that wins
 
-Error grows linearly in `|θ|`, as O(ε·|θ|):
+Rev 2 claimed the map "holds everywhere", which was false. Rev 3 replaced that
+overclaim with a **mis-attributed underclaim**: it reported only
+witness-vs-`ArmFk::forward`, saw the gap grow with `|θ|`, and concluded that the
+drift was shared `sin`/`cos` argument-reduction loss and that "the two walk away
+from the true value together." That comparison cannot support the conclusion —
+with only those two columns, there is no way to tell *which* side is drifting.
 
-| band | witness vs `ArmFk::forward` | `ArmFk::forward` vs 80-digit exact |
-|---|---|---|
-| `[−2,2]` | 1.80e-16 | 0.77e-16 |
-| `[−10²,10²]` | 1.38e-15 | 1.39e-15 |
-| `[−10³,10³]` | 1.32e-14 | 1.49e-14 |
-| `[−10⁶,10⁶]` | 1.40e-11 | 1.58e-11 |
-| `[−10⁹,10⁹]` | 1.43e-8 | 1.45e-8 |
+The missing column, measured at the same 60×60 grid against an 80-digit
+reference (`experiments/0022-exact-fk-reference.py`):
 
-The right-hand column is the decisive one and it is new to rev 3: the f64
-reference **degrades identically**, tracking the witness within a factor of 1.2
-at every decade. The drift is shared floating-point argument-reduction loss in
-`sin`/`cos`, not a defect of the GA path — the witness stays within machine
-precision *of the reference* everywhere tested, and the two walk away from the
-true value together. Reference computed in 80-digit `Decimal` with
-Taylor-series `sin`/`cos` after exact mod-2π reduction of the same f64 angles.
+| band | **witness vs exact** | `ArmFk::forward` vs exact | witness vs `forward` | exact from `fl(t1+t2)` |
+|---|---|---|---|---|
+| `[−2,2]` | 1.68e-16 | 0.78e-16 | 1.80e-16 | 1.70e-16 |
+| `[2,3]` | **0.89e-16** | 1.62e-16 | 1.80e-16 | 1.76e-16 |
+| `[−8,8]` | 1.42e-16 | 1.26e-16 | 1.83e-16 | 1.76e-16 |
+| `[−10²,10²]` | **1.40e-16** | 1.37e-15 | 1.38e-15 | 1.38e-15 |
+| `[−10³,10³]` | **1.39e-16** | 1.32e-14 | 1.32e-14 | 1.32e-14 |
+| `[−10⁹,10⁹]` | **1.44e-16** | 1.43e-8 | 1.43e-8 | 1.43e-8 |
 
-Consequence for §7 Q1: an absolute `< 1e-14` bound, which rev 2 recommended,
-**would fail** on `[−10³,10³]`. The asserted bound is scoped to the bands the
-ACs name.
+**The witness does not degrade.** It is flat at ≈1.4e-16 across nine orders of
+magnitude of `|θ|`, and at `[−10⁹,10⁹]` it is **10⁸× closer to the true map**
+than the f64 reference it is being scored against. What grows is the
+*reference's* error. Rev 3 had the sign of the effect backwards.
+
+The fourth column names the mechanism, and it is not argument reduction. It is
+the same 80-digit FK recomputed from the **f64-rounded** sum `fl(t1 + t2)` —
+the value `baseline.rs:27-28` forms — and it tracks the reference's error to
+three digits at every band. So the entire growth is one rounding: the addition
+of the two joint angles in floating point.
+
+That is the operation the witness **never performs**. §4.1's thesis — *the angle
+addition is performed by the algebra, not by the harness* — is therefore not
+only a structural claim about where the work happens; it is measurable as
+accuracy, and this table is its strongest evidence. The motor product composes
+the two rotations exactly, with no `t1 + t2` ever formed in `f64`.
+
+Consequence for §7 Q1: an absolute `< 1e-14` bound **still fails** on
+`[−10³,10³]`, so the asserted bound stays scoped to the bands the ACs name —
+but the *reason* is that the **reference** drifts there, not the witness. A
+bound on witness-vs-exact would hold at `< 1e-15` across every band above; the
+suite does not assert it because the exact reference is a Python script, not
+something `cargo test` can call.
 
 ### 4.2 The MLP baseline is fair — measured by trying to break it
 
@@ -287,7 +333,7 @@ a reader has to check. This is why `ufl-ga` becomes a direct dependency of
 
 The readout still computes nothing — `t1` and `t2` appear nowhere in it, and it
 takes only `&Mv`, so it *cannot* see them. The homogeneous-weight divide inside
-`to_euclidean` is a measured no-op here (`max abs(w − 1)` ≈ 4.4e-16 … 7.8e-16)
+`to_euclidean` is a measured no-op here (`max abs(w − 1)` ≤ 6.66e-16 across the three acceptance bands)
 and is required by SPEC-0011 §2.3, because an evolver's intermediates are not
 rigid and can produce an ideal (zero-weight) point. The z coordinate is exactly
 `0.0` everywhere — the arm is planar, and asserting that is a free structural
