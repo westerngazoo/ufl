@@ -370,6 +370,25 @@ mod tests {
             node_count(&product(GeoExpr::Param(1.0), GeoExpr::Param(2.0))),
             3
         );
+        // Sub-shapes with DISTINCT counts. Asserting only the witness and the
+        // motor left both counters open to a constant: 4 `Param`s is the right
+        // answer for *both*, and 25 nodes for the only `Sandwich` in the suite,
+        // so `param_count -> 4` and `node_count(Sandwich) -> 25` each survived
+        // a mutation battery. Distinct expected values defeat any constant.
+        assert_eq!(
+            (node_count(&rotor("t1")), param_count(&rotor("t1"))),
+            (6, 1)
+        );
+        assert_eq!(
+            (node_count(&translator(L1)), param_count(&translator(L1))),
+            (4, 1)
+        );
+        let limb = product(rotor("t1"), translator(L1));
+        assert_eq!((node_count(&limb), param_count(&limb)), (11, 2));
+        // A second `Sandwich`, so the witness is not the only one measured.
+        let tiny = GeoExpr::Sandwich(Box::new(GeoExpr::Param(1.0)), Box::new(GeoExpr::Param(2.0)));
+        assert_eq!((node_count(&tiny), param_count(&tiny)), (3, 2));
+
         // The witness and its motor.
         assert_eq!(node_count(&fk_motor(L1, L2)), 23, "motor: 2×(6+4+1) + 1");
         assert_eq!(
@@ -507,6 +526,27 @@ mod tests {
         assert_eq!(
             null_scalar, 0.0,
             "e₀ is null — this is what the unit check excludes"
+        );
+
+        // The residue half of the unit clause needs a fixture whose residue is
+        // NOT zero, or `residue = 0.0` passes every assertion — it survived a
+        // mutation battery for exactly that reason. `Exp(u·e₁)` exponentiates a
+        // EUCLIDEAN vector: `e₁² = +1`, so garust takes its `c > 0` branch and
+        // returns `cosh u + sinh u · e₁`, whose `M ∗ M̃ = cosh 2u + sinh 2u · e₁`
+        // carries a large grade-1 part.
+        let hyperbolic = GeoExpr::Exp(Box::new(product(GeoExpr::Param(0.8), GeoExpr::Basis(1))));
+        let (h_scalar, h_residue) =
+            motor_unit_check(&hyperbolic, 0.0, 0.0).expect("Exp(0.8·e₁) evaluates");
+        assert!(
+            (h_scalar - 1.6f64.cosh()).abs() < 1e-12,
+            "scalar part must be cosh(1.6) = {}, got {h_scalar}",
+            1.6f64.cosh()
+        );
+        assert!(
+            (h_residue - 1.6f64.sinh()).abs() < 1e-12,
+            "the residue must be sinh(1.6) = {} — a residue that always reads \
+             0.0 leaves half the unit clause unverified, got {h_residue}",
+            1.6f64.sinh()
         );
     }
 
